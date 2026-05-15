@@ -73,10 +73,12 @@ Only findings with `observedResult=fail` and `issueReadiness=ready-for-issue` sh
 Run from the repository root:
 
 ```sh
-python tools/bayesilisk/bayesilisk.py --seed 150 --format json --output /tmp/bayesilisk.json
-python tools/bayesilisk/bayesilisk.py --seed 150 --format markdown --output /tmp/bayesilisk.md
-python tools/bayesilisk/bayesilisk.py --seed 150 --format json --limit 3
-python tools/bayesilisk/bayesilisk.py --seed 150 --format json --generated-count 16 --observations /tmp/bayesilisk-observations.json
+python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --output /tmp/bayesilisk.json
+python3 tools/bayesilisk/bayesilisk.py --seed 150 --format markdown --output /tmp/bayesilisk.md
+python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --limit 3
+python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --generated-count 16 --observations /tmp/bayesilisk-observations.json
+python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --context /tmp/bayesilisk-context.json
+python3 tools/bayesilisk/bayesilisk.py --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
 ```
 
 The same seed and inputs produce byte-stable reports. Use a different seed to change scenario evaluation order before final risk sorting.
@@ -97,6 +99,51 @@ Observation history is optional JSON:
   }
 }
 ```
+
+Context ingestion is separate from observation history and is designed for agent and Gitea context:
+
+```json
+{
+  "source": "develop-usa-loop",
+  "agentNotes": [
+    "Worker saw HR documents process metadata, DMS tenant scope, and support takeover access risks."
+  ],
+  "issues": [
+    {
+      "number": 8,
+      "state": "open",
+      "title": "[USA] Add HR documents process-context filter and metadata display",
+      "body": "DMS process context and HR document metadata display"
+    }
+  ],
+  "pullRequests": [
+    {
+      "number": 170,
+      "state": "open",
+      "title": "[USA] Review Bayesilisk verifier hardening"
+    }
+  ],
+  "mutedFingerprints": ["bayesilisk:examplemuted001"]
+}
+```
+
+Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent notes, route/role terms, DMS/process terms, travel/expense terms, support-takeover terms, and related scenario language. Matching context nudges the relevant invariant priors but does not override rule failures. Existing fingerprints are treated as dedupe/mute signals so `bayesilisk.issue_payloads` does not create duplicate Gitea issues.
+
+## MCP tool server
+
+Bayesilisk also has a small stdio MCP tool server:
+
+```sh
+python3 -m tools.bayesilisk.mcp_server
+```
+
+It exposes three tools:
+
+- `bayesilisk.run`: run the full contextual report with optional observations and context.
+- `bayesilisk.rank_context`: return the ranked failed probes from supplied agent/Gitea/repo context.
+- `bayesilisk.issue_payloads`: return deduped Gitea-ready issue payloads for failed findings marked `ready-for-issue`.
+
+Agents should pass the current issue list, open PRs, branch facts, local verifier notes, and any known Bayesilisk fingerprints as context. The MCP tools still run locally, use deterministic seeds, and must not contact production systems or mutate Gitea directly.
 
 ## Hardening workflow
 

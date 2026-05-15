@@ -4,11 +4,13 @@ import argparse
 import hashlib
 import json
 import random
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-VERSION = "bayesilisk.v1.1"
+VERSION = "bayesilisk.v1.2"
 
 EXPENSE_REVIEW_ROUTE = "/api/expense-claims/{claimId}/review"
 BILLING_EXPORT_ROUTE = "/api/billing/exports"
@@ -40,6 +42,96 @@ BOOLEAN_AND_FACT_KEYS = {
     "transportModesCoveredByItinerary",
 }
 NUMERIC_SUM_FACT_KEYS = {"requiredReceiptCount"}
+FINGERPRINT_PATTERN = re.compile(r"bayesilisk:[0-9a-f]{16}")
+
+CONTEXT_INVARIANT_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "roles.route_matrix_allowed": (
+        "403",
+        "access",
+        "actor",
+        "permission",
+        "role",
+        "route",
+        "scope",
+    ),
+    "roles.employee_self_review_forbidden": (
+        "approve own",
+        "employee self",
+        "manager conflict",
+        "self review",
+        "self-review",
+    ),
+    "modules.expense_approval_requires_module_and_receipt": (
+        "expense",
+        "module",
+        "receipt",
+        "reimbursement",
+        "travel expense",
+    ),
+    "dms.tenant_process_boundary": (
+        "candidateid",
+        "contractid",
+        "dms",
+        "document",
+        "metadata",
+        "process context",
+        "source reference",
+        "tenant",
+    ),
+    "support.takeover_session_required": (
+        "expired",
+        "support",
+        "takeover",
+    ),
+    "billing.export_requires_role_and_module": (
+        "accounting export",
+        "billing",
+        "export",
+        "invoice",
+    ),
+    "hr.documents_customer_role_boundary": (
+        "contract",
+        "hr document",
+        "hr documents",
+        "onboarding",
+        "personnel file",
+        "recruiting",
+    ),
+    "travel.itinerary_chronology": (
+        "airplane",
+        "flight",
+        "itinerary",
+        "leg",
+        "rental car",
+        "train",
+    ),
+    "travel.funding_before_expense": (
+        "approval",
+        "funding",
+        "request",
+        "travel request",
+    ),
+    "travel.expense_items_match_itinerary": (
+        "airplane",
+        "category",
+        "expense date",
+        "itinerary",
+        "rental car",
+        "train",
+        "transport",
+    ),
+}
+
+CONTEXT_COLLECTION_KEYS = {
+    "agentNotes",
+    "agents",
+    "issues",
+    "openIssues",
+    "pullRequests",
+    "prs",
+    "recentFailures",
+    "repositoryFacts",
+}
 
 
 @dataclass(frozen=True)
@@ -847,6 +939,127 @@ def load_observations(path: Path | None) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_context(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _context_items(value: Any) -> Iterable[Any]:
+    if isinstance(value, dict):
+        yield value
+        for nested in value.values():
+            yield from _context_items(nested)
+    elif isinstance(value, list | tuple):
+        for nested in value:
+            yield from _context_items(nested)
+
+
+def _context_strings(value: Any) -> Iterable[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, int | float | bool):
+        yield str(value)
+    elif isinstance(value, dict):
+        for nested in value.values():
+            yield from _context_strings(nested)
+    elif isinstance(value, list | tuple):
+        for nested in value:
+            yield from _context_strings(nested)
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list | tuple | set):
+        return []
+    return sorted({item for item in value if isinstance(item, str)})
+
+
+def _count_context_collection(context: dict[str, Any], key: str) -> int:
+    value = context.get(key)
+    if isinstance(value, list | tuple):
+        return len(value)
+    if isinstance(value, dict):
+        return len(value)
+    return 0
+
+
+def _context_prior_adjustments(text: str) -> tuple[dict[str, float], dict[str, int]]:
+    lower = text.lower()
+    keyword_hits: dict[str, int] = {}
+    adjustments: dict[str, float] = {}
+    for invariant_id, keywords in CONTEXT_INVARIANT_KEYWORDS.items():
+        hits = sum(lower.count(keyword) for keyword in keywords)
+        if hits <= 0:
+            continue
+        keyword_hits[invariant_id] = hits
+        adjustments[invariant_id] = round(min(0.18, 0.018 * hits), 6)
+    return adjustments, keyword_hits
+
+
+def context_summary(context: dict[str, Any] | None) -> dict[str, Any]:
+    context = context or {}
+    text_values = list(_context_strings(context))
+    text = "\n".join(text_values)
+    fingerprints = sorted(set(FINGERPRINT_PATTERN.findall(text)))
+    prior_adjustments, keyword_hits = _context_prior_adjustments(text)
+    return {
+        "source": context.get("source", "mcp-context" if context else "none"),
+        "agentNoteCount": _count_context_collection(context, "agentNotes"),
+        "issueCount": _count_context_collection(context, "issues")
+        + _count_context_collection(context, "openIssues"),
+        "pullRequestCount": _count_context_collection(context, "pullRequests")
+        + _count_context_collection(context, "prs"),
+        "repositoryFactCount": _count_context_collection(context, "repositoryFacts"),
+        "textSignalCount": len([value for value in text_values if value.strip()]),
+        "fingerprints": fingerprints,
+        "keywordHits": keyword_hits,
+        "priorAdjustments": prior_adjustments,
+    }
+
+
+def context_observations(context: dict[str, Any] | None) -> dict[str, Any]:
+    summary = context_summary(context)
+    context = context or {}
+    muted = set(summary["fingerprints"])
+    muted.update(_string_list(context.get("mutedFingerprints")))
+    fixed = set(_string_list(context.get("fixedFingerprints")))
+    confirmed = set(_string_list(context.get("confirmedFingerprints")))
+    explicit_adjustments = context.get("priorAdjustments", {})
+    prior_adjustments = dict(summary["priorAdjustments"])
+    if isinstance(explicit_adjustments, dict):
+        for invariant_id, delta in explicit_adjustments.items():
+            if isinstance(invariant_id, str) and isinstance(delta, int | float):
+                prior_adjustments[invariant_id] = round(float(delta), 6)
+    scenario_adjustments = context.get("scenarioAdjustments", {})
+    if not isinstance(scenario_adjustments, dict):
+        scenario_adjustments = {}
+    return {
+        "source": summary["source"],
+        "fixedFingerprints": sorted(fixed),
+        "confirmedFingerprints": sorted(confirmed),
+        "mutedFingerprints": sorted(muted),
+        "priorAdjustments": prior_adjustments,
+        "scenarioAdjustments": scenario_adjustments,
+    }
+
+
+def merge_observations(base: dict[str, Any] | None, incoming: dict[str, Any] | None) -> dict[str, Any]:
+    base = base or {}
+    incoming = incoming or {}
+    merged = dict(base)
+    merged["source"] = incoming.get("source") or base.get("source", "none")
+    for key in ("fixedFingerprints", "confirmedFingerprints", "mutedFingerprints"):
+        merged[key] = sorted(set(_string_list(base.get(key))) | set(_string_list(incoming.get(key))))
+    for key in ("priorAdjustments", "scenarioAdjustments"):
+        merged_values = {}
+        if isinstance(base.get(key), dict):
+            merged_values.update(base[key])
+        if isinstance(incoming.get(key), dict):
+            merged_values.update(incoming[key])
+        merged[key] = merged_values
+    return merged
+
+
 def observation_basis(
     fingerprint: str,
     scenario: Scenario,
@@ -1062,6 +1275,114 @@ def build_report(
     }
 
 
+def build_contextual_report(
+    seed: int,
+    limit: int | None = None,
+    generated_count: int = 8,
+    observations: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    summary = context_summary(context)
+    merged_observations = merge_observations(observations, context_observations(context))
+    report = build_report(
+        seed,
+        limit=limit,
+        generated_count=generated_count,
+        observations=merged_observations,
+    )
+    report["contextSummary"] = summary
+    report["contextObservationSource"] = merged_observations.get("source", "none")
+    report["rankedProbes"] = ranked_probes(report, limit=limit)
+    report["issuePayloads"] = issue_payloads(report, context=context, limit=limit)
+    return report
+
+
+def ranked_probes(report: dict[str, Any], limit: int | None = None) -> list[dict[str, Any]]:
+    probes = [
+        {
+            "accessPattern": finding["accessPattern"],
+            "classification": finding["classification"],
+            "fingerprint": finding["fingerprint"],
+            "generatedScenario": finding["generatedScenario"],
+            "invariantId": finding["invariantId"],
+            "issueReadiness": finding["issueReadiness"],
+            "observedResult": finding["observedResult"],
+            "posteriorMode": finding["posteriorMode"],
+            "reproduce": (
+                f"python3 tools/bayesilisk/bayesilisk.py --seed {report['seed']} "
+                f"--generated-count {report['generatedScenarioCount']} --format json"
+            ),
+            "riskScore": finding["riskScore"],
+            "scenarioId": finding["scenarioId"],
+            "scenarioTitle": finding["scenarioTitle"],
+            "title": finding["suggestedIssueTitle"],
+        }
+        for finding in report["findings"]
+        if finding["observedResult"] == "fail"
+    ]
+    if limit is not None:
+        return probes[:limit]
+    return probes
+
+
+def _existing_context_titles(context: dict[str, Any] | None) -> set[str]:
+    titles: set[str] = set()
+    if not context:
+        return titles
+    for item in _context_items(context):
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title")
+        if isinstance(title, str):
+            titles.add(title.strip().lower())
+    return titles
+
+
+def issue_payloads(
+    report: dict[str, Any],
+    context: dict[str, Any] | None = None,
+    limit: int | None = None,
+    include_existing: bool = False,
+) -> list[dict[str, Any]]:
+    existing_fingerprints = set(context_summary(context)["fingerprints"])
+    existing_titles = _existing_context_titles(context)
+    payloads: list[dict[str, Any]] = []
+    for finding in report["findings"]:
+        if finding["observedResult"] != "fail" or finding["issueReadiness"] != "ready-for-issue":
+            continue
+        title = finding["suggestedIssueTitle"]
+        title_key = title.strip().lower()
+        dedupe_state = "new"
+        if finding["fingerprint"] in existing_fingerprints:
+            dedupe_state = "existing-fingerprint"
+        elif title_key in existing_titles:
+            dedupe_state = "existing-title"
+        if dedupe_state != "new" and not include_existing:
+            continue
+        labels = ["bayesilisk", "usa"]
+        if finding["generatedScenario"]:
+            labels.append("generated-scenario")
+        payloads.append(
+            {
+                "body": finding["suggestedIssueBody"],
+                "classification": finding["classification"],
+                "dedupeKey": finding["dedupeKey"],
+                "dedupeState": dedupe_state,
+                "fingerprint": finding["fingerprint"],
+                "invariantId": finding["invariantId"],
+                "issueReadiness": finding["issueReadiness"],
+                "labels": labels,
+                "posteriorMode": finding["posteriorMode"],
+                "riskScore": finding["riskScore"],
+                "scenarioId": finding["scenarioId"],
+                "title": title,
+            }
+        )
+        if limit is not None and len(payloads) >= limit:
+            break
+    return payloads
+
+
 def suggested_title(
     scenario: Scenario,
     invariant: Invariant,
@@ -1101,7 +1422,7 @@ def suggested_body(
         f"Observation basis:\n```json\n{basis_json}\n```\n\n"
         f"Access pattern:\n```json\n{pattern_json}\n```\n\n"
         f"Fragments:\n{fragment_lines}\n\n"
-        "Reproduce with `python tools/bayesilisk/bayesilisk.py --seed <seed> --format json`."
+        "Reproduce with `python3 tools/bayesilisk/bayesilisk.py --seed <seed> --format json`."
     )
 
 
@@ -1182,17 +1503,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None, help="Optional maximum number of findings.")
     parser.add_argument("--generated-count", type=int, default=8, help="Number of seeded generated composite scenarios.")
     parser.add_argument("--observations", type=Path, default=None, help="Optional JSON observation history.")
+    parser.add_argument("--context", type=Path, default=None, help="Optional JSON context from agents, Gitea, or repo scans.")
+    parser.add_argument(
+        "--issue-payloads",
+        action="store_true",
+        help="Emit only deduped Gitea issue payloads for ready failed findings.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    report = build_report(
-        args.seed,
-        limit=args.limit,
-        generated_count=args.generated_count,
-        observations=load_observations(args.observations),
-    )
+    observations = load_observations(args.observations)
+    context = load_context(args.context)
+    if context:
+        report = build_contextual_report(
+            args.seed,
+            limit=args.limit,
+            generated_count=args.generated_count,
+            observations=observations,
+            context=context,
+        )
+    else:
+        report = build_report(
+            args.seed,
+            limit=args.limit,
+            generated_count=args.generated_count,
+            observations=observations,
+        )
+    if args.issue_payloads:
+        content = json.dumps(issue_payloads(report, context=context, limit=args.limit), indent=2, sort_keys=True) + "\n"
+        write_output(content, args.output)
+        return 0
     if args.format == "json":
         content = json.dumps(report, indent=2, sort_keys=True) + "\n"
     else:

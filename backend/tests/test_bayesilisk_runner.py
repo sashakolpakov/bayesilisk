@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib
+import io
 import json
 import subprocess
 import sys
@@ -8,6 +10,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BAYESILISK = REPO_ROOT / "tools" / "bayesilisk" / "bayesilisk.py"
 DOC = REPO_ROOT / "docs" / "bayesilisk.md"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def run_bayesilisk(*args: str) -> subprocess.CompletedProcess[str]:
@@ -27,7 +31,7 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
     assert first.stdout == second.stdout
     report = json.loads(first.stdout)
 
-    assert report["tool"] == "bayesilisk.v1.1"
+    assert report["tool"] == "bayesilisk.v1.2"
     assert report["seed"] == 150
     assert report["deterministic"] is True
     assert report["productionAccess"] is False
@@ -103,7 +107,7 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
         assert "routes" in finding["accessPattern"]
         assert finding["expectedInvariant"]
         assert finding["suggestedIssueTitle"].startswith("Bayesilisk ")
-        assert "Reproduce with `python tools/bayesilisk/bayesilisk.py --seed <seed> --format json`" in finding[
+        assert "Reproduce with `python3 tools/bayesilisk/bayesilisk.py --seed <seed> --format json`" in finding[
             "suggestedIssueBody"
         ]
 
@@ -173,6 +177,120 @@ def test_bayesilisk_observation_history_dampens_fixed_findings(tmp_path: Path) -
     assert "fixed-regression-watch" in adjusted_finding["observationBasis"]["tags"]
 
 
+def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads() -> None:
+    bayesilisk = importlib.import_module("tools.bayesilisk.bayesilisk")
+    baseline = bayesilisk.build_report(150, limit=8, generated_count=8)
+    existing = next(finding for finding in baseline["findings"] if finding["issueReadiness"] == "ready-for-issue")
+    context = {
+        "source": "unit-test-agent-gitea-context",
+        "agentNotes": [
+            "Verifier saw HR documents process context metadata, support takeover, tenant DMS, travel expense receipts, "
+            "and role permission 403 gaps on develop-usa.",
+        ],
+        "issues": [
+            {
+                "number": 999,
+                "state": "open",
+                "title": "Existing Bayesilisk finding",
+                "body": f"Already tracked fingerprint `{existing['fingerprint']}`.",
+            }
+        ],
+        "pullRequests": [{"number": 170, "state": "open", "title": "Bayesilisk verifier hardening"}],
+    }
+
+    report = bayesilisk.build_contextual_report(150, limit=8, generated_count=8, context=context)
+    context_summary = report["contextSummary"]
+
+    assert context_summary["source"] == "unit-test-agent-gitea-context"
+    assert context_summary["agentNoteCount"] == 1
+    assert context_summary["issueCount"] == 1
+    assert context_summary["pullRequestCount"] == 1
+    assert existing["fingerprint"] in context_summary["fingerprints"]
+    assert context_summary["priorAdjustments"]["dms.tenant_process_boundary"] > 0
+    assert context_summary["priorAdjustments"]["hr.documents_customer_role_boundary"] > 0
+
+    muted = next(finding for finding in report["findings"] if finding["fingerprint"] == existing["fingerprint"])
+    assert muted["issueReadiness"] == "do-not-open-muted"
+    assert "muted-known-non-issue" in muted["observationBasis"]["tags"]
+    assert report["rankedProbes"]
+    assert report["issuePayloads"]
+    assert all(payload["fingerprint"] != existing["fingerprint"] for payload in report["issuePayloads"])
+
+
+def test_bayesilisk_cli_context_can_emit_gitea_issue_payloads(tmp_path: Path) -> None:
+    context_path = tmp_path / "context.json"
+    context_path.write_text(
+        json.dumps(
+            {
+                "source": "unit-test-cli-context",
+                "agentNotes": ["travel expense itinerary and support takeover permission probe"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = json.loads(
+        run_bayesilisk("--seed", "150", "--format", "json", "--limit", "3", "--context", str(context_path)).stdout
+    )
+    payloads = json.loads(
+        run_bayesilisk(
+            "--seed",
+            "150",
+            "--limit",
+            "3",
+            "--context",
+            str(context_path),
+            "--issue-payloads",
+        ).stdout
+    )
+
+    assert report["contextSummary"]["source"] == "unit-test-cli-context"
+    assert report["rankedProbes"]
+    assert payloads
+    assert {"title", "body", "fingerprint", "dedupeState", "labels"} <= set(payloads[0])
+    assert payloads[0]["dedupeState"] == "new"
+
+
+def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
+    server = importlib.import_module("tools.bayesilisk.mcp_server")
+
+    initialize = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+    tools = server.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+    call = server.handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "bayesilisk.rank_context",
+                "arguments": {
+                    "seed": 150,
+                    "limit": 2,
+                    "context": {
+                        "agentNotes": ["HR documents DMS tenant scope and travel expense itinerary probe"],
+                    },
+                },
+            },
+        }
+    )
+
+    assert initialize["result"]["serverInfo"]["version"] == "bayesilisk.v1.2"
+    assert {tool["name"] for tool in tools["result"]["tools"]} == {
+        "bayesilisk.issue_payloads",
+        "bayesilisk.rank_context",
+        "bayesilisk.run",
+    }
+    payload = json.loads(call["result"]["content"][0]["text"])
+    assert payload["tool"] == "bayesilisk.v1.2"
+    assert payload["contextSummary"]["textSignalCount"] >= 1
+    assert len(payload["rankedProbes"]) == 2
+
+    raw = io.BytesIO()
+    server.write_message(raw, {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}})
+    raw.seek(0)
+    assert server.read_message(raw) == {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}}
+
+
 def test_bayesilisk_documentation_pins_no_production_access_and_report_contract() -> None:
     document = DOC.read_text(encoding="utf-8")
 
@@ -187,9 +305,13 @@ def test_bayesilisk_documentation_pins_no_production_access_and_report_contract(
         "fingerprint",
         "issue readiness",
         "observation history",
+        "MCP tool server",
+        "context ingestion",
+        "bayesilisk.rank_context",
+        "bayesilisk.issue_payloads",
         "rental car, train, and airplane",
         "Permission/role matrix",
-        "python tools/bayesilisk/bayesilisk.py --seed 150 --format json",
+        "python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json",
         "must not connect to production systems",
         "must not",
         "internal platform claims",
