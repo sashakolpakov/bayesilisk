@@ -1309,7 +1309,7 @@ def ranked_probes(report: dict[str, Any], limit: int | None = None) -> list[dict
             "observedResult": finding["observedResult"],
             "posteriorMode": finding["posteriorMode"],
             "reproduce": (
-                f"python3 tools/bayesilisk/bayesilisk.py --seed {report['seed']} "
+                f"python3 -m bayesilisk --seed {report['seed']} "
                 f"--generated-count {report['generatedScenarioCount']} --format json"
             ),
             "riskScore": finding["riskScore"],
@@ -1422,7 +1422,7 @@ def suggested_body(
         f"Observation basis:\n```json\n{basis_json}\n```\n\n"
         f"Access pattern:\n```json\n{pattern_json}\n```\n\n"
         f"Fragments:\n{fragment_lines}\n\n"
-        "Reproduce with `python3 tools/bayesilisk/bayesilisk.py --seed <seed> --format json`."
+        "Reproduce with `python3 -m bayesilisk --seed <seed> --format json`."
     )
 
 

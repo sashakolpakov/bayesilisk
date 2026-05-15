@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any, BinaryIO
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from tools.bayesilisk.bayesilisk import (  # type: ignore[no-redef]
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from bayesilisk.bayesilisk import (  # type: ignore[no-redef]
         VERSION,
         build_contextual_report,
         issue_payloads,

@@ -73,12 +73,12 @@ Only findings with `observedResult=fail` and `issueReadiness=ready-for-issue` sh
 Run from the repository root:
 
 ```sh
-python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --output /tmp/bayesilisk.json
-python3 tools/bayesilisk/bayesilisk.py --seed 150 --format markdown --output /tmp/bayesilisk.md
-python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --limit 3
-python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --generated-count 16 --observations /tmp/bayesilisk-observations.json
-python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json --context /tmp/bayesilisk-context.json
-python3 tools/bayesilisk/bayesilisk.py --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
+python3 -m bayesilisk --seed 150 --format json --output /tmp/bayesilisk.json
+python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
+python3 -m bayesilisk --seed 150 --format json --limit 3
+python3 -m bayesilisk --seed 150 --format json --generated-count 16 --observations /tmp/bayesilisk-observations.json
+python3 -m bayesilisk --seed 150 --format json --context /tmp/bayesilisk-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
 ```
 
 The same seed and inputs produce byte-stable reports. Use a different seed to change scenario evaluation order before final risk sorting.
@@ -134,7 +134,7 @@ Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent n
 Bayesilisk also has a small stdio MCP tool server:
 
 ```sh
-python3 -m tools.bayesilisk.mcp_server
+python3 -m bayesilisk.mcp_server
 ```
 
 It exposes three tools:

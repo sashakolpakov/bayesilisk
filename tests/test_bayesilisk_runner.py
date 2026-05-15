@@ -7,8 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-BAYESILISK = REPO_ROOT / "tools" / "bayesilisk" / "bayesilisk.py"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC = REPO_ROOT / "docs" / "bayesilisk.md"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -16,7 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 
 def run_bayesilisk(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(BAYESILISK), *args],
+        [sys.executable, "-m", "bayesilisk", *args],
         check=True,
         cwd=REPO_ROOT,
         text=True,
@@ -107,7 +106,7 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
         assert "routes" in finding["accessPattern"]
         assert finding["expectedInvariant"]
         assert finding["suggestedIssueTitle"].startswith("Bayesilisk ")
-        assert "Reproduce with `python3 tools/bayesilisk/bayesilisk.py --seed <seed> --format json`" in finding[
+        assert "Reproduce with `python3 -m bayesilisk --seed <seed> --format json`" in finding[
             "suggestedIssueBody"
         ]
 
@@ -178,7 +177,7 @@ def test_bayesilisk_observation_history_dampens_fixed_findings(tmp_path: Path) -
 
 
 def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads() -> None:
-    bayesilisk = importlib.import_module("tools.bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
     baseline = bayesilisk.build_report(150, limit=8, generated_count=8)
     existing = next(finding for finding in baseline["findings"] if finding["issueReadiness"] == "ready-for-issue")
     context = {
@@ -198,7 +197,7 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
         "pullRequests": [{"number": 170, "state": "open", "title": "Bayesilisk verifier hardening"}],
     }
 
-    report = bayesilisk.build_contextual_report(150, limit=8, generated_count=8, context=context)
+    report = bayesilisk.build_contextual_report(150, generated_count=8, context=context)
     context_summary = report["contextSummary"]
 
     assert context_summary["source"] == "unit-test-agent-gitea-context"
@@ -252,7 +251,7 @@ def test_bayesilisk_cli_context_can_emit_gitea_issue_payloads(tmp_path: Path) ->
 
 
 def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
-    server = importlib.import_module("tools.bayesilisk.mcp_server")
+    server = importlib.import_module("bayesilisk.mcp_server")
 
     initialize = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
     tools = server.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
@@ -306,12 +305,12 @@ def test_bayesilisk_documentation_pins_no_production_access_and_report_contract(
         "issue readiness",
         "observation history",
         "MCP tool server",
-        "context ingestion",
+        "Context ingestion",
         "bayesilisk.rank_context",
         "bayesilisk.issue_payloads",
         "rental car, train, and airplane",
         "Permission/role matrix",
-        "python3 tools/bayesilisk/bayesilisk.py --seed 150 --format json",
+        "python3 -m bayesilisk --seed 150 --format json",
         "must not connect to production systems",
         "must not",
         "internal platform claims",
