@@ -1,0 +1,73 @@
+# Bayesilisk
+
+Bayesilisk is a deterministic local verifier for permission, entitlement, route, and data-boundary scenarios. It combines explicit rule invariants with Bayesian-style prioritization so future issue worktrees can generate reproducible JSON or Markdown findings for Gitea issues.
+
+Bayesilisk has no production access. It uses static scenario fragments from the repository, a caller-provided seed, and standard-library Python only.
+
+## Layers
+
+### Rule invariants
+
+The rule layer pins invariants that should remain true across Travel, Expenses, Billing, HR, Support, DMS, and module-entitlement flows:
+
+- Permission/role matrix: generated access patterns must use a route-allowed actor role.
+- Roles: employee self-review is blocked; support access must have an active non-expired takeover session.
+- Modules: expense approval and billing export routes must respect enabled customer modules.
+- Routes: review, export, HR document, and support takeover routes are checked against the expected actor and entitlement.
+- Data boundaries: DMS evidence must stay inside tenant and process boundaries; HR documents require customer HR/admin roles; travel itineraries cannot be silently inconsistent.
+- Business scenario sequence: travel expenses require approved funding before expense submission or approval.
+- Business scenario consistency: rental car, train, and airplane expenses must match chronological itinerary legs.
+
+These rules are intentionally separate from probabilistic ranking. A failed invariant remains failed even if its score is lower than another finding.
+
+### Bayesian prioritization
+
+Each invariant carries a prior plus pass/fail likelihood weights. Bayesilisk updates the score for the observed result with:
+
+```text
+posterior = prior * likelihood / (prior * likelihood + (1 - prior) * (1 - likelihood))
+```
+
+The posterior is reported as `posteriorProbability` and `riskScore`, with a `posteriorMode` that separates highest fault-probability findings from harder-to-find modes. Easy breakages should be fixed or documented first; after a rerun with the same seed, `harder-to-find-after-easy-breakages` findings become the next priority. The score does not authorize access, change fixtures, or hide rule failures.
+
+### Scenario fragments
+
+Fragments can be incomplete on their own and are composed into round-up scenarios. The default catalog includes:
+
+- mundane cases, such as a finance actor exporting billing data with the billing module enabled;
+- a travel funding request -> approval -> expenses flow with rental car, train, and airplane items;
+- creative composed cases, such as expired support takeover plus foreign DMS evidence plus expense review;
+- intentionally inconsistent cases, such as an impossible travel itinerary paired with employee self-review;
+- air/train leg mismatch cases where expense dates or transport modes do not fit the itinerary.
+
+This makes Bayesilisk useful for spotting cross-domain gaps before a full feature implementation exists.
+
+## Report Contract
+
+JSON and Markdown reports include:
+
+- seed and tool version;
+- scenario fragments, generated sub-scenarios, access patterns, and domains;
+- expected invariant and invariant layer;
+- observed result and observation detail;
+- breakage/finding classification;
+- prior, likelihood, posterior probability, posterior mode, and risk score;
+- suggested Gitea issue title and body.
+
+Suggested issue bodies include the exact scenario id, classification, posterior mode, invariant expectation, observation, score, access pattern, fragments, and reproduction command.
+
+## CLI
+
+Run from the repository root:
+
+```sh
+python tools/bayesilisk/bayesilisk.py --seed 150 --format json --output /tmp/bayesilisk.json
+python tools/bayesilisk/bayesilisk.py --seed 150 --format markdown --output /tmp/bayesilisk.md
+python tools/bayesilisk/bayesilisk.py --seed 150 --format json --limit 3
+```
+
+The same seed and inputs produce byte-stable reports. Use a different seed to change scenario evaluation order before final risk sorting.
+
+## Boundaries
+
+Bayesilisk is a verifier and prioritizer, not an authorization engine. It must not connect to production systems, inspect live customer data, create migrations, or emit internal platform claims as customer package claims.
