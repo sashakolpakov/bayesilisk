@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-VERSION = "bayesilisk.v1"
+VERSION = "bayesilisk.v1.1"
 
 EXPENSE_REVIEW_ROUTE = "/api/expense-claims/{claimId}/review"
 BILLING_EXPORT_ROUTE = "/api/billing/exports"
@@ -70,6 +71,8 @@ class Scenario:
     title: str
     fragment_ids: tuple[str, ...]
     invariant_ids: tuple[str, ...]
+    generated: bool = False
+    generation_basis: str = "catalog"
 
 
 FRAGMENTS: tuple[Fragment, ...] = (
@@ -664,9 +667,84 @@ SCENARIOS: tuple[Scenario, ...] = (
 )
 
 
+def generated_composite_scenarios(seed: int, count: int) -> list[Scenario]:
+    rng = random.Random(seed + 271828)
+    roles = ("role.finance", "role.employee_self", "role.support_takeover_expired")
+    module_sets = (
+        ("module.travel_on", "module.expenses_on"),
+        ("module.travel_on", "module.expenses_off"),
+        ("module.expenses_on",),
+    )
+    funding_states = ("travel.funding_approved", "travel.funding_missing")
+    itinerary_states = ("travel.legs_consistent_multimodal", "travel.inconsistent_itinerary", "travel.mundane_itinerary")
+    receipt_states = ("dms.correct_receipt", "dms.foreign_tenant_document")
+    expense_modes = (
+        ("expense.train_ticket",),
+        ("expense.rental_car", "expense.train_ticket"),
+        ("expense.rental_car", "expense.train_ticket", "expense.airfare"),
+        ("expense.airfare", "expense.train_ticket"),
+    )
+    generated: list[Scenario] = []
+    seen: set[tuple[str, ...]] = set()
+    attempts = 0
+    while len(generated) < count and attempts < count * 8:
+        attempts += 1
+        role = rng.choice(roles)
+        modules = rng.choice(module_sets)
+        funding = rng.choice(funding_states)
+        itinerary = rng.choice(itinerary_states)
+        dms = rng.choice(receipt_states)
+        expenses = rng.choice(expense_modes)
+        include_funding_approval = funding == "travel.funding_approved" and rng.choice((True, False))
+        fragments = [
+            role,
+            *modules,
+            "route.travel_funding_request",
+            funding,
+            "route.expense_approve",
+            *expenses,
+            dms,
+            itinerary,
+            "creative.travel_expense_roundup",
+        ]
+        if include_funding_approval:
+            fragments.insert(4, "route.travel_funding_approve")
+        fragment_ids = tuple(dict.fromkeys(fragments))
+        if fragment_ids in seen:
+            continue
+        seen.add(fragment_ids)
+        tone = "generated-inconsistent" if itinerary == "travel.inconsistent_itinerary" else "generated-round-up"
+        title = "Generated composite travel expense probe"
+        if set(expenses) >= {"expense.rental_car", "expense.train_ticket", "expense.airfare"}:
+            title = "Generated multi-modal travel expense probe"
+        generated.append(
+            Scenario(
+                f"generated.{len(generated) + 1:02d}.{role.split('.')[-1]}.{funding.split('.')[-1]}.{itinerary.split('.')[-1]}",
+                tone,
+                title,
+                fragment_ids,
+                (
+                    "roles.route_matrix_allowed",
+                    "modules.expense_approval_requires_module_and_receipt",
+                    "dms.tenant_process_boundary",
+                    "travel.funding_before_expense",
+                    "travel.expense_items_match_itinerary",
+                    "travel.itinerary_chronology",
+                ),
+                generated=True,
+                generation_basis="seeded composite fragment generator",
+            )
+        )
+    return generated
+
+
 def bayesian_posterior(prior: float, likelihood: float) -> float:
     denominator = prior * likelihood + (1.0 - prior) * (1.0 - likelihood)
     return round((prior * likelihood) / denominator, 6)
+
+
+def clamp_probability(value: float) -> float:
+    return min(0.95, max(0.05, value))
 
 
 def merge_unique(existing: list[Any], incoming: list[Any]) -> list[Any]:
@@ -752,6 +830,59 @@ def access_pattern(facts: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def finding_fingerprint(scenario: Scenario, invariant: Invariant, fragments: list[Fragment]) -> str:
+    payload = {
+        "fragments": [fragment.id for fragment in fragments],
+        "invariant": invariant.id,
+        "scenario": scenario.id,
+        "tool": VERSION,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+    return f"bayesilisk:{digest[:16]}"
+
+
+def load_observations(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def observation_basis(
+    fingerprint: str,
+    scenario: Scenario,
+    invariant: Invariant,
+    observations: dict[str, Any],
+) -> dict[str, Any]:
+    fixed = set(observations.get("fixedFingerprints", []))
+    confirmed = set(observations.get("confirmedFingerprints", []))
+    muted = set(observations.get("mutedFingerprints", []))
+    invariant_adjustments = observations.get("priorAdjustments", {})
+    scenario_adjustments = observations.get("scenarioAdjustments", {})
+
+    prior_delta = 0.0
+    tags: list[str] = []
+    if fingerprint in fixed:
+        prior_delta -= 0.28
+        tags.append("fixed-regression-watch")
+    if fingerprint in confirmed:
+        prior_delta += 0.18
+        tags.append("confirmed-local-breakage")
+    if fingerprint in muted:
+        prior_delta -= 0.45
+        tags.append("muted-known-non-issue")
+    if invariant.id in invariant_adjustments:
+        prior_delta += float(invariant_adjustments[invariant.id])
+        tags.append(f"invariant-adjustment:{invariant.id}")
+    if scenario.id in scenario_adjustments:
+        prior_delta += float(scenario_adjustments[scenario.id])
+        tags.append(f"scenario-adjustment:{scenario.id}")
+    return {
+        "source": observations.get("source", "none"),
+        "tags": tags or ["fresh-prior"],
+        "priorDelta": round(prior_delta, 6),
+    }
+
+
 def finding_classification(passed: bool, risk_score: float, invariant: Invariant) -> str:
     if passed:
         return "control-confirmed"
@@ -772,11 +903,57 @@ def posterior_mode(passed: bool, risk_score: float, invariant: Invariant) -> str
     return "fault-probability-elevated"
 
 
-def build_report(seed: int, limit: int | None = None) -> dict[str, Any]:
+def issue_readiness(passed: bool, classification: str, basis: dict[str, Any]) -> str:
+    tags = set(basis.get("tags", []))
+    if passed:
+        return "no-issue-control"
+    if "muted-known-non-issue" in tags:
+        return "do-not-open-muted"
+    if "fixed-regression-watch" in tags:
+        return "regression-watch"
+    if classification.startswith("breakage."):
+        return "ready-for-issue"
+    return "probe-only"
+
+
+def report_sections(findings: list[dict[str, Any]]) -> dict[str, list[str]]:
+    return {
+        "confirmedBreakages": [
+            finding["fingerprint"]
+            for finding in findings
+            if finding["observedResult"] == "fail" and finding["issueReadiness"] == "ready-for-issue"
+        ],
+        "candidateProbes": [
+            finding["fingerprint"]
+            for finding in findings
+            if finding["observedResult"] == "fail" and finding["issueReadiness"] in {"probe-only", "regression-watch"}
+        ],
+        "hardToFindModes": [
+            finding["fingerprint"]
+            for finding in findings
+            if finding["posteriorMode"] == "harder-to-find-after-easy-breakages"
+            or finding["classification"] == "breakage.hard-to-find"
+        ],
+        "controls": [
+            finding["fingerprint"]
+            for finding in findings
+            if finding["observedResult"] == "pass"
+        ],
+    }
+
+
+def build_report(
+    seed: int,
+    limit: int | None = None,
+    generated_count: int = 8,
+    observations: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    observations = observations or {}
     rng = random.Random(seed)
     fragment_by_id = {fragment.id: fragment for fragment in FRAGMENTS}
     invariant_by_id = {invariant.id: invariant for invariant in INVARIANTS}
-    scenario_order = list(SCENARIOS)
+    generated_scenarios = generated_composite_scenarios(seed, generated_count)
+    scenario_order = [*SCENARIOS, *generated_scenarios]
     rng.shuffle(scenario_order)
 
     findings: list[dict[str, Any]] = []
@@ -789,10 +966,14 @@ def build_report(seed: int, limit: int | None = None) -> dict[str, Any]:
             invariant = invariant_by_id[invariant_id]
             passed, observation = invariant.evaluator(facts)
             likelihood = invariant.pass_likelihood if passed else invariant.fail_likelihood
-            risk_score = bayesian_posterior(invariant.prior, likelihood)
+            fingerprint = finding_fingerprint(scenario, invariant, fragments)
+            basis = observation_basis(fingerprint, scenario, invariant, observations)
+            adjusted_prior = clamp_probability(invariant.prior + basis["priorDelta"])
+            risk_score = bayesian_posterior(adjusted_prior, likelihood)
             observed_result = "pass" if passed else "fail"
             classification = finding_classification(passed, risk_score, invariant)
             mode = posterior_mode(passed, risk_score, invariant)
+            readiness = issue_readiness(passed, classification, basis)
             title = suggested_title(scenario, invariant, observed_result, classification)
             body = suggested_body(
                 scenario,
@@ -803,13 +984,20 @@ def build_report(seed: int, limit: int | None = None) -> dict[str, Any]:
                 classification,
                 mode,
                 pattern,
+                fingerprint,
+                readiness,
+                basis,
             )
             findings.append(
                 {
                     "id": f"{scenario.id}:{invariant.id}",
+                    "fingerprint": fingerprint,
+                    "dedupeKey": f"{fingerprint}:{invariant.id}",
                     "scenarioId": scenario.id,
                     "scenarioTitle": scenario.title,
                     "scenarioTone": scenario.tone,
+                    "generatedScenario": scenario.generated,
+                    "generationBasis": scenario.generation_basis,
                     "subScenarios": entries,
                     "fragments": [
                         {
@@ -828,7 +1016,10 @@ def build_report(seed: int, limit: int | None = None) -> dict[str, Any]:
                     "observedResult": observed_result,
                     "observation": observation,
                     "classification": classification,
+                    "issueReadiness": readiness,
+                    "observationBasis": basis,
                     "prior": invariant.prior,
+                    "adjustedPrior": adjusted_prior,
                     "likelihood": likelihood,
                     "posteriorProbability": risk_score,
                     "posteriorMode": mode,
@@ -841,11 +1032,13 @@ def build_report(seed: int, limit: int | None = None) -> dict[str, Any]:
     findings.sort(key=lambda item: (-item["riskScore"], item["posteriorMode"], item["id"]))
     if limit is not None:
         findings = findings[:limit]
+    sections = report_sections(findings)
     return {
         "tool": VERSION,
         "seed": seed,
         "deterministic": True,
         "productionAccess": False,
+        "generatedScenarioCount": len(generated_scenarios),
         "domains": ["Travel", "Expenses", "Billing", "HR", "Support", "DMS", "module entitlements"],
         "prioritizationPolicy": (
             "Sort by posterior fault probability first. Fix or document breakage.easy findings, rerun with the "
@@ -864,6 +1057,7 @@ def build_report(seed: int, limit: int | None = None) -> dict[str, Any]:
             for invariant in INVARIANTS
         ],
         "roleRouteMatrix": {route: sorted(roles) for route, roles in ROLE_ROUTE_MATRIX.items()},
+        "sections": sections,
         "findings": findings,
     }
 
@@ -888,16 +1082,23 @@ def suggested_body(
     classification: str,
     mode: str,
     pattern: dict[str, Any],
+    fingerprint: str,
+    readiness: str,
+    basis: dict[str, Any],
 ) -> str:
     fragment_lines = "\n".join(f"- `{fragment.id}` ({fragment.domain}): {fragment.summary}" for fragment in fragments)
     pattern_json = json.dumps(pattern, indent=2, sort_keys=True)
+    basis_json = json.dumps(basis, indent=2, sort_keys=True)
     return (
         f"Scenario `{scenario.id}`: {scenario.title}\n\n"
+        f"Fingerprint: `{fingerprint}`\n\n"
         f"Classification: `{classification}`\n\n"
+        f"Issue readiness: `{readiness}`\n\n"
         f"Posterior mode: `{mode}`\n\n"
         f"Expected invariant: {invariant.expected}\n\n"
         f"Observed: {observation}\n\n"
         f"Risk score: {risk_score:.6f}\n\n"
+        f"Observation basis:\n```json\n{basis_json}\n```\n\n"
         f"Access pattern:\n```json\n{pattern_json}\n```\n\n"
         f"Fragments:\n{fragment_lines}\n\n"
         "Reproduce with `python tools/bayesilisk/bayesilisk.py --seed <seed> --format json`."
@@ -912,7 +1113,15 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"- Seed: `{report['seed']}`",
         f"- Deterministic: `{str(report['deterministic']).lower()}`",
         f"- Production access: `{str(report['productionAccess']).lower()}`",
+        f"- Generated scenarios: `{report['generatedScenarioCount']}`",
         f"- Prioritization: {report['prioritizationPolicy']}",
+        "",
+        "## Sections",
+        "",
+        f"- Confirmed breakages: `{len(report['sections']['confirmedBreakages'])}`",
+        f"- Candidate probes: `{len(report['sections']['candidateProbes'])}`",
+        f"- Hard-to-find modes: `{len(report['sections']['hardToFindModes'])}`",
+        f"- Controls: `{len(report['sections']['controls'])}`",
         "",
         "## Findings",
         "",
@@ -923,11 +1132,15 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"### {finding['suggestedIssueTitle']}",
                 "",
                 f"- Scenario: `{finding['scenarioId']}` ({finding['scenarioTone']})",
+                f"- Fingerprint: `{finding['fingerprint']}`",
+                f"- Generated scenario: `{str(finding['generatedScenario']).lower()}`",
                 f"- Classification: `{finding['classification']}`",
+                f"- Issue readiness: `{finding['issueReadiness']}`",
                 f"- Posterior mode: `{finding['posteriorMode']}`",
                 f"- Expected invariant: {finding['expectedInvariant']}",
                 f"- Observed result: `{finding['observedResult']}`",
                 f"- Observation: {finding['observation']}",
+                f"- Observation basis: `{', '.join(finding['observationBasis']['tags'])}`",
                 f"- Risk score: `{finding['riskScore']:.6f}`",
                 "- Sub-scenarios:",
             ]
@@ -967,12 +1180,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--format", choices=("json", "markdown"), default="json", help="Report format.")
     parser.add_argument("--output", type=Path, default=None, help="Optional output file.")
     parser.add_argument("--limit", type=int, default=None, help="Optional maximum number of findings.")
+    parser.add_argument("--generated-count", type=int, default=8, help="Number of seeded generated composite scenarios.")
+    parser.add_argument("--observations", type=Path, default=None, help="Optional JSON observation history.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.seed, limit=args.limit)
+    report = build_report(
+        args.seed,
+        limit=args.limit,
+        generated_count=args.generated_count,
+        observations=load_observations(args.observations),
+    )
     if args.format == "json":
         content = json.dumps(report, indent=2, sort_keys=True) + "\n"
     else:
