@@ -33,6 +33,16 @@ The tests should cover:
 - model-proposed scenarios are validated before use;
 - issue payloads are deduped and only emitted for ready failed findings.
 
+Live integrations are opt-in. They are marked so CI can skip them on GitHub,
+where no browser binaries or local scenario proposer model are assumed to exist:
+
+```sh
+python3 -m pytest -m live_playwright
+BAYESILISK_LIVE_OLLAMA=1 BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b python3 -m pytest -m live_ollama
+```
+
+Default CI runs deterministic tests and builds the Sphinx docs only.
+
 ## Docs Policy
 
 Build docs locally before changing the public documentation:

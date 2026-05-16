@@ -56,6 +56,16 @@ python3 -m bayesilisk --seed 150 --context /tmp/context.json --format json
 
 The provider abstraction and API-key handling are tracked as a follow-up issue. The design requires that provider output stay untrusted and schema-validated.
 
+Live verification is opt-in:
+
+```sh
+python3 -m pytest -m live_playwright
+BAYESILISK_LIVE_OLLAMA=1 BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b python3 -m pytest -m live_ollama
+```
+
+The GitHub CI workflow skips live Playwright and live Ollama tests by default,
+because it does not assume installed browsers or a local model service.
+
 ## MCP Server
 
 Bayesilisk includes a stdio MCP tool server:
