@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC = REPO_ROOT / "docs" / "bayesilisk.md"
+DESIGN = REPO_ROOT / "DESIGN.md"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -70,6 +71,13 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
     }
     assert {
         "mundane.travel_funding_to_multimodal_expense",
+        "mundane.hr_document_by_hr_manager",
+        "mundane.manager_reviews_employee_expense",
+        "roundup.billing_export_disabled_module",
+        "creative.support_active_hr_document_shortcut",
+        "inconsistent.dms_wrong_process_receipt",
+        "roundup.travel_expense_before_late_funding",
+        "inconsistent.travel_missing_airplane_leg",
         "roundup.travel_funding_unapproved_multimodal_expense",
         "inconsistent.travel_air_train_leg_mismatch",
     } <= {finding["scenarioId"] for finding in findings}
@@ -111,7 +119,78 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
         ]
 
 
-def test_bayesilisk_markdown_and_output_files_include_gitea_ready_findings(tmp_path: Path) -> None:
+def test_expanded_catalog_catches_distinct_bad_spots() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    report = bayesilisk.build_report(150, generated_count=0)
+    findings = report["findings"]
+
+    wrong_process = next(
+        finding
+        for finding in findings
+        if finding["scenarioId"] == "inconsistent.dms_wrong_process_receipt"
+        and finding["invariantId"] == "dms.tenant_process_boundary"
+    )
+    assert wrong_process["observedResult"] == "fail"
+    assert "does not match" in wrong_process["observation"]
+
+    active_support_takeover = next(
+        finding
+        for finding in findings
+        if finding["scenarioId"] == "creative.support_active_hr_document_shortcut"
+        and finding["invariantId"] == "support.takeover_session_required"
+    )
+    active_support_hr = next(
+        finding
+        for finding in findings
+        if finding["scenarioId"] == "creative.support_active_hr_document_shortcut"
+        and finding["invariantId"] == "hr.documents_customer_role_boundary"
+    )
+    assert active_support_takeover["observedResult"] == "pass"
+    assert active_support_hr["observedResult"] == "fail"
+
+    late_funding = next(
+        finding
+        for finding in findings
+        if finding["scenarioId"] == "roundup.travel_expense_before_late_funding"
+        and finding["invariantId"] == "travel.funding_before_expense"
+    )
+    assert late_funding["observedResult"] == "fail"
+    assert "before funding approval" in late_funding["observation"]
+
+    missing_airplane_leg = next(
+        finding
+        for finding in findings
+        if finding["scenarioId"] == "inconsistent.travel_missing_airplane_leg"
+        and finding["invariantId"] == "travel.expense_items_match_itinerary"
+    )
+    assert missing_airplane_leg["observedResult"] == "fail"
+    assert "transport modes are not covered" in missing_airplane_leg["observation"]
+
+
+def test_scenario_catalog_has_valid_references_and_invariant_coverage() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    fragment_ids = {fragment.id for fragment in bayesilisk.FRAGMENTS}
+    invariant_ids = {invariant.id for invariant in bayesilisk.INVARIANTS}
+
+    for scenario in bayesilisk.SCENARIOS:
+        assert scenario.fragment_ids
+        assert scenario.invariant_ids
+        assert set(scenario.fragment_ids) <= fragment_ids
+        assert set(scenario.invariant_ids) <= invariant_ids
+
+    report = bayesilisk.build_report(150, generated_count=0)
+    scenario_ids = {finding["scenarioId"] for finding in report["findings"]}
+    assert {scenario.id for scenario in bayesilisk.SCENARIOS} <= scenario_ids
+
+    invariant_results: dict[str, set[str]] = {}
+    for finding in report["findings"]:
+        invariant_results.setdefault(finding["invariantId"], set()).add(finding["observedResult"])
+
+    for invariant_id in invariant_ids:
+        assert invariant_results[invariant_id] == {"fail", "pass"}
+
+
+def test_bayesilisk_markdown_and_output_files_include_issue_ready_findings(tmp_path: Path) -> None:
     json_path = tmp_path / "bayesilisk.json"
     markdown_path = tmp_path / "bayesilisk.md"
 
@@ -145,7 +224,7 @@ def test_bayesilisk_markdown_and_output_files_include_gitea_ready_findings(tmp_p
     assert "Observation basis:" in markdown
     assert "Access pattern:" in markdown
     assert "Sub-scenarios:" in markdown
-    assert "Suggested Gitea issue body:" in markdown
+    assert "Suggested issue body:" in markdown
     assert "Expected invariant:" in markdown
     assert "Risk score:" in markdown
 
@@ -181,7 +260,7 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
     baseline = bayesilisk.build_report(150, limit=8, generated_count=8)
     existing = next(finding for finding in baseline["findings"] if finding["issueReadiness"] == "ready-for-issue")
     context = {
-        "source": "unit-test-agent-gitea-context",
+        "source": "unit-test-agent-tracker-context",
         "agentNotes": [
             "Verifier saw HR documents process context metadata, support takeover, tenant DMS, travel expense receipts, "
             "and role permission 403 gaps on develop-usa.",
@@ -200,7 +279,7 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
     report = bayesilisk.build_contextual_report(150, generated_count=8, context=context)
     context_summary = report["contextSummary"]
 
-    assert context_summary["source"] == "unit-test-agent-gitea-context"
+    assert context_summary["source"] == "unit-test-agent-tracker-context"
     assert context_summary["agentNoteCount"] == 1
     assert context_summary["issueCount"] == 1
     assert context_summary["pullRequestCount"] == 1
@@ -216,7 +295,161 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
     assert all(payload["fingerprint"] != existing["fingerprint"] for payload in report["issuePayloads"])
 
 
-def test_bayesilisk_cli_context_can_emit_gitea_issue_payloads(tmp_path: Path) -> None:
+def test_playwright_probe_context_promotes_browser_observed_route_failures() -> None:
+    adapter = importlib.import_module("bayesilisk.playwright_adapter")
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    context = adapter.build_context_from_probe_results(
+        [
+            {
+                "actorRole": "support",
+                "expectedStatus": 403,
+                "invariantId": "hr.documents_customer_role_boundary",
+                "observedStatus": 200,
+                "route": "/api/hr/documents",
+                "title": "Expired support shortcut reaches HR documents",
+            },
+            {
+                "actorRole": "finance",
+                "expectedStatus": 200,
+                "invariantId": "billing.export_requires_role_and_module",
+                "observedStatus": 200,
+                "route": "/api/billing/exports",
+                "title": "Finance billing export remains allowed",
+            },
+        ],
+        target="file:///tmp/playwright-target.html",
+    )
+
+    assert context["source"] == "playwright-probe"
+    assert context["playwrightProbe"]["failedCount"] == 1
+    assert context["playwrightProbe"]["passedCount"] == 1
+    assert context["priorAdjustments"]["hr.documents_customer_role_boundary"] == 0.06
+    assert "Microsoft Playwright observed route permission behavior" in context["agentNotes"][0]
+    assert context["repositoryFacts"][0]["source"] == "microsoft-playwright"
+
+    report = bayesilisk.build_contextual_report(150, limit=12, context=context)
+    observations = bayesilisk.context_observations(context)
+    assert report["contextSummary"]["source"] == "playwright-probe"
+    assert observations["priorAdjustments"]["hr.documents_customer_role_boundary"] == 0.06
+    attention = report["grassmannAttention"]
+    assert attention["boundedFeedback"] is True
+    assert attention["embeddingMode"] == "grassmann-style-anchor-plane-proxy"
+    assert "hr.documents_customer_role_boundary" in attention["selectedPlaneIds"]
+    assert attention["planes"][0]["attentionScore"] > 0
+    assert any("playwright-evidence" in plane["reasons"] for plane in attention["planes"])
+    assert any(
+        finding["generatedScenario"]
+        and finding["generationBasis"].startswith("grassmann-attention:")
+        for finding in report["findings"]
+    )
+    assert all("attentionScore" in finding for finding in report["findings"])
+    assert report["rankedProbes"]
+
+
+def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    context = {
+        "source": "unit-test-travel-plane",
+        "repositoryFacts": [
+            {
+                "actorRole": "finance",
+                "expectedStatus": 403,
+                "invariantId": "travel.expense_items_match_itinerary",
+                "observedStatus": 200,
+                "passed": False,
+                "route": "/api/expense-claims/{claimId}/review",
+                "source": "microsoft-playwright",
+                "title": "Airfare accepted without matching itinerary leg",
+            }
+        ],
+    }
+
+    baseline = bayesilisk.build_report(150, generated_count=8)
+    contextual = bayesilisk.build_contextual_report(150, generated_count=8, context=context)
+
+    assert "travel.expense_items_match_itinerary" in contextual["grassmannAttention"]["selectedPlaneIds"]
+    assert not any(
+        finding["generationBasis"].startswith("grassmann-attention:")
+        for finding in baseline["findings"]
+    )
+    attention_findings = [
+        finding
+        for finding in contextual["findings"]
+        if finding["scenarioId"] == "generated.attention.01.travel_expense_items_match_itinerary"
+    ]
+    assert attention_findings
+    chronology = next(
+        finding for finding in attention_findings if finding["invariantId"] == "travel.itinerary_chronology"
+    )
+    transport_match = next(
+        finding
+        for finding in attention_findings
+        if finding["invariantId"] == "travel.expense_items_match_itinerary"
+    )
+    assert chronology["observedResult"] == "pass"
+    assert transport_match["observedResult"] == "fail"
+    assert transport_match["attentionScore"] > 0
+    assert "playwright-evidence" in transport_match["attentionReasons"]
+
+
+def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    attention = {
+        "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
+        "planes": [],
+    }
+    proposals = [
+        {
+            "title": "Weak model proposes support HR document probe",
+            "targetPlane": "hr.documents_customer_role_boundary",
+            "fragments": ["role.support_takeover_active", "hr.payroll_file_route"],
+            "invariants": [
+                "support.takeover_session_required",
+                "hr.documents_customer_role_boundary",
+            ],
+        },
+        {
+            "title": "Rejected invented route",
+            "targetPlane": "hr.documents_customer_role_boundary",
+            "fragments": ["role.support_takeover_active", "route.invented"],
+            "invariants": ["hr.documents_customer_role_boundary"],
+        },
+    ]
+
+    scenarios, rejected = bayesilisk.validate_model_scenario_proposals(proposals, attention)
+    assert len(scenarios) == 1
+    assert scenarios[0].id.startswith("generated.model.01.hr_documents_customer_role_boundary")
+    assert scenarios[0].generation_basis == "weak-model-proposal:hr.documents_customer_role_boundary"
+    assert rejected[0]["reason"] == "unknown-fragment-id"
+
+    report = bayesilisk.build_report(
+        150,
+        generated_count=1,
+        grassmann={
+            "embeddingMode": "unit-test",
+            "planes": [
+                {
+                    "attentionScore": 0.8,
+                    "invariantId": "hr.documents_customer_role_boundary",
+                    "reasons": ["unit-test-model-proposal"],
+                }
+            ],
+            "selectedPlaneIds": [],
+            "weakModelScenarioGeneration": {"enabled": True, "acceptedCount": 1},
+        },
+        model_scenarios=scenarios,
+    )
+    model_findings = [
+        finding
+        for finding in report["findings"]
+        if finding["scenarioId"] == scenarios[0].id
+    ]
+    assert model_findings
+    assert any(finding["observedResult"] == "fail" for finding in model_findings)
+    assert all(finding["generationBasis"].startswith("weak-model-proposal:") for finding in model_findings)
+
+
+def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:
     context_path = tmp_path / "context.json"
     context_path.write_text(
         json.dumps(
@@ -305,6 +538,9 @@ def test_bayesilisk_documentation_pins_no_production_access_and_report_contract(
         "issue readiness",
         "observation history",
         "MCP tool server",
+        "Microsoft Playwright bridge",
+        "Grassmann attention",
+        "tools/playwright_probe.py --demo",
         "Context ingestion",
         "bayesilisk.rank_context",
         "bayesilisk.issue_payloads",
@@ -316,3 +552,24 @@ def test_bayesilisk_documentation_pins_no_production_access_and_report_contract(
         "internal platform claims",
     ):
         assert fragment in document
+
+
+def test_design_document_pins_trust_boundaries() -> None:
+    design = DESIGN.read_text(encoding="utf-8")
+
+    for fragment in (
+        "scenario facts -> invariant checks -> pass/fail -> Bayesian ranking",
+        "observedByPlaywright",
+        "selectedByGrassmannAttention",
+        "proposedByModel",
+        "verifiedByBayesilisk",
+        "Playwright is the sensor.",
+        "Grassmann is the router.",
+        "The scenario proposer model is the proposer.",
+        "Bayesilisk is the judge.",
+        "No embedding, Grassmann score, model output, issue text, or Playwright observation may directly decide",
+        "attentionScore",
+        "riskScore",
+        "Model output is untrusted candidate input.",
+    ):
+        assert fragment in design

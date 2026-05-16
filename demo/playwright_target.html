@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bayesilisk Playwright Target</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.45;
+      }
+
+      body {
+        margin: 0;
+        background: #f7f8fa;
+        color: #172033;
+      }
+
+      main {
+        margin: 0 auto;
+        max-width: 1080px;
+        padding: 32px 20px 48px;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin: 0 0 8px;
+      }
+
+      p {
+        color: #526070;
+        margin: 0 0 24px;
+      }
+
+      table {
+        background: #ffffff;
+        border: 1px solid #d8dee8;
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #e5e9f0;
+        padding: 12px;
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        background: #eef2f7;
+        color: #344055;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      code {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 13px;
+      }
+
+      button {
+        background: #135f8f;
+        border: 0;
+        border-radius: 6px;
+        color: #ffffff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        min-width: 72px;
+        padding: 8px 12px;
+      }
+
+      button:focus-visible {
+        outline: 3px solid #87c7ee;
+        outline-offset: 2px;
+      }
+
+      [data-observed-status] {
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+      }
+
+      .muted {
+        color: #6f7b8a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Bayesilisk Playwright Target</h1>
+      <p>
+        A local, static permission target for browser probes. Some rows intentionally return the wrong status so
+        Bayesilisk has concrete route evidence to rank.
+      </p>
+
+      <table aria-label="Bayesilisk permission probes">
+        <thead>
+          <tr>
+            <th>Probe</th>
+            <th>Actor</th>
+            <th>Route</th>
+            <th>Expected</th>
+            <th>Observed</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            data-bayesilisk-probe
+            data-title="Finance billing export remains allowed"
+            data-actor-role="finance"
+            data-route="/api/billing/exports"
+            data-invariant-id="billing.export_requires_role_and_module"
+            data-expected-status="200"
+            data-actual-status="200"
+          >
+            <td>Billing export control</td>
+            <td><code>finance</code></td>
+            <td><code>/api/billing/exports</code></td>
+            <td><code>200</code></td>
+            <td><code data-observed-status>pending</code></td>
+            <td><button type="button" data-run-probe>Run</button></td>
+          </tr>
+          <tr
+            data-bayesilisk-probe
+            data-title="Expired support shortcut reaches HR documents"
+            data-actor-role="support"
+            data-route="/api/hr/documents"
+            data-invariant-id="hr.documents_customer_role_boundary"
+            data-expected-status="403"
+            data-actual-status="200"
+          >
+            <td>HR support shortcut</td>
+            <td><code>support</code></td>
+            <td><code>/api/hr/documents</code></td>
+            <td><code>403</code></td>
+            <td><code data-observed-status>pending</code></td>
+            <td><button type="button" data-run-probe>Run</button></td>
+          </tr>
+          <tr
+            data-bayesilisk-probe
+            data-title="Disabled expenses module still approves a claim"
+            data-actor-role="finance"
+            data-route="/api/expense-claims/{claimId}/review"
+            data-invariant-id="modules.expense_approval_requires_module_and_receipt"
+            data-expected-status="403"
+            data-actual-status="200"
+          >
+            <td>Disabled expense approval</td>
+            <td><code>finance</code></td>
+            <td><code>/api/expense-claims/{claimId}/review</code></td>
+            <td><code>403</code></td>
+            <td><code data-observed-status>pending</code></td>
+            <td><button type="button" data-run-probe>Run</button></td>
+          </tr>
+          <tr
+            data-bayesilisk-probe
+            data-title="Foreign tenant DMS receipt is blocked"
+            data-actor-role="finance"
+            data-route="/api/expense-claims/{claimId}/review"
+            data-invariant-id="dms.tenant_process_boundary"
+            data-expected-status="403"
+            data-actual-status="403"
+          >
+            <td>DMS tenant boundary control</td>
+            <td><code>finance</code></td>
+            <td><code>/api/expense-claims/{claimId}/review</code></td>
+            <td><code>403</code></td>
+            <td><code data-observed-status>pending</code></td>
+            <td><button type="button" data-run-probe>Run</button></td>
+          </tr>
+          <tr
+            data-bayesilisk-probe
+            data-title="Employee self-review is accepted"
+            data-actor-role="employee"
+            data-route="/api/expense-claims/{claimId}/review"
+            data-invariant-id="roles.employee_self_review_forbidden"
+            data-expected-status="403"
+            data-actual-status="200"
+          >
+            <td>Employee self-review</td>
+            <td><code>employee</code></td>
+            <td><code>/api/expense-claims/{claimId}/review</code></td>
+            <td><code>403</code></td>
+            <td><code data-observed-status>pending</code></td>
+            <td><button type="button" data-run-probe>Run</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted">The page does not call a backend. It is a deterministic browser target for adapter testing.</p>
+    </main>
+
+    <script>
+      for (const button of document.querySelectorAll("[data-run-probe]")) {
+        button.addEventListener("click", () => {
+          const row = button.closest("[data-bayesilisk-probe]");
+          row.querySelector("[data-observed-status]").textContent = row.dataset.actualStatus;
+        });
+      }
+    </script>
+  </body>
+</html>

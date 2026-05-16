@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import random
 import re
+import urllib.request
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -133,6 +135,187 @@ CONTEXT_COLLECTION_KEYS = {
     "repositoryFacts",
 }
 
+GRASSMANN_ATTENTION_WEIGHTS = {
+    "failureDensity": 0.45,
+    "untestedness": 0.25,
+    "sensitivity": 0.15,
+    "playwrightEvidence": 0.10,
+    "novelty": 0.05,
+}
+
+INVARIANT_SENSITIVITY = {
+    "roles.route_matrix_allowed": 0.90,
+    "roles.employee_self_review_forbidden": 0.82,
+    "modules.expense_approval_requires_module_and_receipt": 0.86,
+    "dms.tenant_process_boundary": 0.92,
+    "support.takeover_session_required": 0.84,
+    "billing.export_requires_role_and_module": 0.74,
+    "hr.documents_customer_role_boundary": 0.92,
+    "travel.itinerary_chronology": 0.58,
+    "travel.funding_before_expense": 0.64,
+    "travel.expense_items_match_itinerary": 0.62,
+}
+
+ATTENTION_SCENARIO_TEMPLATES: dict[str, dict[str, Any]] = {
+    "roles.route_matrix_allowed": {
+        "title": "Grassmann-attention route matrix probe",
+        "fragments": (
+            "role.support_takeover_expired",
+            "route.expense_approve",
+            "expense.receipt_missing",
+            "dms.foreign_tenant_document",
+            "creative.travel_expense_roundup",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "support.takeover_session_required",
+            "modules.expense_approval_requires_module_and_receipt",
+            "dms.tenant_process_boundary",
+        ),
+    },
+    "roles.employee_self_review_forbidden": {
+        "title": "Grassmann-attention employee self-review probe",
+        "fragments": (
+            "role.employee_self",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.train_ticket",
+            "dms.correct_receipt",
+            "travel.mundane_itinerary",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "roles.employee_self_review_forbidden",
+            "modules.expense_approval_requires_module_and_receipt",
+            "travel.expense_items_match_itinerary",
+        ),
+    },
+    "modules.expense_approval_requires_module_and_receipt": {
+        "title": "Grassmann-attention disabled expense approval probe",
+        "fragments": (
+            "role.finance",
+            "module.expenses_off",
+            "route.expense_approve",
+            "expense.receipt_missing",
+            "dms.correct_receipt",
+            "creative.travel_expense_roundup",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "dms.tenant_process_boundary",
+        ),
+    },
+    "dms.tenant_process_boundary": {
+        "title": "Grassmann-attention foreign DMS evidence probe",
+        "fragments": (
+            "role.finance",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.rental_car",
+            "dms.foreign_tenant_document",
+            "travel.mundane_itinerary",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "dms.tenant_process_boundary",
+        ),
+    },
+    "support.takeover_session_required": {
+        "title": "Grassmann-attention expired support takeover probe",
+        "fragments": (
+            "role.support_takeover_expired",
+            "hr.payroll_file_route",
+            "creative.travel_expense_roundup",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "support.takeover_session_required",
+            "hr.documents_customer_role_boundary",
+        ),
+    },
+    "billing.export_requires_role_and_module": {
+        "title": "Grassmann-attention billing export entitlement probe",
+        "fragments": (
+            "role.finance",
+            "module.billing_off",
+            "billing.export_route",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "billing.export_requires_role_and_module",
+        ),
+    },
+    "hr.documents_customer_role_boundary": {
+        "title": "Grassmann-attention HR document boundary probe",
+        "fragments": (
+            "role.support_takeover_expired",
+            "hr.payroll_file_route",
+            "module.billing_on",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "support.takeover_session_required",
+            "hr.documents_customer_role_boundary",
+        ),
+    },
+    "travel.funding_before_expense": {
+        "title": "Grassmann-attention unapproved travel funding probe",
+        "fragments": (
+            "role.finance",
+            "module.travel_on",
+            "module.expenses_on",
+            "route.travel_funding_request",
+            "travel.funding_missing",
+            "route.expense_approve",
+            "expense.train_ticket",
+            "dms.correct_receipt",
+            "travel.mundane_itinerary",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "travel.funding_before_expense",
+        ),
+    },
+    "travel.itinerary_chronology": {
+        "title": "Grassmann-attention inconsistent itinerary probe",
+        "fragments": (
+            "role.finance",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.train_ticket",
+            "dms.correct_receipt",
+            "travel.inconsistent_itinerary",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "travel.itinerary_chronology",
+            "travel.expense_items_match_itinerary",
+        ),
+    },
+    "travel.expense_items_match_itinerary": {
+        "title": "Grassmann-attention transport mode mismatch probe",
+        "fragments": (
+            "role.finance",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.airfare",
+            "dms.correct_receipt",
+            "travel.legs_missing_airplane",
+        ),
+        "invariants": (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "travel.itinerary_chronology",
+            "travel.expense_items_match_itinerary",
+            "dms.tenant_process_boundary",
+        ),
+    },
+}
+
 
 @dataclass(frozen=True)
 class Fragment:
@@ -183,11 +366,32 @@ FRAGMENTS: tuple[Fragment, ...] = (
         "Finance actor with review and export intent.",
     ),
     Fragment(
+        "role.manager_reviewer",
+        "Expenses",
+        "actor",
+        {"actorRole": "manager", "actorEmployeeId": "emp-manager", "targetEmployeeId": "emp-002"},
+        "Manager actor reviews a different employee's expense claim.",
+    ),
+    Fragment(
+        "role.hr_manager",
+        "HR",
+        "actor",
+        {"actorRole": "hr_manager", "actorEmployeeId": "emp-hr"},
+        "Customer HR manager actor reviews personnel documents.",
+    ),
+    Fragment(
         "role.support_takeover_expired",
         "Support",
         "actor",
         {"actorRole": "support", "supportSessionActive": False, "supportSessionExpired": True},
         "Support actor has an expired takeover session.",
+    ),
+    Fragment(
+        "role.support_takeover_active",
+        "Support",
+        "actor",
+        {"actorRole": "support", "supportSessionActive": True, "supportSessionExpired": False},
+        "Support actor has an active non-expired takeover session.",
     ),
     Fragment(
         "module.expenses_on",
@@ -216,6 +420,13 @@ FRAGMENTS: tuple[Fragment, ...] = (
         "entitlement",
         {"modules": {"billing": True}},
         "Billing module is enabled.",
+    ),
+    Fragment(
+        "module.billing_off",
+        "module entitlements",
+        "entitlement",
+        {"modules": {"billing": False}},
+        "Billing module is disabled.",
     ),
     Fragment(
         "route.travel_funding_request",
@@ -251,6 +462,17 @@ FRAGMENTS: tuple[Fragment, ...] = (
             "travelFundingApproved": False,
         },
         "Travel funding request exists but has no approval.",
+    ),
+    Fragment(
+        "travel.funding_approved_late",
+        "Travel",
+        "data",
+        {
+            "businessFlow": ["travel funding request", "late travel funding approval"],
+            "fundingApprovedOn": "2026-06-15",
+            "travelFundingApproved": True,
+        },
+        "Travel funding is approved after the expense submission date.",
     ),
     Fragment(
         "route.expense_approve",
@@ -332,6 +554,18 @@ FRAGMENTS: tuple[Fragment, ...] = (
         "DMS receipt is tenant-scoped and approved for travel expense.",
     ),
     Fragment(
+        "dms.wrong_process_document",
+        "DMS",
+        "data",
+        {
+            "dmsDocumentStatus": "approved",
+            "dmsProcess": "recruiting",
+            "documentTenantMatches": True,
+            "expectedDmsProcess": "travel_expense",
+        },
+        "DMS document is tenant-scoped but belongs to the wrong process.",
+    ),
+    Fragment(
         "travel.legs_consistent_multimodal",
         "Travel",
         "data",
@@ -379,6 +613,20 @@ FRAGMENTS: tuple[Fragment, ...] = (
             "tripStartsOn": "2026-06-10",
         },
         "Travel itinerary is chronological.",
+    ),
+    Fragment(
+        "travel.legs_missing_airplane",
+        "Travel",
+        "data",
+        {
+            "itineraryCoversExpenseDates": True,
+            "segmentsChronological": True,
+            "transportModesCoveredByItinerary": False,
+            "travelLegs": [{"end": "2026-06-12", "mode": "train", "start": "2026-06-10"}],
+            "tripEndsOn": "2026-06-12",
+            "tripStartsOn": "2026-06-10",
+        },
+        "Travel itinerary is chronological but lacks an airplane leg for airfare.",
     ),
     Fragment(
         "billing.export_route",
@@ -445,6 +693,9 @@ def dms_tenant_boundary(facts: dict[str, Any]) -> tuple[bool, str]:
         return False, "DMS document crosses tenant boundary"
     if facts.get("dmsDocumentStatus") not in {"approved", "accepted"}:
         return False, "DMS document status is not usable"
+    expected_process = facts.get("expectedDmsProcess")
+    if expected_process and facts.get("dmsProcess") != expected_process:
+        return False, f"DMS document process `{facts.get('dmsProcess')}` does not match `{expected_process}`"
     return True, "DMS document is tenant-scoped and usable"
 
 
@@ -620,6 +871,40 @@ SCENARIOS: tuple[Scenario, ...] = (
         ("roles.route_matrix_allowed", "billing.export_requires_role_and_module"),
     ),
     Scenario(
+        "mundane.hr_document_by_hr_manager",
+        "mundane",
+        "Customer HR manager downloads an HR document through the customer HR route.",
+        ("role.hr_manager", "hr.payroll_file_route"),
+        ("roles.route_matrix_allowed", "hr.documents_customer_role_boundary"),
+    ),
+    Scenario(
+        "mundane.manager_reviews_employee_expense",
+        "mundane",
+        "Manager reviews a different employee's expense with usable evidence.",
+        (
+            "role.manager_reviewer",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.train_ticket",
+            "dms.correct_receipt",
+            "travel.mundane_itinerary",
+        ),
+        (
+            "roles.route_matrix_allowed",
+            "roles.employee_self_review_forbidden",
+            "modules.expense_approval_requires_module_and_receipt",
+            "dms.tenant_process_boundary",
+            "travel.expense_items_match_itinerary",
+        ),
+    ),
+    Scenario(
+        "mundane.support_takeover_active_control",
+        "mundane",
+        "Support actor has an active non-expired takeover session with no customer data route.",
+        ("role.support_takeover_active",),
+        ("support.takeover_session_required", "roles.route_matrix_allowed"),
+    ),
+    Scenario(
         "mundane.travel_funding_to_multimodal_expense",
         "mundane",
         "Travel funding request is approved before rental car, train, and airplane expenses.",
@@ -664,6 +949,13 @@ SCENARIOS: tuple[Scenario, ...] = (
         ),
     ),
     Scenario(
+        "roundup.billing_export_disabled_module",
+        "round-up",
+        "Finance actor reaches billing export while the billing module is disabled.",
+        ("role.finance", "module.billing_off", "billing.export_route"),
+        ("roles.route_matrix_allowed", "billing.export_requires_role_and_module"),
+    ),
+    Scenario(
         "creative.support_foreign_dms_expense_review",
         "creative",
         "Expired support session tries to inspect a foreign DMS receipt during expense review.",
@@ -679,6 +971,17 @@ SCENARIOS: tuple[Scenario, ...] = (
             "support.takeover_session_required",
             "dms.tenant_process_boundary",
             "modules.expense_approval_requires_module_and_receipt",
+        ),
+    ),
+    Scenario(
+        "creative.support_active_hr_document_shortcut",
+        "creative",
+        "Active support takeover is still not a customer HR role for HR document download.",
+        ("role.support_takeover_active", "hr.payroll_file_route", "module.billing_on"),
+        (
+            "roles.route_matrix_allowed",
+            "support.takeover_session_required",
+            "hr.documents_customer_role_boundary",
         ),
     ),
     Scenario(
@@ -701,6 +1004,25 @@ SCENARIOS: tuple[Scenario, ...] = (
         ),
     ),
     Scenario(
+        "inconsistent.dms_wrong_process_receipt",
+        "intentionally-inconsistent",
+        "Tenant-scoped DMS evidence comes from the recruiting process during travel expense review.",
+        (
+            "role.finance",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.rental_car",
+            "dms.wrong_process_document",
+            "travel.mundane_itinerary",
+        ),
+        (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "dms.tenant_process_boundary",
+            "travel.expense_items_match_itinerary",
+        ),
+    ),
+    Scenario(
         "roundup.support_hr_document_shortcut",
         "round-up",
         "Support-flavored HR document shortcut composed from partial actor and HR route fragments.",
@@ -709,6 +1031,29 @@ SCENARIOS: tuple[Scenario, ...] = (
             "roles.route_matrix_allowed",
             "support.takeover_session_required",
             "hr.documents_customer_role_boundary",
+        ),
+    ),
+    Scenario(
+        "roundup.travel_expense_before_late_funding",
+        "round-up",
+        "Travel expense is submitted before a late funding approval lands.",
+        (
+            "role.finance",
+            "module.travel_on",
+            "module.expenses_on",
+            "route.travel_funding_request",
+            "route.travel_funding_approve",
+            "travel.funding_approved_late",
+            "route.expense_approve",
+            "expense.train_ticket",
+            "dms.correct_receipt",
+            "travel.mundane_itinerary",
+        ),
+        (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "travel.funding_before_expense",
+            "travel.expense_items_match_itinerary",
         ),
     ),
     Scenario(
@@ -736,6 +1081,26 @@ SCENARIOS: tuple[Scenario, ...] = (
         ),
     ),
     Scenario(
+        "inconsistent.travel_missing_airplane_leg",
+        "intentionally-inconsistent",
+        "Airfare is claimed against a chronological itinerary that lacks an airplane leg.",
+        (
+            "role.finance",
+            "module.expenses_on",
+            "route.expense_approve",
+            "expense.airfare",
+            "dms.correct_receipt",
+            "travel.legs_missing_airplane",
+        ),
+        (
+            "roles.route_matrix_allowed",
+            "modules.expense_approval_requires_module_and_receipt",
+            "travel.itinerary_chronology",
+            "travel.expense_items_match_itinerary",
+            "dms.tenant_process_boundary",
+        ),
+    ),
+    Scenario(
         "inconsistent.travel_air_train_leg_mismatch",
         "intentionally-inconsistent",
         "Airplane and train expenses are attached to reversed travel dates and mismatched legs.",
@@ -759,25 +1124,267 @@ SCENARIOS: tuple[Scenario, ...] = (
 )
 
 
-def generated_composite_scenarios(seed: int, count: int) -> list[Scenario]:
+def attention_composite_scenarios(plane_ids: Iterable[str], count: int) -> list[Scenario]:
+    scenarios: list[Scenario] = []
+    seen: set[tuple[str, ...]] = set()
+    for plane_id in plane_ids:
+        template = ATTENTION_SCENARIO_TEMPLATES.get(plane_id)
+        if not template:
+            continue
+        fragment_ids = tuple(template["fragments"])
+        if fragment_ids in seen:
+            continue
+        seen.add(fragment_ids)
+        scenarios.append(
+            Scenario(
+                f"generated.attention.{len(scenarios) + 1:02d}.{plane_id.replace('.', '_')}",
+                "generated-grassmann-attention",
+                template["title"],
+                fragment_ids,
+                tuple(template["invariants"]),
+                generated=True,
+                generation_basis=f"grassmann-attention:{plane_id}",
+            )
+        )
+        if len(scenarios) >= count:
+            break
+    return scenarios
+
+
+def _slug_id(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")[:48] or "proposal"
+
+
+def _extract_json_object(text: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(text)
+        if isinstance(payload, dict):
+            return payload
+    except json.JSONDecodeError:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return {}
+    try:
+        payload = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _ollama_chat_json(
+    messages: list[dict[str, str]],
+    *,
+    base_url: str,
+    model: str,
+    timeout: float,
+) -> dict[str, Any]:
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TEMPERATURE", "0.2")),
+                "num_predict": int(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_NUM_PREDICT", "1200")),
+            },
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}/api/chat",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    content = data.get("message", {}).get("content", "")
+    if not isinstance(content, str):
+        return {}
+    return _extract_json_object(content)
+
+
+def _model_prompt(attention: dict[str, Any]) -> list[dict[str, str]]:
+    top_planes = [
+        {
+            "attentionScore": plane.get("attentionScore"),
+            "invariantId": plane.get("invariantId"),
+            "reasons": plane.get("reasons", []),
+        }
+        for plane in attention.get("planes", [])[:6]
+    ]
+    catalog = {
+        "allowedFragmentIds": [fragment.id for fragment in FRAGMENTS],
+        "allowedInvariantIds": [invariant.id for invariant in INVARIANTS],
+        "selectedPlaneIds": attention.get("selectedPlaneIds", []),
+        "topPlanes": top_planes,
+    }
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You propose Bayesilisk local verifier scenarios. Return JSON only. "
+                "Use only allowedFragmentIds and allowedInvariantIds. Do not invent routes, facts, "
+                "production observations, customer data, or new invariant names."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Create up to 3 scenario proposals near the selected high-attention planes. "
+                "Shape: {\"scenarios\":[{\"title\":\"...\",\"targetPlane\":\"invariant.id\","
+                "\"fragments\":[\"fragment.id\"],\"invariants\":[\"invariant.id\"]}]}\n\n"
+                f"Catalog:\n{json.dumps(catalog, indent=2, sort_keys=True)}"
+            ),
+        },
+    ]
+
+
+def weak_model_raw_scenario_proposals(attention: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    provider = {
+        "enabled": os.environ.get("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL") == "1",
+        "source": "disabled",
+    }
+    if not provider["enabled"]:
+        return [], provider
+    model = os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", os.environ.get("OLLAMA_MODEL", "gemma4:e2b"))
+    base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
+    timeout = float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TIMEOUT", "45"))
+    provider.update({"baseUrl": base_url, "model": model, "source": "ollama-chat"})
+    try:
+        payload = _ollama_chat_json(
+            _model_prompt(attention),
+            base_url=base_url,
+            model=model,
+            timeout=timeout,
+        )
+    except Exception as exc:
+        provider["error"] = str(exc)
+        return [], provider
+    scenarios = payload.get("scenarios", [])
+    if not isinstance(scenarios, list):
+        provider["error"] = "model response did not include a scenarios array"
+        return [], provider
+    provider["rawCount"] = len(scenarios)
+    return [scenario for scenario in scenarios if isinstance(scenario, dict)], provider
+
+
+def validate_model_scenario_proposals(
+    proposals: list[dict[str, Any]],
+    attention: dict[str, Any],
+    *,
+    limit: int = 3,
+) -> tuple[list[Scenario], list[dict[str, Any]]]:
+    fragment_ids = {fragment.id for fragment in FRAGMENTS}
+    invariant_ids = {invariant.id for invariant in INVARIANTS}
+    selected_planes = set(attention.get("selectedPlaneIds", []))
+    scenarios: list[Scenario] = []
+    rejected: list[dict[str, Any]] = []
+    seen: set[tuple[tuple[str, ...], tuple[str, ...]]] = set()
+    for proposal in proposals:
+        title = proposal.get("title")
+        target_plane = proposal.get("targetPlane")
+        fragments = proposal.get("fragments")
+        invariants = proposal.get("invariants")
+        if not isinstance(title, str) or not title.strip():
+            rejected.append({"reason": "missing-title", "proposal": proposal})
+            continue
+        if not isinstance(target_plane, str) or target_plane not in invariant_ids:
+            rejected.append({"reason": "unknown-target-plane", "proposal": proposal})
+            continue
+        if selected_planes and target_plane not in selected_planes:
+            rejected.append({"reason": "target-plane-not-selected", "proposal": proposal})
+            continue
+        if not isinstance(fragments, list) or not 2 <= len(fragments) <= 12:
+            rejected.append({"reason": "invalid-fragment-count", "proposal": proposal})
+            continue
+        if not isinstance(invariants, list) or not 1 <= len(invariants) <= 6:
+            rejected.append({"reason": "invalid-invariant-count", "proposal": proposal})
+            continue
+        fragment_tuple = tuple(item for item in fragments if isinstance(item, str))
+        invariant_tuple = tuple(item for item in invariants if isinstance(item, str))
+        if len(fragment_tuple) != len(fragments) or any(item not in fragment_ids for item in fragment_tuple):
+            rejected.append({"reason": "unknown-fragment-id", "proposal": proposal})
+            continue
+        if len(invariant_tuple) != len(invariants) or any(item not in invariant_ids for item in invariant_tuple):
+            rejected.append({"reason": "unknown-invariant-id", "proposal": proposal})
+            continue
+        if target_plane not in invariant_tuple:
+            rejected.append({"reason": "target-plane-not-in-invariants", "proposal": proposal})
+            continue
+        key = (fragment_tuple, invariant_tuple)
+        if key in seen:
+            rejected.append({"reason": "duplicate-proposal", "proposal": proposal})
+            continue
+        seen.add(key)
+        digest = hashlib.sha256(json.dumps(proposal, sort_keys=True).encode("utf-8")).hexdigest()[:8]
+        scenarios.append(
+            Scenario(
+                f"generated.model.{len(scenarios) + 1:02d}.{_slug_id(target_plane)}.{digest}",
+                "generated-weak-model-proposal",
+                title.strip(),
+                fragment_tuple,
+                invariant_tuple,
+                generated=True,
+                generation_basis=f"weak-model-proposal:{target_plane}",
+            )
+        )
+        if len(scenarios) >= limit:
+            break
+    return scenarios, rejected
+
+
+def weak_model_scenarios(attention: dict[str, Any]) -> tuple[list[Scenario], dict[str, Any]]:
+    limit = int(os.environ.get("BAYESILISK_MODEL_SCENARIO_LIMIT", "3"))
+    raw, provider = weak_model_raw_scenario_proposals(attention)
+    scenarios, rejected = validate_model_scenario_proposals(raw, attention, limit=limit)
+    provider.update(
+        {
+            "acceptedCount": len(scenarios),
+            "rejected": rejected,
+            "rejectedCount": len(rejected),
+        }
+    )
+    return scenarios, provider
+
+
+def generated_composite_scenarios(
+    seed: int,
+    count: int,
+    attention_plane_ids: Iterable[str] | None = None,
+    model_scenarios: list[Scenario] | None = None,
+) -> list[Scenario]:
     rng = random.Random(seed + 271828)
-    roles = ("role.finance", "role.employee_self", "role.support_takeover_expired")
+    roles = ("role.finance", "role.employee_self", "role.support_takeover_expired", "role.support_takeover_active")
     module_sets = (
         ("module.travel_on", "module.expenses_on"),
         ("module.travel_on", "module.expenses_off"),
         ("module.expenses_on",),
     )
-    funding_states = ("travel.funding_approved", "travel.funding_missing")
-    itinerary_states = ("travel.legs_consistent_multimodal", "travel.inconsistent_itinerary", "travel.mundane_itinerary")
-    receipt_states = ("dms.correct_receipt", "dms.foreign_tenant_document")
+    funding_states = ("travel.funding_approved", "travel.funding_missing", "travel.funding_approved_late")
+    itinerary_states = (
+        "travel.legs_consistent_multimodal",
+        "travel.inconsistent_itinerary",
+        "travel.mundane_itinerary",
+        "travel.legs_missing_airplane",
+    )
+    receipt_states = ("dms.correct_receipt", "dms.foreign_tenant_document", "dms.wrong_process_document")
     expense_modes = (
         ("expense.train_ticket",),
         ("expense.rental_car", "expense.train_ticket"),
         ("expense.rental_car", "expense.train_ticket", "expense.airfare"),
         ("expense.airfare", "expense.train_ticket"),
     )
-    generated: list[Scenario] = []
-    seen: set[tuple[str, ...]] = set()
+    generated: list[Scenario] = attention_composite_scenarios(attention_plane_ids or (), count)
+    seen: set[tuple[str, ...]] = {scenario.fragment_ids for scenario in generated}
+    for scenario in model_scenarios or []:
+        if len(generated) >= count:
+            break
+        if scenario.fragment_ids in seen:
+            continue
+        seen.add(scenario.fragment_ids)
+        generated.append(scenario)
     attempts = 0
     while len(generated) < count and attempts < count * 8:
         attempts += 1
@@ -1043,6 +1650,266 @@ def context_observations(context: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _context_plane_facts(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    facts: list[dict[str, Any]] = []
+    if not context:
+        return facts
+    for item in _context_items(context):
+        if not isinstance(item, dict):
+            continue
+        invariant_id = item.get("invariantId")
+        if not isinstance(invariant_id, str):
+            continue
+        passed = item.get("passed")
+        if not isinstance(passed, bool):
+            expected_status = _int_or_none(item.get("expectedStatus"))
+            observed_status = _int_or_none(item.get("observedStatus"))
+            if expected_status is None or observed_status is None:
+                continue
+            passed = expected_status == observed_status
+        facts.append(
+            {
+                "actorRole": item.get("actorRole"),
+                "invariantId": invariant_id,
+                "passed": passed,
+                "route": item.get("route"),
+                "source": item.get("source", context.get("source", "context")),
+            }
+        )
+    return facts
+
+
+def _normalize_vector(vector: list[float]) -> list[float]:
+    norm = sum(value * value for value in vector) ** 0.5
+    if norm <= 1e-10:
+        return [0.0 for _ in vector]
+    return [float(value) / norm for value in vector]
+
+
+def _cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right:
+        return 0.0
+    limit = min(len(left), len(right))
+    return sum(left[index] * right[index] for index in range(limit))
+
+
+def _ollama_embed_texts(
+    texts: list[str],
+    *,
+    base_url: str,
+    model: str,
+    timeout: float,
+) -> list[list[float]]:
+    if not texts:
+        return []
+    payload = json.dumps({"model": model, "input": texts}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}/api/embed",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    embeddings = data.get("embeddings")
+    if not isinstance(embeddings, list):
+        raise ValueError("Ollama /api/embed response did not include embeddings")
+    return [_normalize_vector([float(value) for value in embedding]) for embedding in embeddings]
+
+
+def _plane_anchor_text(invariant: Invariant) -> str:
+    keywords = " ".join(CONTEXT_INVARIANT_KEYWORDS.get(invariant.id, ()))
+    return f"{invariant.id} {invariant.layer} {invariant.expected} {keywords}".strip()
+
+
+def _context_attention_texts(context: dict[str, Any] | None) -> list[str]:
+    if not context:
+        return []
+    texts: list[str] = []
+    for fact in _context_plane_facts(context):
+        texts.append(
+            " ".join(
+                str(value)
+                for value in (
+                    fact.get("source"),
+                    fact.get("actorRole"),
+                    fact.get("route"),
+                    fact.get("invariantId"),
+                    "passed" if fact.get("passed") else "failed",
+                )
+                if value
+            )
+        )
+    for value in _context_strings(context):
+        if value.strip():
+            texts.append(value.strip())
+    return texts[:24]
+
+
+def embedding_plane_similarities(context: dict[str, Any] | None) -> tuple[dict[str, float], dict[str, Any]]:
+    if os.environ.get("BAYESILISK_USE_OLLAMA_EMBEDDINGS") != "1":
+        return {}, {"enabled": False}
+    model = os.environ.get("BAYESILISK_OLLAMA_MODEL", "nomic-embed-text")
+    base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", "http://localhost:11434")
+    timeout = float(os.environ.get("BAYESILISK_OLLAMA_TIMEOUT", "30"))
+    context_texts = _context_attention_texts(context)
+    if not context_texts:
+        return {}, {"enabled": True, "model": model, "baseUrl": base_url, "textCount": 0}
+    plane_texts = [_plane_anchor_text(invariant) for invariant in INVARIANTS]
+    try:
+        embeddings = _ollama_embed_texts(
+            [*plane_texts, *context_texts],
+            base_url=base_url,
+            model=model,
+            timeout=timeout,
+        )
+    except Exception as exc:
+        return {}, {
+            "baseUrl": base_url,
+            "enabled": True,
+            "error": str(exc),
+            "model": model,
+            "textCount": len(context_texts),
+        }
+    plane_embeddings = embeddings[: len(plane_texts)]
+    context_embeddings = embeddings[len(plane_texts) :]
+    similarities = {}
+    for invariant, plane_embedding in zip(INVARIANTS, plane_embeddings):
+        best = max(
+            (_cosine_similarity(plane_embedding, context_embedding) for context_embedding in context_embeddings),
+            default=0.0,
+        )
+        similarities[invariant.id] = round(max(0.0, min(1.0, best)), 6)
+    return similarities, {
+        "baseUrl": base_url,
+        "enabled": True,
+        "model": model,
+        "textCount": len(context_texts),
+    }
+
+
+def _attention_reason_list(
+    failure_count: int,
+    tested_count: int,
+    playwright_count: int,
+    sensitivity: float,
+    keyword_hits: int,
+    prior_adjustment: float,
+    embedding_similarity: float,
+) -> list[str]:
+    reasons: list[str] = []
+    if failure_count:
+        reasons.append("observed-failure-density")
+    if tested_count == 0:
+        reasons.append("untested-plane")
+    if sensitivity >= 0.85:
+        reasons.append("sensitive-invariant-plane")
+    if playwright_count:
+        reasons.append("playwright-evidence")
+    if keyword_hits:
+        reasons.append("context-keyword-near-plane")
+    if embedding_similarity >= 0.55:
+        reasons.append("ollama-embedding-near-plane")
+    if prior_adjustment:
+        reasons.append("context-prior-adjustment")
+    return reasons or ["baseline-plane"]
+
+
+def grassmann_attention(
+    context: dict[str, Any] | None,
+    observations: dict[str, Any] | None = None,
+    *,
+    selection_limit: int = 4,
+    selection_threshold: float = 0.35,
+) -> dict[str, Any]:
+    summary = context_summary(context)
+    merged_observations = merge_observations(observations, context_observations(context))
+    facts = _context_plane_facts(context)
+    embedding_similarities, embedding_provider = embedding_plane_similarities(context)
+    planes: list[dict[str, Any]] = []
+    for invariant in INVARIANTS:
+        plane_facts = [fact for fact in facts if fact["invariantId"] == invariant.id]
+        tested_count = len(plane_facts)
+        failure_count = len([fact for fact in plane_facts if not fact["passed"]])
+        playwright_count = len([fact for fact in plane_facts if fact["source"] == "microsoft-playwright"])
+        keyword_hits = int(summary["keywordHits"].get(invariant.id, 0))
+        prior_adjustment = float(merged_observations.get("priorAdjustments", {}).get(invariant.id, 0.0))
+        failure_density = failure_count / tested_count if tested_count else 0.0
+        untestedness = 1.0 if tested_count == 0 else max(0.0, 1.0 - min(tested_count, 4) / 4.0)
+        sensitivity = INVARIANT_SENSITIVITY.get(invariant.id, 0.5)
+        playwright_evidence = min(1.0, playwright_count / 3.0)
+        embedding_similarity = embedding_similarities.get(invariant.id, 0.0)
+        novelty = max(min(1.0, keyword_hits / 6.0), embedding_similarity)
+        raw_score = (
+            GRASSMANN_ATTENTION_WEIGHTS["failureDensity"] * failure_density
+            + GRASSMANN_ATTENTION_WEIGHTS["untestedness"] * untestedness
+            + GRASSMANN_ATTENTION_WEIGHTS["sensitivity"] * sensitivity
+            + GRASSMANN_ATTENTION_WEIGHTS["playwrightEvidence"] * playwright_evidence
+            + GRASSMANN_ATTENTION_WEIGHTS["novelty"] * novelty
+        )
+        score = round(min(1.0, max(0.0, raw_score)), 6)
+        planes.append(
+            {
+                "attentionScore": score,
+                "failureCount": failure_count,
+                "failureDensity": round(failure_density, 6),
+                "embeddingSimilarity": round(embedding_similarity, 6),
+                "invariantId": invariant.id,
+                "keywordHits": keyword_hits,
+                "playwrightEvidence": round(playwright_evidence, 6),
+                "priorAdjustment": round(prior_adjustment, 6),
+                "reasons": _attention_reason_list(
+                    failure_count,
+                    tested_count,
+                    playwright_count,
+                    sensitivity,
+                    keyword_hits,
+                    prior_adjustment,
+                    embedding_similarity,
+                ),
+                "sensitivity": sensitivity,
+                "testedCount": tested_count,
+                "untestedness": round(untestedness, 6),
+            }
+        )
+    planes.sort(key=lambda item: (-item["attentionScore"], item["invariantId"]))
+    selected = [
+        plane["invariantId"]
+        for plane in planes
+        if plane["attentionScore"] >= selection_threshold
+    ][:selection_limit]
+    return {
+        "boundedFeedback": True,
+        "embeddingMode": (
+            f"ollama:{embedding_provider.get('model')}"
+            if embedding_provider.get("enabled") and not embedding_provider.get("error")
+            else "grassmann-style-anchor-plane-proxy"
+        ),
+        "embeddingProvider": embedding_provider,
+        "notes": (
+            "Attention scores direct scenario exploration toward bad or under-tested planes. "
+            "They do not decide invariant pass/fail."
+        ),
+        "planes": planes,
+        "selectedPlaneIds": selected,
+        "source": summary["source"],
+        "weights": GRASSMANN_ATTENTION_WEIGHTS,
+    }
+
+
 def merge_observations(base: dict[str, Any] | None, incoming: dict[str, Any] | None) -> dict[str, Any]:
     base = base or {}
     incoming = incoming or {}
@@ -1160,12 +2027,25 @@ def build_report(
     limit: int | None = None,
     generated_count: int = 8,
     observations: dict[str, Any] | None = None,
+    grassmann: dict[str, Any] | None = None,
+    model_scenarios: list[Scenario] | None = None,
 ) -> dict[str, Any]:
     observations = observations or {}
+    grassmann = grassmann or {}
+    attention_by_invariant = {
+        plane["invariantId"]: plane
+        for plane in grassmann.get("planes", [])
+        if isinstance(plane, dict) and isinstance(plane.get("invariantId"), str)
+    }
     rng = random.Random(seed)
     fragment_by_id = {fragment.id: fragment for fragment in FRAGMENTS}
     invariant_by_id = {invariant.id: invariant for invariant in INVARIANTS}
-    generated_scenarios = generated_composite_scenarios(seed, generated_count)
+    generated_scenarios = generated_composite_scenarios(
+        seed,
+        generated_count,
+        attention_plane_ids=grassmann.get("selectedPlaneIds", []),
+        model_scenarios=model_scenarios,
+    )
     scenario_order = [*SCENARIOS, *generated_scenarios]
     rng.shuffle(scenario_order)
 
@@ -1188,6 +2068,7 @@ def build_report(
             mode = posterior_mode(passed, risk_score, invariant)
             readiness = issue_readiness(passed, classification, basis)
             title = suggested_title(scenario, invariant, observed_result, classification)
+            attention_plane = attention_by_invariant.get(invariant.id, {})
             body = suggested_body(
                 scenario,
                 invariant,
@@ -1230,6 +2111,8 @@ def build_report(
                     "observation": observation,
                     "classification": classification,
                     "issueReadiness": readiness,
+                    "attentionScore": attention_plane.get("attentionScore", 0.0),
+                    "attentionReasons": attention_plane.get("reasons", ["no-grassmann-attention"]),
                     "observationBasis": basis,
                     "prior": invariant.prior,
                     "adjustedPrior": adjusted_prior,
@@ -1252,6 +2135,16 @@ def build_report(
         "deterministic": True,
         "productionAccess": False,
         "generatedScenarioCount": len(generated_scenarios),
+        "grassmannAttention": grassmann or {
+            "boundedFeedback": True,
+            "embeddingMode": "disabled",
+            "planes": [],
+            "selectedPlaneIds": [],
+            "source": "none",
+        },
+        "weakModelScenarioGeneration": grassmann.get("weakModelScenarioGeneration", {"enabled": False})
+        if grassmann
+        else {"enabled": False},
         "domains": ["Travel", "Expenses", "Billing", "HR", "Support", "DMS", "module entitlements"],
         "prioritizationPolicy": (
             "Sort by posterior fault probability first. Fix or document breakage.easy findings, rerun with the "
@@ -1284,11 +2177,16 @@ def build_contextual_report(
 ) -> dict[str, Any]:
     summary = context_summary(context)
     merged_observations = merge_observations(observations, context_observations(context))
+    attention = grassmann_attention(context, observations)
+    model_scenarios, model_generation = weak_model_scenarios(attention)
+    attention["weakModelScenarioGeneration"] = model_generation
     report = build_report(
         seed,
         limit=limit,
         generated_count=generated_count,
         observations=merged_observations,
+        grassmann=attention,
+        model_scenarios=model_scenarios,
     )
     report["contextSummary"] = summary
     report["contextObservationSource"] = merged_observations.get("source", "none")
@@ -1372,6 +2270,8 @@ def issue_payloads(
                 "invariantId": finding["invariantId"],
                 "issueReadiness": finding["issueReadiness"],
                 "labels": labels,
+                "attentionReasons": finding.get("attentionReasons", []),
+                "attentionScore": finding.get("attentionScore", 0.0),
                 "posteriorMode": finding["posteriorMode"],
                 "riskScore": finding["riskScore"],
                 "scenarioId": finding["scenarioId"],
@@ -1435,6 +2335,7 @@ def markdown_report(report: dict[str, Any]) -> str:
         f"- Deterministic: `{str(report['deterministic']).lower()}`",
         f"- Production access: `{str(report['productionAccess']).lower()}`",
         f"- Generated scenarios: `{report['generatedScenarioCount']}`",
+        f"- Grassmann attention: `{report['grassmannAttention']['embeddingMode']}`",
         f"- Prioritization: {report['prioritizationPolicy']}",
         "",
         "## Sections",
@@ -1462,6 +2363,8 @@ def markdown_report(report: dict[str, Any]) -> str:
                 f"- Observed result: `{finding['observedResult']}`",
                 f"- Observation: {finding['observation']}",
                 f"- Observation basis: `{', '.join(finding['observationBasis']['tags'])}`",
+                f"- Attention score: `{finding.get('attentionScore', 0.0):.6f}`",
+                f"- Attention reasons: `{', '.join(finding.get('attentionReasons', []))}`",
                 f"- Risk score: `{finding['riskScore']:.6f}`",
                 "- Sub-scenarios:",
             ]
@@ -1476,7 +2379,7 @@ def markdown_report(report: dict[str, Any]) -> str:
                 json.dumps(finding["accessPattern"], indent=2, sort_keys=True),
                 "```",
                 "",
-                "Suggested Gitea issue body:",
+                "Suggested issue body:",
                 "",
                 "````markdown",
                 finding["suggestedIssueBody"],
@@ -1503,11 +2406,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None, help="Optional maximum number of findings.")
     parser.add_argument("--generated-count", type=int, default=8, help="Number of seeded generated composite scenarios.")
     parser.add_argument("--observations", type=Path, default=None, help="Optional JSON observation history.")
-    parser.add_argument("--context", type=Path, default=None, help="Optional JSON context from agents, Gitea, or repo scans.")
+    parser.add_argument("--context", type=Path, default=None, help="Optional JSON context from agents, trackers, or repo scans.")
     parser.add_argument(
         "--issue-payloads",
         action="store_true",
-        help="Emit only deduped Gitea issue payloads for ready failed findings.",
+        help="Emit only deduped issue payloads for ready failed findings.",
     )
     return parser.parse_args()
 

@@ -1,6 +1,6 @@
 # Bayesilisk
 
-Bayesilisk is a deterministic local verifier for permission, entitlement, route, and data-boundary scenarios. It combines explicit rule invariants with Bayesian-style prioritization so future issue worktrees can generate reproducible JSON or Markdown findings for Gitea issues.
+Bayesilisk is a deterministic local verifier for permission, entitlement, route, and data-boundary scenarios. It combines explicit rule invariants with Bayesian-style prioritization so tester and agent workflows can generate reproducible JSON, Markdown, and issue-ready findings.
 
 Bayesilisk has no production access. It uses static scenario fragments from the repository, a caller-provided seed, and standard-library Python only.
 
@@ -62,7 +62,7 @@ JSON and Markdown reports include:
 - observation basis and prior adjustment;
 - prior, likelihood, posterior probability, posterior mode, and risk score;
 - report sections for confirmed breakages, candidate probes, hard-to-find modes, and controls;
-- suggested Gitea issue title and body.
+- suggested issue title and body.
 
 Suggested issue bodies include the exact scenario id, fingerprint, issue readiness, classification, posterior mode, invariant expectation, observation, score, observation basis, access pattern, fragments, and reproduction command.
 
@@ -100,7 +100,7 @@ Observation history is optional JSON:
 }
 ```
 
-Context ingestion is separate from observation history and is designed for agent and Gitea context:
+Context ingestion is separate from observation history and is designed for agent and issue-tracker context:
 
 ```json
 {
@@ -127,7 +127,7 @@ Context ingestion is separate from observation history and is designed for agent
 }
 ```
 
-Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent notes, route/role terms, DMS/process terms, travel/expense terms, support-takeover terms, and related scenario language. Matching context nudges the relevant invariant priors but does not override rule failures. Existing fingerprints are treated as dedupe/mute signals so `bayesilisk.issue_payloads` does not create duplicate Gitea issues.
+Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent notes, route/role terms, DMS/process terms, travel/expense terms, support-takeover terms, and related scenario language. Matching context nudges the relevant invariant priors but does not override rule failures. Existing fingerprints are treated as dedupe/mute signals so `bayesilisk.issue_payloads` does not create duplicate tracker issues.
 
 ## MCP tool server
 
@@ -140,10 +140,96 @@ python3 -m bayesilisk.mcp_server
 It exposes three tools:
 
 - `bayesilisk.run`: run the full contextual report with optional observations and context.
-- `bayesilisk.rank_context`: return the ranked failed probes from supplied agent/Gitea/repo context.
-- `bayesilisk.issue_payloads`: return deduped Gitea-ready issue payloads for failed findings marked `ready-for-issue`.
+- `bayesilisk.rank_context`: return the ranked failed probes from supplied agent, tracker, and repository context.
+- `bayesilisk.issue_payloads`: return deduped issue payloads for failed findings marked `ready-for-issue`.
 
-Agents should pass the current issue list, open PRs, branch facts, local verifier notes, and any known Bayesilisk fingerprints as context. The MCP tools still run locally, use deterministic seeds, and must not contact production systems or mutate Gitea directly.
+Agents should pass the current issue list, open PRs, branch facts, local verifier notes, and any known Bayesilisk fingerprints as context. The MCP tools still run locally, use deterministic seeds, and must not contact production systems or mutate issue trackers directly.
+
+## Microsoft Playwright bridge
+
+Bayesilisk can be paired with Microsoft Playwright as an optional browser evidence collector. The browser probe is separate from the verifier: it opens a local or caller-provided target URL, clicks elements marked with `data-bayesilisk-probe`, records expected versus observed route status codes, and writes Bayesilisk context JSON.
+
+Install the optional browser dependency and run the bundled target:
+
+```sh
+python3 -m pip install -e '.[playwright]'
+python3 -m playwright install chromium
+python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
+```
+
+The target contract is intentionally small. Each probe row needs:
+
+- `data-bayesilisk-probe`
+- `data-title`
+- `data-actor-role`
+- `data-route`
+- `data-invariant-id`
+- `data-expected-status`
+- a clickable child marked `data-run-probe`
+- a status child marked `data-observed-status`
+
+The bundled `demo/playwright_target.html` is static and includes deliberate permission mismatches. The generated context uses `agentNotes`, `repositoryFacts`, and explicit `priorAdjustments` to promote related Bayesilisk invariants, but it still does not prove a production defect by itself.
+
+## Grassmann attention
+
+Contextual reports also include a bounded Grassmann-style attention layer. It is modeled after the practical Cage pattern: extract local context-plane anchors, score overlap/coupling, and use that score to direct the next exploration step. Bayesilisk keeps the default implementation transparent and dependency-free by using an anchor-plane proxy. If `BAYESILISK_USE_OLLAMA_EMBEDDINGS=1` is set, it also calls Ollama `/api/embed` with `BAYESILISK_OLLAMA_MODEL` defaulting to `nomic-embed-text`, normalizes the returned vectors, and adds `embeddingSimilarity` as another plane signal.
+
+The attention loop uses:
+
+- Playwright `repositoryFacts`, especially expected versus observed route status;
+- invariant ids and descriptions;
+- route, role, module, tenant, DMS, HR, support, travel, and expense terms in context;
+- prior adjustments supplied by the caller or inferred from context text;
+- whether a plane has browser evidence, failures, or no coverage.
+
+Each plane reports:
+
+- `attentionScore`;
+- `failureDensity`;
+- `untestedness`;
+- `sensitivity`;
+- `playwrightEvidence`;
+- `keywordHits`;
+- `priorAdjustment`;
+- optional `embeddingSimilarity`;
+- human-readable attention reasons.
+
+High-attention planes are copied to `selectedPlaneIds`. The seeded generator uses those plane ids to add nearby generated scenarios, for example an HR/support plane can produce an expired-support HR document probe. This is the positive feedback loop: bad or under-tested planes receive more deterministic probes on the next report.
+
+If `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` is set, Bayesilisk also runs a local scenario proposer model through Ollama `/api/chat`. The default model is `BAYESILISK_OLLAMA_SCENARIO_MODEL`, then `OLLAMA_MODEL`, then `gemma4:e2b`. The prompt receives only selected planes plus the allowed fragment and invariant ids, and asks for strict JSON:
+
+```json
+{
+  "scenarios": [
+    {
+      "title": "Support actor reaches HR documents after active takeover",
+      "targetPlane": "hr.documents_customer_role_boundary",
+      "fragments": ["role.support_takeover_active", "hr.payroll_file_route"],
+      "invariants": ["support.takeover_session_required", "hr.documents_customer_role_boundary"]
+    }
+  ]
+}
+```
+
+The proposal is accepted only if every fragment id and invariant id exists, the target plane is selected, and the target invariant is included in the scenario. Accepted proposals appear as `generated.model.*` scenarios. The current report contract still uses `generationBasis=weak-model-proposal:<plane>` and `weakModelScenarioGeneration.rejected` for compatibility with earlier Bayesilisk reports.
+
+The preferred local proposer for scenario generation is:
+
+```sh
+BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1 \
+BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
+```
+
+Scenario tests must cover both sides of each invariant. The deterministic catalog is expected to include at least one passing control and one failing bad-spot for every invariant before attention or model proposals are considered.
+
+Attention never authorizes access, hides failures, or declares a bug. It only changes where Bayesilisk looks next. The final finding still separates:
+
+- `attentionScore` and `attentionReasons`: selected by Grassmann-style attention;
+- `generationBasis`: deterministic template, seeded composite, or model proposal provenance;
+- `observedResult`: verified by deterministic invariants;
+- `riskScore`: Bayesian-style prioritization after the invariant result.
 
 ## Hardening workflow
 

@@ -1,10 +1,50 @@
 # Bayesilisk
 
-Bayesilisk is a deterministic local verifier for permission, entitlement, route, and data-boundary scenarios. It combines explicit rule invariants with Bayesian-style prioritization so agent workflows can produce reproducible JSON or Markdown findings.
+Bayesilisk is a deterministic local verifier for permission, entitlement, route,
+and data-boundary scenarios. It combines explicit rule invariants with
+Bayesian-style prioritization so agent and tester workflows can produce
+reproducible JSON, Markdown, and issue-ready findings.
 
-Bayesilisk uses only local static scenarios, caller-provided context, optional observation history, and the Python standard library. It does not connect to production systems or inspect live customer data.
+Bayesilisk is intentionally local-first. It uses static scenario fragments,
+caller-provided context, optional observation history, optional browser evidence,
+and optional local model proposals. It does not connect to production systems or
+inspect live customer data.
 
-## Usage
+## What It Is
+
+Bayesilisk is designed to find "bad spots" in authorization and data-boundary
+logic before those gaps become hard-to-debug application bugs.
+
+It checks scenarios involving:
+
+- permission and role-route matrices;
+- customer module entitlements;
+- expense approval and receipt evidence;
+- billing export access;
+- HR document access boundaries;
+- support takeover sessions;
+- DMS tenant and process boundaries;
+- travel funding and travel-expense consistency.
+
+The core verifier is deterministic:
+
+```text
+scenario facts -> invariant checks -> pass/fail -> Bayesian ranking
+```
+
+No embedding, model output, issue text, or Playwright observation can directly
+declare a bug. Those layers can only steer where Bayesilisk looks next.
+
+See [DESIGN.md](DESIGN.md) for the governing architecture:
+
+```text
+Playwright is the sensor.
+Grassmann attention is the router.
+The scenario proposer model is the proposer.
+Bayesilisk is the judge.
+```
+
+## Quick Start
 
 Run the CLI from the repository root:
 
@@ -14,18 +54,158 @@ python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
 ```
 
-Run the stdio MCP tool server:
+After installation, the same entry points are available as:
 
 ```sh
-python3 -m bayesilisk.mcp_server
+bayesilisk --seed 150 --format json
+bayesilisk-mcp
 ```
 
-After installing the package, the same entry points are available as `bayesilisk` and `bayesilisk-mcp`.
-
-## Development
+Run the test suite:
 
 ```sh
 python3 -m pytest
 ```
 
-See [docs/bayesilisk.md](docs/bayesilisk.md) for the full report contract, context ingestion format, and hardening workflow.
+## Reports
+
+Reports include:
+
+- seed and tool version;
+- deterministic production-access boundary;
+- scenario fragments and generated sub-scenarios;
+- access patterns;
+- expected invariant and observed result;
+- stable fingerprint and dedupe key;
+- classification and issue readiness;
+- attention score and attention reasons when context is supplied;
+- posterior probability and risk score;
+- suggested issue title and body.
+
+Only findings with:
+
+```text
+observedResult = fail
+issueReadiness = ready-for-issue
+```
+
+should be opened automatically. `probe-only`, `regression-watch`,
+`do-not-open-muted`, and `no-issue-control` findings are intentionally not
+automatic issue material.
+
+## Microsoft Playwright Bridge
+
+Bayesilisk includes a static demo target and an optional Microsoft Playwright
+probe. Playwright observes concrete browser behavior and writes Bayesilisk
+context; Bayesilisk still performs deterministic verification afterward.
+
+Install the optional browser dependency:
+
+```sh
+python3 -m pip install -e '.[playwright]'
+python3 -m playwright install chromium
+```
+
+Run the bundled demo probe:
+
+```sh
+python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
+```
+
+The demo page is local and static. It intentionally includes a few wrong observed
+statuses so the probe can produce route, role, and invariant context without
+touching production systems.
+
+## Grassmann Attention
+
+Contextual reports include a bounded Grassmann-style attention layer. It treats
+Playwright observations, repository facts, issue text, and invariant descriptions
+as local context planes, then scores which planes look bad or under-tested.
+
+By default this uses a dependency-free anchor-plane proxy. Set
+`BAYESILISK_USE_OLLAMA_EMBEDDINGS=1` to add Ollama `/api/embed` similarities with
+`BAYESILISK_OLLAMA_MODEL`, defaulting to `nomic-embed-text`.
+
+Attention scores answer:
+
+```text
+Where should Bayesilisk look next?
+```
+
+Risk scores answer:
+
+```text
+Given this deterministic rule result, how important is this finding?
+```
+
+Those are deliberately separate.
+
+## Scenario Proposer Model
+
+Set `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` to let a local scenario proposer
+model suggest extra scenario compositions through Ollama `/api/chat`.
+
+The preferred local proposer is `gemma4:e2b`:
+
+```sh
+BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1 \
+BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
+```
+
+Model output is untrusted. Bayesilisk accepts a proposal only if it uses known
+fragment ids and invariant ids, targets a selected attention plane, and passes
+schema validation. Accepted proposals appear as `generated.model.*` scenarios
+with `weak-model-proposal:*` provenance for compatibility with the earlier
+report field name.
+
+## MCP Server
+
+Bayesilisk includes a small stdio MCP tool server:
+
+```sh
+python3 -m bayesilisk.mcp_server
+```
+
+It exposes:
+
+- `bayesilisk.run`;
+- `bayesilisk.rank_context`;
+- `bayesilisk.issue_payloads`.
+
+Agents should pass current issue lists, open PRs, branch facts, local verifier
+notes, Playwright observations, and known Bayesilisk fingerprints as context.
+The MCP server still runs locally and does not mutate GitHub or production
+systems.
+
+## Documentation
+
+Sphinx documentation lives in [docs/](docs/). The GitHub Pages workflow builds it
+with MyST Markdown support and publishes it from GitHub Actions.
+
+Local docs build:
+
+```sh
+python3 -m pip install -r docs/requirements.txt
+sphinx-build -b html docs docs/_build/html
+```
+
+## Development Notes
+
+The test suite includes scenario-matrix coverage:
+
+- every catalog scenario must reference valid fragments and invariants;
+- every invariant must have at least one passing control and one failing
+  bad-spot case in the deterministic catalog;
+- Playwright, Grassmann attention, and model proposals must not override
+  deterministic verifier results.
+
+Current public planning issues are tracked in GitHub Issues.
+
+## Boundaries
+
+Bayesilisk is a verifier and prioritizer, not an authorization engine. It must
+not connect to production systems, inspect live customer data, create migrations,
+or emit internal platform claims as customer package claims.

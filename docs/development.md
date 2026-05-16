@@ -1,0 +1,59 @@
+# Development
+
+## Repository Layout
+
+```text
+bayesilisk/
+  bayesilisk.py          deterministic verifier, attention, reports, CLI
+  playwright_adapter.py  Playwright observation adapter
+  mcp_server.py          stdio MCP server
+demo/
+  playwright_target.html local browser-probe target
+docs/
+  *.md                   Sphinx/MyST documentation
+tests/
+  test_bayesilisk_runner.py
+tools/
+  playwright_probe.py    demo and target Playwright probe
+```
+
+## Test Policy
+
+Run:
+
+```sh
+python3 -m pytest
+```
+
+The tests should cover:
+
+- every catalog scenario references valid fragments and invariants;
+- every invariant has at least one passing control and one failing bad-spot case;
+- Playwright context affects attention but does not override deterministic results;
+- model-proposed scenarios are validated before use;
+- issue payloads are deduped and only emitted for ready failed findings.
+
+## Docs Policy
+
+Build docs locally before changing the public documentation:
+
+```sh
+python3 -m pip install -r docs/requirements.txt
+sphinx-build -b html docs docs/_build/html
+```
+
+The GitHub Pages workflow builds the same Sphinx site on pushes to `main`.
+
+## Public Language
+
+Use “scenario proposer model” in user-facing documentation. The current code still emits some `weakModelScenarioGeneration` and `weak-model-proposal:*` fields for compatibility with earlier report contracts.
+
+## Boundaries
+
+Do not add code that:
+
+- connects Bayesilisk to production systems;
+- treats embeddings as pass/fail evidence;
+- treats model output as trusted;
+- opens tracker issues directly from the verifier;
+- hides deterministic failures because attention is low.

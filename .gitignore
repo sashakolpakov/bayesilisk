@@ -6,5 +6,6 @@ __pycache__/
 .coverage
 dist/
 build/
+docs/_build/
 *.egg-info/
 .venv/

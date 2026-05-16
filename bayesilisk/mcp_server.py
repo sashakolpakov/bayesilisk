@@ -21,7 +21,7 @@ PROTOCOL_VERSION = "2024-11-05"
 TOOLS: tuple[dict[str, Any], ...] = (
     {
         "name": "bayesilisk.run",
-        "description": "Run Bayesilisk with optional agent/Gitea context and return the full contextual report.",
+        "description": "Run Bayesilisk with optional agent/tracker context and return the full contextual report.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -35,7 +35,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "bayesilisk.rank_context",
-        "description": "Rank likely fault probes from supplied repo, Gitea, and agent context.",
+        "description": "Rank likely fault probes from supplied repository, tracker, and agent context.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -49,7 +49,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "bayesilisk.issue_payloads",
-        "description": "Return deduped Gitea-ready issue payloads for confirmed local invariant failures.",
+        "description": "Return deduped issue payloads for confirmed local invariant failures.",
         "inputSchema": {
             "type": "object",
             "properties": {
