@@ -1,9 +1,18 @@
 # Bayesilisk
 
-Bayesilisk is a deterministic local verifier for permission, entitlement, route,
-and data-boundary scenarios. It is built for testers and agents that need
-reproducible findings, stable fingerprints, and issue-ready output without
-granting a model authority over the final verdict.
+```{image} ../logo/bayesilisk_logo.png
+:alt: Bayesilisk logo
+:width: 180px
+:align: center
+```
+
+Bayesilisk is a deterministic local layer for permission, entitlement, route,
+and data-boundary sitting over Playwright, with Grassmann attention, and
+LLM-generated scenario-proposal workflows gated by a finite-state verifier.
+
+It is built for testers and agents that need reproducible findings, stable
+fingerprints, and issue-ready output without granting a model authority over the
+final verdict.
 
 ```text
 Playwright is the sensor.

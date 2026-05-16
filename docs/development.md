@@ -4,7 +4,7 @@
 
 ```text
 bayesilisk/
-  bayesilisk.py          deterministic verifier, attention, reports, CLI
+  bayesilisk.py          finite-state verifier, attention, reports, CLI
   playwright_adapter.py  Playwright observation adapter
   mcp_server.py          stdio MCP server
 demo/

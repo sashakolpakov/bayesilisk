@@ -27,6 +27,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "furo"
 html_title = "Bayesilisk"
+html_logo = "../logo/bayesilisk_logo.png"
 html_static_path = ["_static"]
 
 myst_enable_extensions = [

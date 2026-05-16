@@ -1,6 +1,8 @@
 # Bayesilisk
 
-Bayesilisk is a deterministic local verifier for permission, entitlement, route, and data-boundary scenarios. It combines explicit rule invariants with Bayesian-style prioritization so tester and agent workflows can generate reproducible JSON, Markdown, and issue-ready findings.
+Bayesilisk is a deterministic local layer for permission, entitlement, route, and data-boundary sitting over Playwright, with Grassmann attention, and LLM-generated scenario-proposal workflows gated by a finite-state verifier.
+
+It combines explicit rule invariants with Bayesian-style prioritization so tester and agent workflows can generate reproducible JSON, Markdown, and issue-ready findings.
 
 Bayesilisk has no production access. It uses static scenario fragments from the repository, a caller-provided seed, and standard-library Python only.
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Bayesilisk is built around one hard rule: the deterministic verifier is the only component that can mark a scenario as pass or fail.
+Bayesilisk is built around one hard rule: the finite-state deterministic verifier is the only component that can mark a scenario as pass or fail.
 
 ```text
 scenario facts -> invariant checks -> pass/fail -> Bayesian ranking
@@ -10,7 +10,7 @@ The surrounding layers improve where Bayesilisk looks next, but they do not deci
 
 ## Core Verifier
 
-The verifier owns:
+The finite-state verifier owns:
 
 - scenario fragments;
 - fact merging;

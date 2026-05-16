@@ -4,7 +4,7 @@ This document is the governing design for Bayesilisk. Implementation details can
 
 ## Core Principle
 
-Bayesilisk is a deterministic verifier with optional attention and proposal layers around it.
+Bayesilisk is a deterministic finite-state verifier with optional attention and proposal layers around it.
 
 The core rule engine remains the authority:
 

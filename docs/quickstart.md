@@ -70,7 +70,7 @@ BAYESILISK_OLLAMA_MODEL=nomic-embed-text \
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
 ```
 
-The scenario proposer model suggests extra candidate scenarios. Bayesilisk validates those proposals before they enter the deterministic verifier:
+The scenario proposer model suggests extra candidate scenarios. Bayesilisk validates those proposals before they enter the finite-state verifier:
 
 ```sh
 BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1 \

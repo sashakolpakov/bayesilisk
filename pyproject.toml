@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bayesilisk"
 version = "1.2.0"
-description = "Deterministic local verifier for permission, entitlement, route, and data-boundary scenarios."
+description = "Deterministic local layer for permission, entitlement, route, and data-boundary sitting over Playwright, with Grassmann attention, and LLM-generated scenario-proposal workflows gated by a finite-state verifier."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
