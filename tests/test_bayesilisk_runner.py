@@ -416,11 +416,26 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
         },
     ]
 
-    scenarios, rejected = bayesilisk.validate_model_scenario_proposals(proposals, attention)
+    provider = {
+        "baseUrlClass": "loopback",
+        "modelName": "gemma4:e2b",
+        "promptHash": "prompt-hash-for-test",
+        "promptVersion": "scenario-proposer.v1",
+        "provider": "ollama",
+        "source": "ollama-chat",
+        "sourceContext": "unit-test",
+    }
+    scenarios, rejected = bayesilisk.validate_model_scenario_proposals(proposals, attention, provider=provider)
     assert len(scenarios) == 1
     assert scenarios[0].id.startswith("generated.model.01.hr_documents_customer_role_boundary")
     assert scenarios[0].generation_basis == "weak-model-proposal:hr.documents_customer_role_boundary"
+    assert scenarios[0].provenance["provider"] == "ollama"
+    assert scenarios[0].provenance["modelName"] == "gemma4:e2b"
+    assert scenarios[0].provenance["baseUrlClass"] == "loopback"
+    assert scenarios[0].provenance["promptHash"] == "prompt-hash-for-test"
+    assert scenarios[0].provenance["proposalHash"]
     assert rejected[0]["reason"] == "unknown-fragment-id"
+    assert rejected[0]["proposalHash"]
 
     report = bayesilisk.build_report(
         150,
@@ -447,6 +462,12 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
     assert model_findings
     assert any(finding["observedResult"] == "fail" for finding in model_findings)
     assert all(finding["generationBasis"].startswith("weak-model-proposal:") for finding in model_findings)
+    assert all(finding["modelProvenance"]["proposalHash"] == scenarios[0].provenance["proposalHash"] for finding in model_findings)
+
+    payloads = bayesilisk.issue_payloads(report)
+    model_payloads = [payload for payload in payloads if payload["scenarioId"] == scenarios[0].id]
+    assert model_payloads
+    assert all(payload["modelProvenance"]["provider"] == "ollama" for payload in model_payloads)
 
 
 def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:

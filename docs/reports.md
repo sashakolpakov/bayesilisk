@@ -18,6 +18,7 @@ A full report includes:
 - attention score and reasons;
 - posterior probability and risk score;
 - suggested issue title and body.
+- safe model proposal provenance for accepted model-proposed scenarios.
 
 ## Finding Status
 
@@ -63,3 +64,7 @@ python3 -m bayesilisk --seed 150 --context /tmp/context.json --issue-payloads
 ```
 
 The CLI does not mutate issue trackers. It returns payloads that another trusted workflow can review and submit.
+
+When a finding came from a model-proposed scenario, issue payloads include the
+same safe `modelProvenance` object as the report. This provenance is intended for
+auditability only; it does not make the model output trusted.
