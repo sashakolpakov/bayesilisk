@@ -19,6 +19,13 @@ A full report includes:
 - posterior probability and risk score;
 - suggested issue title and body.
 
+Contextual reports also expose four first-class ledgers:
+
+- `observedByPlaywright`: concrete browser evidence supplied by Playwright;
+- `selectedByGrassmannAttention`: invariant planes selected for exploration;
+- `proposedByModel`: untrusted scenario proposal activity;
+- `verifiedByBayesilisk`: deterministic invariant results that issue payloads may use.
+
 ## Finding Status
 
 `observedResult` is deterministic:
