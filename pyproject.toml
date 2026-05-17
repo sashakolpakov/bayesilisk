@@ -24,3 +24,7 @@ include = ["bayesilisk*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live_playwright: requires installed Playwright browsers and runs the browser probe end to end",
+    "live_ollama: requires a reachable Ollama server and configured scenario proposer model",
+]
