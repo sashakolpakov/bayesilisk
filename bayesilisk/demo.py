@@ -18,7 +18,7 @@ from .model_proposals import (
     validate_model_scenario_proposals,
 )
 from .playwright_adapter import build_context_from_probe_results
-from .reporting import build_contextual_report, issue_payloads
+from .reporting import build_contextual_report, build_report, issue_payloads
 
 
 CLASSIFICATION_LEGEND: dict[str, str] = {
@@ -48,47 +48,146 @@ DEMO_PROBES: tuple[dict[str, str], ...] = (
     {
         "actorRole": "manager",
         "actualStatus": "200",
+        "domain": "Travel",
         "expectedStatus": "409",
+        "fixtureId": "travel-expense-before-funding",
         "invariantId": "travel.funding_before_expense",
         "meaning": "Should reject expense review before travel funding is approved.",
         "route": "/demo/wizard/expense-review",
+        "source": "seeded-workflow-fixture",
         "title": "Wizard accepts expense review before travel funding approval",
     },
     {
         "actorRole": "finance",
         "actualStatus": "200",
+        "domain": "Travel",
         "expectedStatus": "409",
+        "fixtureId": "travel-itinerary-expense-mismatch",
         "invariantId": "travel.expense_items_match_itinerary",
         "meaning": "Should reject expense review when itinerary and expense dates do not match.",
         "route": "/demo/checkout/review",
+        "source": "seeded-workflow-fixture",
         "title": "Checkout review accepts itinerary and expense mismatch",
     },
     {
         "actorRole": "employee",
         "actualStatus": "200",
+        "domain": "Expenses",
         "expectedStatus": "409",
+        "fixtureId": "expense-duplicate-stale-submit",
         "invariantId": "modules.expense_approval_requires_module_and_receipt",
         "meaning": "Should reject duplicate or stale expense submission state.",
         "route": "/demo/retry/expense-submit",
+        "source": "seeded-workflow-fixture",
         "title": "Retry after back navigation creates duplicate submission",
     },
     {
         "actorRole": "support",
         "actualStatus": "200",
+        "domain": "HR",
         "expectedStatus": "403",
+        "fixtureId": "support-hr-document-shortcut",
         "invariantId": "hr.documents_customer_role_boundary",
         "meaning": "Should deny support access to customer HR documents.",
         "route": "/api/hr/documents",
+        "source": "seeded-workflow-fixture",
         "title": "Support actor reaches HR document route",
     },
     {
         "actorRole": "finance",
         "actualStatus": "200",
+        "domain": "Billing",
         "expectedStatus": "403",
+        "fixtureId": "billing-export-feature-off",
         "invariantId": "billing.export_requires_role_and_module",
         "meaning": "Should deny billing export when the feature/module boundary is closed.",
         "route": "/api/billing/exports",
+        "source": "seeded-workflow-fixture",
         "title": "Feature flag off but billing export path remains exposed",
+    },
+    {
+        "actorRole": "finance",
+        "actualStatus": "200",
+        "domain": "DMS",
+        "expectedStatus": "403",
+        "fixtureId": "foreign-tenant-receipt",
+        "invariantId": "dms.tenant_process_boundary",
+        "meaning": "Should reject a receipt document from another tenant.",
+        "route": "/api/dms/documents/foreign-receipt",
+        "source": "seeded-workflow-fixture",
+        "title": "Foreign-tenant receipt is accepted during expense review",
+    },
+    {
+        "actorRole": "employee",
+        "actualStatus": "200",
+        "domain": "Expenses",
+        "expectedStatus": "403",
+        "fixtureId": "employee-self-review",
+        "invariantId": "roles.employee_self_review_forbidden",
+        "meaning": "Should deny an employee approving their own claim.",
+        "route": "/api/expense-claims/self/review",
+        "source": "seeded-workflow-fixture",
+        "title": "Employee self-review is accepted",
+    },
+    {
+        "actorRole": "support",
+        "actualStatus": "200",
+        "domain": "Support",
+        "expectedStatus": "403",
+        "fixtureId": "expired-support-takeover",
+        "invariantId": "support.takeover_session_required",
+        "meaning": "Should deny support access after takeover expiry.",
+        "route": "/api/support/takeover/expense-review",
+        "source": "seeded-workflow-fixture",
+        "title": "Expired support takeover still reaches a workflow",
+    },
+    {
+        "actorRole": "finance",
+        "actualStatus": "200",
+        "domain": "Expenses",
+        "expectedStatus": "403",
+        "fixtureId": "expense-missing-receipt",
+        "invariantId": "modules.expense_approval_requires_module_and_receipt",
+        "meaning": "Should reject approval when required receipt evidence is missing.",
+        "route": "/api/expense-claims/missing-receipt/review",
+        "source": "seeded-workflow-fixture",
+        "title": "Expense approval succeeds without required receipt",
+    },
+    {
+        "actorRole": "finance",
+        "actualStatus": "200",
+        "domain": "Travel",
+        "expectedStatus": "409",
+        "fixtureId": "non-chronological-itinerary",
+        "invariantId": "travel.itinerary_chronology",
+        "meaning": "Should reject a travel itinerary with impossible date ordering.",
+        "route": "/api/travel/itineraries/non-chronological",
+        "source": "seeded-workflow-fixture",
+        "title": "Non-chronological itinerary is accepted",
+    },
+    {
+        "actorRole": "finance",
+        "actualStatus": "200",
+        "domain": "Billing",
+        "expectedStatus": "200",
+        "fixtureId": "billing-export-control",
+        "invariantId": "billing.export_requires_role_and_module",
+        "meaning": "Control: finance with billing enabled should export successfully.",
+        "route": "/api/billing/exports",
+        "source": "seeded-control-fixture",
+        "title": "Billing export control remains allowed",
+    },
+    {
+        "actorRole": "hr_manager",
+        "actualStatus": "200",
+        "domain": "HR",
+        "expectedStatus": "200",
+        "fixtureId": "hr-document-control",
+        "invariantId": "hr.documents_customer_role_boundary",
+        "meaning": "Control: customer HR manager should reach HR documents.",
+        "route": "/api/hr/documents",
+        "source": "seeded-control-fixture",
+        "title": "HR manager document control remains allowed",
     },
 )
 
@@ -102,8 +201,11 @@ def demo_html() -> str:
               data-bayesilisk-probe
               data-title="{probe['title']}"
               data-actor-role="{probe['actorRole']}"
+              data-domain="{probe['domain']}"
+              data-fixture-id="{probe['fixtureId']}"
               data-meaning="{probe['meaning']}"
               data-route="{probe['route']}"
+              data-source="{probe['source']}"
               data-invariant-id="{probe['invariantId']}"
               data-expected-status="{probe['expectedStatus']}"
               data-actual-status="{probe['actualStatus']}"
@@ -111,9 +213,11 @@ def demo_html() -> str:
               data-fixture-source="{DEMO_FIXTURE_SOURCE}"
             >
               <td>{probe['title']}</td>
+              <td><code>{probe['domain']}</code></td>
               <td><code>{probe['actorRole']}</code></td>
               <td><code>{probe['route']}</code></td>
               <td>{probe['meaning']}</td>
+              <td><code>{probe['source']}</code></td>
               <td><code>{probe['expectedStatus']}</code></td>
               <td><code data-observed-status>pending</code></td>
               <td><button type="button" data-run-probe>Run</button></td>
@@ -139,23 +243,23 @@ def demo_html() -> str:
       }}
       main {{
         margin: 0 auto;
-        max-width: 1120px;
+        max-width: 1440px;
         padding: 28px 20px 44px;
       }}
-	      h1 {{
-	        font-size: 28px;
-	        margin: 0 0 8px;
-	      }}
-	      .notice {{
-	        background: #fff7da;
-	        border: 1px solid #dcc36b;
-	        color: #3d3212;
-	        margin: 0 0 18px;
-	        padding: 12px 14px;
-	      }}
-	      p {{
-	        color: #526070;
-	        margin: 0 0 18px;
+      h1 {{
+        font-size: 28px;
+        margin: 0 0 8px;
+      }}
+      .notice {{
+        background: #fff7da;
+        border: 1px solid #dcc36b;
+        color: #3d3212;
+        margin: 0 0 18px;
+        padding: 12px 14px;
+      }}
+      p {{
+        color: #526070;
+        margin: 0 0 18px;
       }}
       table {{
         background: #ffffff;
@@ -165,7 +269,7 @@ def demo_html() -> str:
       }}
       th, td {{
         border-bottom: 1px solid #e7ebf2;
-        padding: 11px 12px;
+        padding: 9px 10px;
         text-align: left;
         vertical-align: middle;
       }}
@@ -197,24 +301,28 @@ def demo_html() -> str:
     </style>
   </head>
   <body>
-	    <main>
-	      <h1>Bayesilisk Workflow Pressure Demo</h1>
-	      <div class="notice">
-	        Synthetic local fixture. These rows are not imported from an existing customer app.
-	        They are defined in <code>{DEMO_FIXTURE_SOURCE}</code> to demonstrate the verifier loop.
-	      </div>
-	      <p>
-	        Local brittle product-like workflows: stale state, impossible ordering, duplicate submission,
-	        feature-flag exposure, and one auth lane. The browser observes this fixture; Bayesilisk judges
-	        deterministic invariants from the resulting context.
-	      </p>
+    <main>
+      <h1>Bayesilisk Workflow Pressure Demo</h1>
+      <div class="notice">
+        Synthetic local fixture app. These rows are not imported from an existing customer app.
+        They are defined in <code>{DEMO_FIXTURE_SOURCE}</code>; Bayesilisk then adds generated and
+        model-style scenarios and checks everything with deterministic invariants.
+      </div>
+      <p>
+        Twelve product-like workflow fixtures across Travel, Expenses, Billing, HR, Support, and DMS:
+        stale state, impossible ordering, duplicate submission, feature-flag exposure, tenant boundaries,
+        controls, and role lanes. The browser observes the fixture app; Bayesilisk judges deterministic
+        invariants from the resulting context.
+      </p>
       <table aria-label="Bayesilisk workflow pressure probes">
         <thead>
           <tr>
             <th>Scenario pressure</th>
+            <th>Domain</th>
             <th>Actor</th>
             <th>Route or workflow</th>
             <th>Guard</th>
+            <th>Fixture source</th>
             <th>Expected</th>
             <th>Observed</th>
             <th>Action</th>
@@ -312,19 +420,22 @@ def run_playwright_probe(
                 results.append(
                     {
                         "actorRole": probe.get_attribute("data-actor-role"),
+                        "domain": probe.get_attribute("data-domain"),
                         "expectedStatus": probe.get_attribute("data-expected-status"),
                         "failureDetail": "",
+                        "fixtureId": probe.get_attribute("data-fixture-id"),
+                        "fixtureSource": probe.get_attribute("data-fixture-source"),
                         "invariantId": probe.get_attribute("data-invariant-id"),
-                "networkResponses": network_responses[-12:],
-                "observedStatus": observed,
-                "route": probe.get_attribute("data-route"),
-                "selector": f"[data-bayesilisk-probe] >> nth={index}",
-                "targetUrl": url,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "title": probe.get_attribute("data-title"),
-                "fixtureSource": probe.get_attribute("data-fixture-source"),
-            }
-        )
+                        "networkResponses": network_responses[-12:],
+                        "observedStatus": observed,
+                        "route": probe.get_attribute("data-route"),
+                        "selector": f"[data-bayesilisk-probe] >> nth={index}",
+                        "source": probe.get_attribute("data-source"),
+                        "targetUrl": url,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "title": probe.get_attribute("data-title"),
+                    }
+                )
                 if step_delay_ms:
                     page.wait_for_timeout(step_delay_ms)
             if hold_ms:
@@ -339,17 +450,20 @@ def fallback_probe_results(url: str) -> list[dict[str, Any]]:
     return [
         {
             "actorRole": probe["actorRole"],
+            "domain": probe["domain"],
             "expectedStatus": probe["expectedStatus"],
             "failureDetail": "deterministic local fallback; Playwright not used",
+            "fixtureId": probe["fixtureId"],
+            "fixtureSource": DEMO_FIXTURE_SOURCE,
             "invariantId": probe["invariantId"],
             "networkResponses": [{"status": int(probe["actualStatus"]), "url": f"{url}{probe['route'].lstrip('/')}"}],
             "observedStatus": probe["actualStatus"],
             "route": probe["route"],
             "selector": f"demo-probe-{index}",
+            "source": probe["source"],
             "targetUrl": url,
             "timestamp": timestamp,
             "title": probe["title"],
-            "fixtureSource": DEMO_FIXTURE_SOURCE,
         }
         for index, probe in enumerate(DEMO_PROBES, start=1)
     ]
@@ -375,7 +489,15 @@ def canned_model_proposal(attention: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any]) -> dict[str, Any]:
+def classification_counts(findings: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for finding in findings:
+        classification = str(finding.get("classification", "unknown"))
+        counts[classification] = counts.get(classification, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any], *, seed: int) -> dict[str, Any]:
     attention = report["grassmannAttention"]
     provider = {
         "baseUrlClass": "not-used",
@@ -397,6 +519,19 @@ def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any]) -> dict[s
         attention,
         provider=provider,
     )
+    model_report = build_report(
+        seed,
+        generated_count=max(1, len(accepted)),
+        grassmann={**attention, "selectedPlaneIds": []},
+        limit=None,
+        model_scenarios=accepted,
+    )
+    model_findings = [
+        finding
+        for finding in model_report["findings"]
+        if isinstance(finding.get("generationBasis"), str)
+        and finding["generationBasis"].startswith("weak-model-proposal:")
+    ]
     payloads = issue_payloads(report, limit=1)
     verdict = next((finding for finding in report["findings"] if finding["observedResult"] == "fail"), report["findings"][0])
     return {
@@ -412,11 +547,20 @@ def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any]) -> dict[s
         "modelProposal": {
             "acceptedCount": len(accepted),
             "acceptedScenarioIds": [scenario.id for scenario in accepted],
+            "deterministicFindingCount": len(model_findings),
+            "deterministicResultCounts": classification_counts(model_findings),
             "mode": "canned-local-optional",
             "rejectedCount": len(rejected),
             "rejectedReasons": [item["reason"] for item in rejected],
         },
         "playwrightEvidence": report["observedByPlaywright"][0] if report["observedByPlaywright"] else {},
+        "reportSummary": {
+            "classificationCounts": classification_counts(report["findings"]),
+            "findingCount": len(report["findings"]),
+            "generatedScenarioCount": report["generatedScenarioCount"],
+            "invariantCount": len(report["invariants"]),
+            "rankedProbeCount": len(report.get("rankedProbes", [])),
+        },
     }
 
 
@@ -489,7 +633,7 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
     model_proposal = canned_model_proposal(report["grassmannAttention"])
     return {
         "appUrl": url,
-        "chain": demo_chain(report, model_proposal),
+        "chain": demo_chain(report, model_proposal, seed=args.seed),
         "classificationLegend": CLASSIFICATION_LEGEND,
         "demo": "workflow-pressure",
         "evidence": evidence_rows(report),
@@ -505,9 +649,11 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
 def render_text(payload: dict[str, Any]) -> str:
     chain = payload["chain"]
     issue = chain["issuePayload"]
+    summary = chain["reportSummary"]
     verdict = chain["deterministicVerdict"]
     evidence = payload.get("evidence", [])
     failed = [row for row in evidence if not row.get("passed")]
+    passed = [row for row in evidence if row.get("passed")]
     lines = [
         "Bayesilisk local workflow pressure demo",
         "",
@@ -520,8 +666,19 @@ def render_text(payload: dict[str, Any]) -> str:
         "What this proves:",
         "- Playwright is only the sensor: it clicks a local fixture or caller-provided app and records expected vs observed status.",
         "- Grassmann attention is only the router: it selects where to spend verifier budget.",
+        "- Catalog and attention-generated scenarios expand the search space beyond the seeded browser clicks.",
         "- The scenario proposer lane is not trusted: one local model-style proposal is accepted, one invented target is rejected.",
         "- Bayesilisk is the judge: deterministic invariants produce the verdict and issue payload.",
+        "",
+        "Scale of this local run:",
+        (
+            f"- browser fixtures: {payload['playwrightProbe']['resultCount']} user actions "
+            f"({payload['playwrightProbe']['failedCount']} failing, {payload['playwrightProbe']['passedCount']} controls)"
+        ),
+        f"- deterministic rules: {summary['invariantCount']} invariants",
+        f"- generated scenarios: {summary['generatedScenarioCount']} catalog/attention composites",
+        f"- ranked findings inspected: {summary['findingCount']} with {summary['classificationCounts']}",
+        f"- ranked follow-up probes: {summary['rankedProbeCount']}",
         "",
         f"App: {payload['appUrl']}",
         (
@@ -537,6 +694,14 @@ def render_text(payload: dict[str, Any]) -> str:
             f"expected={row['expectedStatus']} observed={row['observedStatus']} | invariant={row['invariantId']}"
         )
         lines.append(f"     meaning: {row['whyItMatters']}")
+    if passed:
+        lines.append("  controls:")
+        for row in passed[:3]:
+            lines.append(
+                "     "
+                f"{row['title']} | actor={row['actorRole']} | expected={row['expectedStatus']} "
+                f"observed={row['observedStatus']}"
+            )
     lines.extend(
         [
             "",
@@ -560,6 +725,15 @@ def render_text(payload: dict[str, Any]) -> str:
                 f"{chain['modelProposal']['mode']} accepted={chain['modelProposal']['acceptedCount']} "
                 f"rejected={chain['modelProposal']['rejectedCount']} "
                 f"rejectedReasons={chain['modelProposal']['rejectedReasons']}"
+            ),
+            (
+                "  acceptedScenarioIds="
+                + ", ".join(chain["modelProposal"].get("acceptedScenarioIds", []))
+            ),
+            (
+                "  deterministicChecksOnAcceptedProposal="
+                f"{chain['modelProposal']['deterministicFindingCount']} findings "
+                f"{chain['modelProposal']['deterministicResultCounts']}"
             ),
             "  Accepted proposals still have to pass schema/id validation and deterministic invariant checks.",
             "",

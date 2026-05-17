@@ -171,10 +171,12 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 
 `bayesilisk-demo` serves a synthetic local fixture defined in
 `bayesilisk/demo.py::DEMO_PROBES`. Those rows are not claims about an existing
-customer app; they are deliberately brittle product-like workflows with stale
-state, impossible ordering, duplicate submission, feature-flag exposure, and one
-auth lane. Its output shows the chain: Playwright evidence -> Grassmann plane ->
-optional model-style proposal -> deterministic verdict -> issue payload. Use
+customer app; they are twelve deliberately brittle product-like workflows across
+Travel, Expenses, Billing, HR, Support, and DMS, with stale state, impossible
+ordering, duplicate submission, feature-flag exposure, tenant boundaries, two
+controls, and role lanes. Its output shows the chain: Playwright evidence ->
+Grassmann plane -> generated catalog/attention scenarios -> optional
+model-style proposal -> deterministic verdict -> issue payload. Use
 `bayesilisk-demo --recording` to open headed Chromium, slow the probe clicks, and
 hold the browser long enough to screen-record the local workflow pressure. Use
 `bayesilisk-demo --no-playwright` to see the same local loop without launching a
