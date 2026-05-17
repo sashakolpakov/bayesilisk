@@ -1860,6 +1860,7 @@ def _attention_reason_list(
     keyword_hits: int,
     prior_adjustment: float,
     embedding_similarity: float,
+    decay: float,
 ) -> list[str]:
     reasons: list[str] = []
     if failure_count:
@@ -1876,7 +1877,42 @@ def _attention_reason_list(
         reasons.append("ollama-embedding-near-plane")
     if prior_adjustment:
         reasons.append("context-prior-adjustment")
+    if decay:
+        reasons.append("fixed-or-muted-attention-decay")
     return reasons or ["baseline-plane"]
+
+
+def _invariant_id_set(payload: dict[str, Any] | None, *keys: str) -> set[str]:
+    if not isinstance(payload, dict):
+        return set()
+    invariant_ids = {invariant.id for invariant in INVARIANTS}
+    found: set[str] = set()
+    for key in keys:
+        values = payload.get(key, [])
+        if isinstance(values, str):
+            values = [values]
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if isinstance(value, str) and value in invariant_ids:
+                found.add(value)
+    return found
+
+
+def _attention_decay_by_invariant(
+    context: dict[str, Any] | None,
+    observations: dict[str, Any] | None,
+) -> dict[str, float]:
+    fixed = _invariant_id_set(context, "fixedInvariantIds", "regressionWatchInvariantIds") | _invariant_id_set(
+        observations,
+        "fixedInvariantIds",
+        "regressionWatchInvariantIds",
+    )
+    muted = _invariant_id_set(context, "mutedInvariantIds") | _invariant_id_set(observations, "mutedInvariantIds")
+    decay: dict[str, float] = {invariant_id: 0.12 for invariant_id in fixed}
+    for invariant_id in muted:
+        decay[invariant_id] = max(decay.get(invariant_id, 0.0), 0.2)
+    return decay
 
 
 def grassmann_attention(
@@ -1890,6 +1926,7 @@ def grassmann_attention(
     merged_observations = merge_observations(observations, context_observations(context))
     facts = _context_plane_facts(context)
     embedding_similarities, embedding_provider = embedding_plane_similarities(context)
+    decay_by_invariant = _attention_decay_by_invariant(context, merged_observations)
     planes: list[dict[str, Any]] = []
     for invariant in INVARIANTS:
         plane_facts = [fact for fact in facts if fact["invariantId"] == invariant.id]
@@ -1904,12 +1941,14 @@ def grassmann_attention(
         playwright_evidence = min(1.0, playwright_count / 3.0)
         embedding_similarity = embedding_similarities.get(invariant.id, 0.0)
         novelty = max(min(1.0, keyword_hits / 6.0), embedding_similarity)
+        decay = decay_by_invariant.get(invariant.id, 0.0)
         raw_score = (
             GRASSMANN_ATTENTION_WEIGHTS["failureDensity"] * failure_density
             + GRASSMANN_ATTENTION_WEIGHTS["untestedness"] * untestedness
             + GRASSMANN_ATTENTION_WEIGHTS["sensitivity"] * sensitivity
             + GRASSMANN_ATTENTION_WEIGHTS["playwrightEvidence"] * playwright_evidence
             + GRASSMANN_ATTENTION_WEIGHTS["novelty"] * novelty
+            - decay
         )
         score = round(min(1.0, max(0.0, raw_score)), 6)
         planes.append(
@@ -1918,6 +1957,7 @@ def grassmann_attention(
                 "failureCount": failure_count,
                 "failureDensity": round(failure_density, 6),
                 "embeddingSimilarity": round(embedding_similarity, 6),
+                "decayForFixedOrMuted": round(decay, 6),
                 "invariantId": invariant.id,
                 "keywordHits": keyword_hits,
                 "playwrightEvidence": round(playwright_evidence, 6),
@@ -1930,6 +1970,7 @@ def grassmann_attention(
                     keyword_hits,
                     prior_adjustment,
                     embedding_similarity,
+                    decay,
                 ),
                 "sensitivity": sensitivity,
                 "testedCount": tested_count,

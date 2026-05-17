@@ -58,6 +58,10 @@ issueReadiness = ready-for-issue
 
 Keeping these separate prevents embeddings or model output from becoming a hidden bug oracle.
 
+Muted, fixed, or regression-watch invariant planes can apply
+`decayForFixedOrMuted` to attention. That lowers future exploration priority but
+does not hide deterministic failures or alter `riskScore`.
+
 ## Fingerprints
 
 Bayesilisk fingerprints are stable identifiers derived from verified scenario and invariant data. Use them to dedupe issues, mute noisy probes, and mark fixed regressions in observation history.

@@ -351,6 +351,46 @@ def test_playwright_probe_context_promotes_browser_observed_route_failures() -> 
     assert report["rankedProbes"]
 
 
+def test_fixed_or_muted_context_decays_attention_without_hiding_failures() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    context = {
+        "source": "unit-test-muted-attention",
+        "mutedInvariantIds": ["hr.documents_customer_role_boundary"],
+        "repositoryFacts": [
+            {
+                "actorRole": "support",
+                "expectedStatus": 403,
+                "invariantId": "hr.documents_customer_role_boundary",
+                "observedStatus": 200,
+                "passed": False,
+                "route": "/api/hr/documents",
+                "source": "microsoft-playwright",
+            }
+        ],
+    }
+    undecayed = bayesilisk.grassmann_attention(
+        {key: value for key, value in context.items() if key != "mutedInvariantIds"}
+    )
+    decayed = bayesilisk.grassmann_attention(context)
+    undecayed_plane = next(
+        plane for plane in undecayed["planes"] if plane["invariantId"] == "hr.documents_customer_role_boundary"
+    )
+    decayed_plane = next(
+        plane for plane in decayed["planes"] if plane["invariantId"] == "hr.documents_customer_role_boundary"
+    )
+
+    assert decayed_plane["decayForFixedOrMuted"] == 0.2
+    assert decayed_plane["attentionScore"] < undecayed_plane["attentionScore"]
+    assert "fixed-or-muted-attention-decay" in decayed_plane["reasons"]
+
+    report = bayesilisk.build_contextual_report(150, generated_count=0, context=context)
+    assert any(
+        finding["invariantId"] == "hr.documents_customer_role_boundary"
+        and finding["observedResult"] == "fail"
+        for finding in report["findings"]
+    )
+
+
 def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> None:
     bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
     context = {

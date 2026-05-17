@@ -194,6 +194,7 @@ Each plane reports:
 - `playwrightEvidence`;
 - `keywordHits`;
 - `priorAdjustment`;
+- `decayForFixedOrMuted` when a caller marks the invariant plane fixed, muted, or under regression watch;
 - optional `embeddingSimilarity`;
 - human-readable attention reasons.
 
