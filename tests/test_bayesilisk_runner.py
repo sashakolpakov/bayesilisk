@@ -126,7 +126,7 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
 
 
 def test_expanded_catalog_catches_distinct_bad_spots() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     report = bayesilisk.build_report(150, generated_count=0)
     findings = report["findings"]
 
@@ -173,8 +173,29 @@ def test_expanded_catalog_catches_distinct_bad_spots() -> None:
     assert "transport modes are not covered" in missing_airplane_leg["observation"]
 
 
+def test_focused_modules_expose_expected_boundaries() -> None:
+    attention = importlib.import_module("bayesilisk.attention")
+    catalog = importlib.import_module("bayesilisk.catalog")
+    cli = importlib.import_module("bayesilisk.cli")
+    config = importlib.import_module("bayesilisk.config")
+    context = importlib.import_module("bayesilisk.context")
+    invariants = importlib.import_module("bayesilisk.invariants")
+    model_proposals = importlib.import_module("bayesilisk.model_proposals")
+    reporting = importlib.import_module("bayesilisk.reporting")
+
+    assert catalog.FRAGMENTS
+    assert catalog.SCENARIOS
+    assert invariants.route_matrix_allowed
+    assert attention.grassmann_attention
+    assert model_proposals.validate_model_scenario_proposals
+    assert reporting.build_contextual_report
+    assert config.effective_runtime_config()["scenarioProvider"]
+    assert context.context_summary({"agentNotes": ["expense route"]})["textSignalCount"] == 1
+    assert cli.main
+
+
 def test_scenario_catalog_has_valid_references_and_invariant_coverage() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     fragment_ids = {fragment.id for fragment in bayesilisk.FRAGMENTS}
     invariant_ids = {invariant.id for invariant in bayesilisk.INVARIANTS}
 
@@ -262,7 +283,7 @@ def test_bayesilisk_observation_history_dampens_fixed_findings(tmp_path: Path) -
 
 
 def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     baseline = bayesilisk.build_report(150, limit=8, generated_count=8)
     existing = next(finding for finding in baseline["findings"] if finding["issueReadiness"] == "ready-for-issue")
     context = {
@@ -303,7 +324,7 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
 
 def test_playwright_probe_context_promotes_browser_observed_route_failures() -> None:
     adapter = importlib.import_module("bayesilisk.playwright_adapter")
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     context = adapter.build_context_from_probe_results(
         [
             {
@@ -358,7 +379,7 @@ def test_playwright_probe_context_promotes_browser_observed_route_failures() -> 
 
 
 def test_fixed_or_muted_context_decays_attention_without_hiding_failures() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     context = {
         "source": "unit-test-muted-attention",
         "mutedInvariantIds": ["hr.documents_customer_role_boundary"],
@@ -430,7 +451,7 @@ def test_playwright_context_preserves_probe_evidence_metadata() -> None:
 
 
 def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     context = {
         "source": "unit-test-travel-plane",
         "repositoryFacts": [
@@ -476,7 +497,7 @@ def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> 
 
 
 def test_generated_failure_minimization_covers_travel_dms_support_and_hr() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     selected_planes = [
         "travel.expense_items_match_itinerary",
         "dms.tenant_process_boundary",
@@ -546,7 +567,7 @@ def test_generated_failure_minimization_covers_travel_dms_support_and_hr() -> No
 
 
 def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     attention = {
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
         "planes": [],
@@ -636,7 +657,7 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
 
 
 def test_scenario_proposer_config_precedence_and_report_redaction(monkeypatch: pytest.MonkeyPatch) -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     monkeypatch.setenv("BAYESILISK_SCENARIO_PROVIDER", "openai-compatible")
     monkeypatch.setenv("BAYESILISK_SCENARIO_API_KEY_ENV", "BAYESILISK_UNIT_SCENARIO_KEY")
     monkeypatch.setenv("BAYESILISK_UNIT_SCENARIO_KEY", "sk-unit-secret")
@@ -661,7 +682,7 @@ def test_scenario_proposer_config_precedence_and_report_redaction(monkeypatch: p
 
 
 def test_openai_compatible_provider_requires_api_key() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     attention = {
         "source": "unit-test",
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
@@ -685,7 +706,7 @@ def test_openai_compatible_provider_requires_api_key() -> None:
 
 
 def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     attention = {
         "source": "unit-test",
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
@@ -722,7 +743,7 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
 
 
 def test_provider_output_remains_untrusted_and_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     attention = {
         "source": "unit-test",
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],

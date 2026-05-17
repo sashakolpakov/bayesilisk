@@ -1,3 +1,3 @@
-from .bayesilisk import main
+from .cli import main
 
 raise SystemExit(main())

@@ -16,7 +16,7 @@ def test_live_playwright_demo_probe_end_to_end(tmp_path: Path) -> None:
     pytest.importorskip("playwright.sync_api")
     probe = importlib.import_module("tools.playwright_probe")
     adapter = importlib.import_module("bayesilisk.playwright_adapter")
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
 
     try:
         results = probe.run_browser_probe(probe.demo_url(), headless=True)
@@ -41,7 +41,7 @@ def test_live_ollama_scenario_proposer_when_enabled(monkeypatch: pytest.MonkeyPa
     if os.environ.get("BAYESILISK_LIVE_OLLAMA") != "1":
         pytest.skip("set BAYESILISK_LIVE_OLLAMA=1 to run live Ollama scenario proposer test")
 
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "1")
     monkeypatch.setenv(
         "BAYESILISK_OLLAMA_SCENARIO_MODEL",

@@ -16,7 +16,7 @@ docs = ["sphinx>=7", "myst-parser>=2", "furo>=2024.1.29"]
 playwright = ["playwright>=1.44"]
 
 [project.scripts]
-bayesilisk = "bayesilisk.bayesilisk:main"
+bayesilisk = "bayesilisk.cli:main"
 bayesilisk-demo = "bayesilisk.demo:main"
 bayesilisk-mcp = "bayesilisk.mcp_server:main"
 

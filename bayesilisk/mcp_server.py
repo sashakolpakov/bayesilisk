@@ -7,15 +7,17 @@ from typing import Any, BinaryIO
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from bayesilisk.bayesilisk import (  # type: ignore[no-redef]
-        VERSION,
+    from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
+    from bayesilisk.engine import VERSION  # type: ignore[no-redef]
+    from bayesilisk.reporting import (  # type: ignore[no-redef]
         build_contextual_report,
         issue_payloads,
         ranked_probes,
-        effective_runtime_config,
     )
 else:
-    from .bayesilisk import VERSION, build_contextual_report, effective_runtime_config, issue_payloads, ranked_probes
+    from .config import effective_runtime_config
+    from .engine import VERSION
+    from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
 PROTOCOL_VERSION = "2024-11-05"
 
