@@ -20,6 +20,16 @@ python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-con
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
 ```
 
+Capture evidence artifacts:
+
+```sh
+python3 tools/playwright_probe.py --demo \
+  --artifacts-dir /tmp/bayesilisk-artifacts \
+  --screenshot \
+  --trace \
+  --output /tmp/bayesilisk-playwright-context.json
+```
+
 The probe looks for rows marked with `data-bayesilisk-probe`. Each row should provide:
 
 - `data-title`;

@@ -391,6 +391,38 @@ def test_fixed_or_muted_context_decays_attention_without_hiding_failures() -> No
     )
 
 
+def test_playwright_context_preserves_probe_evidence_metadata() -> None:
+    adapter = importlib.import_module("bayesilisk.playwright_adapter")
+    context = adapter.build_context_from_probe_results(
+        [
+            {
+                "actorRole": "support",
+                "artifactPaths": ["/tmp/bayesilisk/probe-01-screenshot.png", "/tmp/bayesilisk/trace.zip"],
+                "expectedStatus": 403,
+                "failureDetail": "observed 200 while expecting 403",
+                "invariantId": "hr.documents_customer_role_boundary",
+                "networkResponses": [{"status": 200, "url": "https://example.test/api/hr/documents"}],
+                "observedStatus": 200,
+                "route": "/api/hr/documents",
+                "selector": "[data-bayesilisk-probe] >> nth=0",
+                "targetUrl": "https://example.test/demo",
+                "timestamp": "2026-05-16T00:00:00+00:00",
+                "title": "Support reaches HR documents",
+            }
+        ],
+        target="https://example.test/demo",
+    )
+    fact = context["repositoryFacts"][0]
+
+    assert context["playwrightProbe"]["artifactCount"] == 2
+    assert fact["artifactPaths"] == ["/tmp/bayesilisk/probe-01-screenshot.png", "/tmp/bayesilisk/trace.zip"]
+    assert fact["failureDetail"] == "observed 200 while expecting 403"
+    assert fact["networkResponses"] == [{"status": 200, "url": "https://example.test/api/hr/documents"}]
+    assert fact["selector"] == "[data-bayesilisk-probe] >> nth=0"
+    assert fact["targetUrl"] == "https://example.test/demo"
+    assert fact["timestamp"] == "2026-05-16T00:00:00+00:00"
+
+
 def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> None:
     bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
     context = {
