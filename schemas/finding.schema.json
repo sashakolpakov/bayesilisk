@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bayesilisk.local/schemas/finding.schema.json",
+  "title": "Bayesilisk finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accessPattern",
+    "adjustedPrior",
+    "attentionReasons",
+    "attentionScore",
+    "classification",
+    "dedupeKey",
+    "expectedInvariant",
+    "fingerprint",
+    "fragments",
+    "generatedScenario",
+    "generationBasis",
+    "id",
+    "invariantId",
+    "invariantLayer",
+    "issueReadiness",
+    "likelihood",
+    "modelProvenance",
+    "observation",
+    "observationBasis",
+    "observedResult",
+    "posteriorMode",
+    "posteriorProbability",
+    "prior",
+    "riskScore",
+    "scenarioId",
+    "scenarioTitle",
+    "scenarioTone",
+    "subScenarios",
+    "suggestedIssueBody",
+    "suggestedIssueTitle"
+  ],
+  "properties": {
+    "accessPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actorRole", "businessFlow", "dataSignals", "decision", "expenseCategories", "modules", "routes", "transportModes"],
+      "properties": {
+        "actorRole": {"type": "string"},
+        "businessFlow": {"type": "array", "items": {"type": "string"}},
+        "dataSignals": {"type": "object"},
+        "decision": {"type": ["string", "null"]},
+        "expenseCategories": {"type": "array", "items": {"type": "string"}},
+        "modules": {"type": "object"},
+        "routes": {"type": "array", "items": {"type": "string"}},
+        "transportModes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "adjustedPrior": {"type": "number", "minimum": 0, "maximum": 1},
+    "attentionReasons": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "attentionScore": {"type": "number", "minimum": 0, "maximum": 1},
+    "classification": {
+      "type": "string",
+      "enum": ["breakage.easy", "breakage.hard-to-find", "control-confirmed", "finding.candidate-breakage"]
+    },
+    "dedupeKey": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}:"},
+    "expectedInvariant": {"type": "string"},
+    "fingerprint": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}$"},
+    "fragments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["completeAlone", "domain", "id", "kind", "summary"],
+        "properties": {
+          "completeAlone": {"type": "boolean"},
+          "domain": {"type": "string"},
+          "id": {"type": "string"},
+          "kind": {"type": "string"},
+          "summary": {"type": "string"}
+        }
+      }
+    },
+    "generatedScenario": {"type": "boolean"},
+    "generationBasis": {"type": "string"},
+    "id": {"type": "string"},
+    "invariantId": {"type": "string"},
+    "invariantLayer": {"type": "string"},
+    "issueReadiness": {
+      "type": "string",
+      "enum": ["do-not-open-muted", "no-issue-control", "probe-only", "ready-for-issue", "regression-watch"]
+    },
+    "likelihood": {"type": "number", "minimum": 0, "maximum": 1},
+    "modelProvenance": {"type": ["object", "null"]},
+    "minimizedReproducer": {"type": ["object", "null"]},
+    "observation": {"type": "string"},
+    "observationBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["priorDelta", "source", "tags"],
+      "properties": {
+        "priorDelta": {"type": "number"},
+        "source": {"type": "string"},
+        "tags": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "observedResult": {"type": "string", "enum": ["fail", "pass", "probe"]},
+    "originalScenario": {"type": ["object", "null"]},
+    "posteriorMode": {
+      "type": "string",
+      "enum": [
+        "fault-probability-elevated",
+        "harder-to-find-after-easy-breakages",
+        "highest-fault-probability",
+        "posterior-control-confidence"
+      ]
+    },
+    "posteriorProbability": {"type": "number", "minimum": 0, "maximum": 1},
+    "prior": {"type": "number", "minimum": 0, "maximum": 1},
+    "riskScore": {"type": "number", "minimum": 0, "maximum": 1},
+    "scenarioId": {"type": "string"},
+    "scenarioTitle": {"type": "string"},
+    "scenarioTone": {"type": "string"},
+    "subScenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["completeAlone", "domain", "fragmentId", "id", "kind", "summary"],
+        "properties": {
+          "completeAlone": {"type": "boolean"},
+          "domain": {"type": "string"},
+          "fragmentId": {"type": "string"},
+          "id": {"type": "string"},
+          "kind": {"type": "string"},
+          "summary": {"type": "string"}
+        }
+      }
+    },
+    "suggestedIssueBody": {"type": "string"},
+    "suggestedIssueTitle": {"type": "string"}
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bayesilisk.local/schemas/report.schema.json",
+  "title": "Bayesilisk report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "deterministic",
+    "domains",
+    "findings",
+    "generatedScenarioCount",
+    "grassmannAttention",
+    "invariants",
+    "observedByPlaywright",
+    "prioritizationPolicy",
+    "productionAccess",
+    "proposedByModel",
+    "roleRouteMatrix",
+    "sections",
+    "seed",
+    "selectedByGrassmannAttention",
+    "tool",
+    "verifiedByBayesilisk",
+    "weakModelScenarioGeneration"
+  ],
+  "properties": {
+    "contextObservationSource": {"type": "string"},
+    "contextSummary": {"type": "object"},
+    "deterministic": {"type": "boolean", "const": true},
+    "domains": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"$ref": "finding.schema.json"}},
+    "generatedScenarioCount": {"type": "integer", "minimum": 0},
+    "grassmannAttention": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["boundedFeedback", "embeddingMode", "planes", "selectedPlaneIds", "source"],
+      "properties": {
+        "boundedFeedback": {"type": "boolean", "const": true},
+        "embeddingMode": {"type": "string"},
+        "embeddingProvider": {"type": "object"},
+        "notes": {"type": "string"},
+        "planes": {"type": "array", "items": {"$ref": "attention-plane.schema.json"}},
+        "selectedPlaneIds": {"type": "array", "items": {"type": "string"}},
+        "source": {"type": "string"},
+        "weakModelScenarioGeneration": {"type": "object"},
+        "weights": {"type": "object"}
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["difficulty", "expected", "failLikelihood", "id", "layer", "passLikelihood", "prior"],
+        "properties": {
+          "difficulty": {"type": "string", "enum": ["easy", "hard"]},
+          "expected": {"type": "string"},
+          "failLikelihood": {"type": "number", "minimum": 0, "maximum": 1},
+          "id": {"type": "string"},
+          "layer": {"type": "string"},
+          "passLikelihood": {"type": "number", "minimum": 0, "maximum": 1},
+          "prior": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "issuePayloads": {"type": "array", "items": {"$ref": "issue-payload.schema.json"}},
+    "observedByPlaywright": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actorRole", "expectedStatus", "invariantId", "observedStatus", "passed", "route", "source", "title"],
+        "properties": {
+          "actorRole": {"type": "string"},
+          "expectedStatus": {"type": ["integer", "null"]},
+          "invariantId": {"type": "string"},
+          "observedStatus": {"type": ["integer", "null"]},
+          "passed": {"type": "boolean"},
+          "route": {"type": "string"},
+          "source": {"type": "string", "const": "microsoft-playwright"},
+          "title": {"type": "string"}
+        }
+      }
+    },
+    "prioritizationPolicy": {"type": "string"},
+    "productionAccess": {"type": "boolean", "const": false},
+    "proposedByModel": {
+      "type": ["array", "object"],
+      "additionalProperties": true
+    },
+    "rankedProbes": {"type": "array"},
+    "roleRouteMatrix": {"type": "object"},
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateProbes", "confirmedBreakages", "controls", "hardToFindModes"],
+      "properties": {
+        "candidateProbes": {"type": "array", "items": {"type": "string"}},
+        "confirmedBreakages": {"type": "array", "items": {"type": "string"}},
+        "controls": {"type": "array", "items": {"type": "string"}},
+        "hardToFindModes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "seed": {"type": "integer"},
+    "selectedByGrassmannAttention": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attentionScore", "invariantId", "reasons"],
+        "properties": {
+          "attentionScore": {"type": "number", "minimum": 0, "maximum": 1},
+          "invariantId": {"type": "string"},
+          "reasons": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "tool": {"type": "string", "const": "bayesilisk.v1.2"},
+    "verifiedByBayesilisk": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["classification", "fingerprint", "invariantId", "issueReadiness", "observedResult", "riskScore", "scenarioId"],
+        "properties": {
+          "classification": {"type": "string"},
+          "fingerprint": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}$"},
+          "invariantId": {"type": "string"},
+          "issueReadiness": {"type": "string"},
+          "observedResult": {"type": "string", "enum": ["fail", "pass", "probe"]},
+          "riskScore": {"type": "number", "minimum": 0, "maximum": 1},
+          "scenarioId": {"type": "string"}
+        }
+      }
+    },
+    "weakModelScenarioGeneration": {"type": "object"}
+  }
+}

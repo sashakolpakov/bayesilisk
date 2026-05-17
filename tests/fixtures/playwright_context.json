@@ -1,0 +1,63 @@
+{
+  "source": "playwright-probe",
+  "agentNotes": [
+    "Microsoft Playwright observed route permission behavior for `/api/hr/documents` as `support`: expected HTTP 403, observed HTTP 200; invariant `hr.documents_customer_role_boundary`; probe `Expired support shortcut reaches HR documents`."
+  ],
+  "priorAdjustments": {
+    "hr.documents_customer_role_boundary": 0.06
+  },
+  "repositoryFacts": [
+    {
+      "actorRole": "support",
+      "artifactPaths": [
+        "/tmp/bayesilisk/probe-01-screenshot.png",
+        "/tmp/bayesilisk/trace.zip"
+      ],
+      "expectedStatus": 403,
+      "failureDetail": "observed 200 while expecting 403",
+      "invariantId": "hr.documents_customer_role_boundary",
+      "networkResponses": [
+        {
+          "status": 200,
+          "url": "https://example.test/api/hr/documents"
+        }
+      ],
+      "observedStatus": 200,
+      "passed": false,
+      "route": "/api/hr/documents",
+      "selector": "[data-bayesilisk-probe]",
+      "source": "microsoft-playwright",
+      "targetUrl": "https://example.test/demo",
+      "timestamp": "2026-05-16T00:00:00+00:00",
+      "title": "Expired support shortcut reaches HR documents"
+    },
+    {
+      "actorRole": "finance",
+      "artifactPaths": [],
+      "expectedStatus": 200,
+      "failureDetail": "",
+      "invariantId": "billing.export_requires_role_and_module",
+      "networkResponses": [
+        {
+          "status": 200,
+          "url": "https://example.test/api/billing/exports"
+        }
+      ],
+      "observedStatus": 200,
+      "passed": true,
+      "route": "/api/billing/exports",
+      "selector": "[data-bayesilisk-probe]",
+      "source": "microsoft-playwright",
+      "targetUrl": "https://example.test/demo",
+      "timestamp": "2026-05-16T00:01:00+00:00",
+      "title": "Finance billing export remains allowed"
+    }
+  ],
+  "playwrightProbe": {
+    "artifactCount": 2,
+    "failedCount": 1,
+    "passedCount": 1,
+    "resultCount": 2,
+    "target": "https://example.test/demo"
+  }
+}
