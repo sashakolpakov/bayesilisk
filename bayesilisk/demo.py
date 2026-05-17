@@ -21,12 +21,32 @@ from .playwright_adapter import build_context_from_probe_results
 from .reporting import build_contextual_report, issue_payloads
 
 
+CLASSIFICATION_LEGEND: dict[str, str] = {
+    "breakage.easy": (
+        "An invariant fails in a direct, high-signal path. This is usually obvious once the route or state is tested."
+    ),
+    "breakage.hard-to-find": (
+        "An invariant fails only after context narrows the search to a cross-role, cross-module, stale-state, "
+        "or unusual workflow path. It is still a deterministic failure; the label describes discoverability, "
+        "not uncertainty."
+    ),
+    "control-confirmed": (
+        "A control path behaved as expected and increases confidence that the verifier is not blindly reporting noise."
+    ),
+    "finding.candidate-breakage": (
+        "An invariant failed, but the posterior score or evidence basis is not strong enough for an automatic issue. "
+        "Keep it as a probe until a local verifier, browser evidence, or human review confirms it."
+    ),
+}
+
+
 DEMO_PROBES: tuple[dict[str, str], ...] = (
     {
         "actorRole": "manager",
         "actualStatus": "200",
         "expectedStatus": "409",
         "invariantId": "travel.funding_before_expense",
+        "meaning": "Should reject expense review before travel funding is approved.",
         "route": "/demo/wizard/expense-review",
         "title": "Wizard accepts expense review before travel funding approval",
     },
@@ -35,6 +55,7 @@ DEMO_PROBES: tuple[dict[str, str], ...] = (
         "actualStatus": "200",
         "expectedStatus": "409",
         "invariantId": "travel.expense_items_match_itinerary",
+        "meaning": "Should reject expense review when itinerary and expense dates do not match.",
         "route": "/demo/checkout/review",
         "title": "Checkout review accepts itinerary and expense mismatch",
     },
@@ -43,6 +64,7 @@ DEMO_PROBES: tuple[dict[str, str], ...] = (
         "actualStatus": "200",
         "expectedStatus": "409",
         "invariantId": "modules.expense_approval_requires_module_and_receipt",
+        "meaning": "Should reject duplicate or stale expense submission state.",
         "route": "/demo/retry/expense-submit",
         "title": "Retry after back navigation creates duplicate submission",
     },
@@ -51,6 +73,7 @@ DEMO_PROBES: tuple[dict[str, str], ...] = (
         "actualStatus": "200",
         "expectedStatus": "403",
         "invariantId": "hr.documents_customer_role_boundary",
+        "meaning": "Should deny support access to customer HR documents.",
         "route": "/api/hr/documents",
         "title": "Support actor reaches HR document route",
     },
@@ -59,6 +82,7 @@ DEMO_PROBES: tuple[dict[str, str], ...] = (
         "actualStatus": "200",
         "expectedStatus": "403",
         "invariantId": "billing.export_requires_role_and_module",
+        "meaning": "Should deny billing export when the feature/module boundary is closed.",
         "route": "/api/billing/exports",
         "title": "Feature flag off but billing export path remains exposed",
     },
@@ -74,6 +98,7 @@ def demo_html() -> str:
               data-bayesilisk-probe
               data-title="{probe['title']}"
               data-actor-role="{probe['actorRole']}"
+              data-meaning="{probe['meaning']}"
               data-route="{probe['route']}"
               data-invariant-id="{probe['invariantId']}"
               data-expected-status="{probe['expectedStatus']}"
@@ -83,6 +108,7 @@ def demo_html() -> str:
               <td>{probe['title']}</td>
               <td><code>{probe['actorRole']}</code></td>
               <td><code>{probe['route']}</code></td>
+              <td>{probe['meaning']}</td>
               <td><code>{probe['expectedStatus']}</code></td>
               <td><code data-observed-status>pending</code></td>
               <td><button type="button" data-run-probe>Run</button></td>
@@ -171,6 +197,7 @@ def demo_html() -> str:
             <th>Scenario pressure</th>
             <th>Actor</th>
             <th>Route or workflow</th>
+            <th>Guard</th>
             <th>Expected</th>
             <th>Observed</th>
             <th>Action</th>
@@ -234,7 +261,14 @@ def demo_server() -> Any:
         thread.join(timeout=2)
 
 
-def run_playwright_probe(url: str, *, headless: bool, timeout_ms: int) -> list[dict[str, Any]]:
+def run_playwright_probe(
+    url: str,
+    *,
+    headless: bool,
+    hold_ms: int,
+    step_delay_ms: int,
+    timeout_ms: int,
+) -> list[dict[str, Any]]:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
@@ -273,6 +307,10 @@ def run_playwright_probe(url: str, *, headless: bool, timeout_ms: int) -> list[d
                         "title": probe.get_attribute("data-title"),
                     }
                 )
+                if step_delay_ms:
+                    page.wait_for_timeout(step_delay_ms)
+            if hold_ms:
+                page.wait_for_timeout(hold_ms)
         finally:
             browser.close()
     return results
@@ -363,6 +401,43 @@ def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any]) -> dict[s
     }
 
 
+def explain_status_delta(expected: Any, observed: Any) -> str:
+    try:
+        expected_status = int(expected)
+        observed_status = int(observed)
+    except (TypeError, ValueError):
+        return "status evidence was malformed; normalized before use"
+    if expected_status == observed_status:
+        return "control matched expectation"
+    if expected_status == 409 and 200 <= observed_status < 300:
+        return "workflow should reject inconsistent state, but the app accepted it"
+    if expected_status == 403 and 200 <= observed_status < 300:
+        return "role/module boundary should deny access, but the app allowed it"
+    if expected_status >= 400 and 200 <= observed_status < 300:
+        return "negative-path guard expected an error, but the app returned success"
+    return f"expected HTTP {expected_status}, observed HTTP {observed_status}"
+
+
+def evidence_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    for fact in report.get("observedByPlaywright", []):
+        expected = fact.get("expectedStatus")
+        observed = fact.get("observedStatus")
+        rows.append(
+            {
+                "actorRole": fact.get("actorRole", "unknown"),
+                "expectedStatus": expected,
+                "invariantId": fact.get("invariantId", "unknown"),
+                "observedStatus": observed,
+                "passed": fact.get("passed") is True,
+                "route": fact.get("route", "unknown"),
+                "title": fact.get("title", "Observed probe"),
+                "whyItMatters": explain_status_delta(expected, observed),
+            }
+        )
+    return rows
+
+
 def run_demo(args: argparse.Namespace) -> dict[str, Any]:
     if args.no_playwright:
         url = "http://127.0.0.1/local-bayesilisk-demo/"
@@ -372,7 +447,13 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
         with demo_server() as url:
             mode = "playwright"
             try:
-                results = run_playwright_probe(url, headless=not args.headed, timeout_ms=max(1000, args.timeout_ms))
+                results = run_playwright_probe(
+                    url,
+                    headless=not args.headed,
+                    hold_ms=args.hold_seconds * 1000,
+                    step_delay_ms=args.step_delay_ms,
+                    timeout_ms=max(1000, args.timeout_ms),
+                )
             except RuntimeError as exc:
                 mode = f"fallback: {exc}"
                 results = fallback_probe_results(url)
@@ -390,9 +471,12 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "appUrl": url,
         "chain": demo_chain(report, model_proposal),
+        "classificationLegend": CLASSIFICATION_LEGEND,
         "demo": "workflow-pressure",
+        "evidence": evidence_rows(report),
         "playwrightMode": mode,
         "playwrightProbe": context["playwrightProbe"],
+        "recordingCommand": "bayesilisk-demo --recording",
         "tool": VERSION,
     }
 
@@ -400,27 +484,79 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
 def render_text(payload: dict[str, Any]) -> str:
     chain = payload["chain"]
     issue = chain["issuePayload"]
-    return "\n".join(
+    verdict = chain["deterministicVerdict"]
+    evidence = payload.get("evidence", [])
+    failed = [row for row in evidence if not row.get("passed")]
+    lines = [
+        "Bayesilisk local workflow pressure demo",
+        "",
+        "What this proves:",
+        "- Playwright is only the sensor: it clicks a local brittle app and records expected vs observed status.",
+        "- Grassmann attention is only the router: it selects where to spend verifier budget.",
+        "- The scenario proposer lane is not trusted: one local model-style proposal is accepted, one invented target is rejected.",
+        "- Bayesilisk is the judge: deterministic invariants produce the verdict and issue payload.",
+        "",
+        f"App: {payload['appUrl']}",
+        (
+            "Browser evidence: "
+            f"{payload['playwrightMode']} observed {payload['playwrightProbe']['failedCount']} failing probes "
+            f"out of {payload['playwrightProbe']['resultCount']}."
+        ),
+    ]
+    for index, row in enumerate(failed[:5], start=1):
+        lines.append(
+            "  "
+            f"{index}. {row['title']} | actor={row['actorRole']} | route={row['route']} | "
+            f"expected={row['expectedStatus']} observed={row['observedStatus']} | invariant={row['invariantId']}"
+        )
+        lines.append(f"     meaning: {row['whyItMatters']}")
+    lines.extend(
         [
-            "Bayesilisk local workflow pressure demo",
-            f"App: {payload['appUrl']}",
-            f"Playwright evidence: {payload['playwrightMode']} with {payload['playwrightProbe']['failedCount']} mismatches",
-            f"Grassmann plane: {chain['grassmannPlane'].get('invariantId', 'none')}",
+            "",
+            "Classification legend:",
+            *[
+                f"  {classification}: {meaning}"
+                for classification, meaning in sorted(payload["classificationLegend"].items())
+            ],
+            "",
+            "Attention routing:",
             (
-                "Model proposal: "
+                "  selected="
+                f"{chain['grassmannPlane'].get('invariantId', 'none')} "
+                f"score={chain['grassmannPlane'].get('attentionScore', 0)}"
+            ),
+            "  reasons=" + ", ".join(chain["grassmannPlane"].get("reasons", [])),
+            "",
+            "Untrusted proposal lane:",
+            (
+                "  "
                 f"{chain['modelProposal']['mode']} accepted={chain['modelProposal']['acceptedCount']} "
-                f"rejected={chain['modelProposal']['rejectedCount']}"
+                f"rejected={chain['modelProposal']['rejectedCount']} "
+                f"rejectedReasons={chain['modelProposal']['rejectedReasons']}"
             ),
+            "  Accepted proposals still have to pass schema/id validation and deterministic invariant checks.",
+            "",
+            "Deterministic verdict:",
             (
-                "Deterministic verdict: "
-                f"{chain['deterministicVerdict']['observedResult']} "
-                f"{chain['deterministicVerdict']['classification']} "
-                f"{chain['deterministicVerdict']['invariantId']}"
+                "  "
+                f"{verdict['observedResult']} {verdict['classification']} "
+                f"invariant={verdict['invariantId']} risk={verdict['riskScore']}"
             ),
-            f"Issue payload: {issue.get('title', 'none')}",
+            f"  scenario={verdict['scenarioId']}",
+            "  classificationMeaning="
+            + payload["classificationLegend"].get(verdict["classification"], "No definition available."),
+            "",
+            "Issue-ready output:",
+            f"  title={issue.get('title', 'none')}",
+            f"  fingerprint={issue.get('fingerprint', 'none')}",
+            f"  dedupeState={issue.get('dedupeState', 'none')}",
+            "",
+            "Recording command:",
+            f"  {payload['recordingCommand']}",
             "",
         ]
     )
+    return "\n".join(lines)
 
 
 def parse_args() -> argparse.Namespace:
@@ -431,9 +567,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=12, help="Maximum findings included in the demo report.")
     parser.add_argument("--no-playwright", action="store_true", help="Use deterministic local probe evidence instead of launching Chromium.")
     parser.add_argument("--headed", action="store_true", help="Run Chromium with a visible browser window.")
+    parser.add_argument(
+        "--recording",
+        action="store_true",
+        help="Open headed Chromium, slow probe clicks, and hold the browser briefly for screen recording.",
+    )
+    parser.add_argument("--hold-seconds", type=int, default=0, help="Seconds to keep headed Chromium open after probes.")
+    parser.add_argument("--step-delay-ms", type=int, default=0, help="Delay between browser probe clicks.")
     parser.add_argument("--timeout-ms", type=int, default=5000, help="Per-navigation and per-probe timeout in ms.")
     parser.add_argument("--enable-scenario-proposer", action="store_true", help="Also call the configured scenario proposer provider.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.recording:
+        args.headed = True
+        args.step_delay_ms = max(args.step_delay_ms, 450)
+        args.hold_seconds = max(args.hold_seconds, 10)
+    return args
 
 
 def main() -> int:

@@ -163,6 +163,7 @@ Run the bundled demo probe:
 
 ```sh
 bayesilisk-demo
+bayesilisk-demo --recording
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
@@ -172,8 +173,15 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 state, impossible ordering, duplicate submission, feature-flag exposure, and one
 auth lane. Its output shows the chain: Playwright evidence -> Grassmann plane ->
 optional model-style proposal -> deterministic verdict -> issue payload. Use
+`bayesilisk-demo --recording` to open headed Chromium, slow the probe clicks, and
+hold the browser long enough to screen-record the local workflow pressure. Use
 `bayesilisk-demo --no-playwright` to see the same local loop without launching a
-browser.
+browser. The transcript explains every finding class: `breakage.easy`,
+`breakage.hard-to-find`, `finding.candidate-breakage`, and
+`control-confirmed`. `breakage.hard-to-find` means the deterministic invariant
+failed only after context narrowed the search to a cross-role, cross-module,
+stale-state, or unusual workflow path; it does not mean the model guessed the
+verdict.
 
 ## Grassmann Attention
 

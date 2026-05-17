@@ -60,9 +60,21 @@ systems.
 
 ```sh
 bayesilisk-demo
+bayesilisk-demo --recording
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
 ```
+
+`bayesilisk-demo --recording` opens headed Chromium, slows the probe clicks, and
+holds the browser briefly for screen recording. The transcript explains the
+trust boundary: Playwright observes, Grassmann routes, the scenario proposer lane
+is untrusted, and Bayesilisk's deterministic invariants judge. A
+`breakage.hard-to-find` verdict is still a deterministic invariant failure; the
+label means it required cross-role, cross-module, stale-state, or unusual
+workflow context to surface. The transcript also defines `breakage.easy`,
+`finding.candidate-breakage`, and `control-confirmed`, and it translates status
+pairs such as `expected=409 observed=200` into the product meaning: a workflow
+that should reject inconsistent state returned success.
 
 ## Enable Optional Ollama Layers
 
