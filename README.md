@@ -176,7 +176,12 @@ Travel, Expenses, Billing, HR, Support, and DMS, with stale state, impossible
 ordering, duplicate submission, feature-flag exposure, tenant boundaries, two
 controls, and role lanes. Its output shows the chain: Playwright evidence ->
 Grassmann plane -> generated catalog/attention scenarios -> optional
-model-style proposal -> deterministic verdict -> issue payload. Use
+model-style proposal -> deterministic verdict -> issue payload. It also includes
+a hard-to-find drill-down showing a route-matrix failure that appears only after
+connecting support takeover state, HR document access, route permissions, and
+module context. The drill-down includes a seeded sweep order, so changing
+`--seed` can make the same buried failure surface earlier or later while
+remaining reproducible for that seed. Use
 `bayesilisk-demo --recording` to open headed Chromium, slow the probe clicks, and
 hold the browser long enough to screen-record the local workflow pressure. Use
 `bayesilisk-demo --no-playwright` to see the same local loop without launching a

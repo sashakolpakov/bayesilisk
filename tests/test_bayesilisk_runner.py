@@ -863,6 +863,11 @@ def test_bayesilisk_demo_command_shows_full_loop_without_playwright() -> None:
     assert chain["modelProposal"]["rejectedReasons"] == ["unknown-target-plane"]
     assert chain["reportSummary"]["generatedScenarioCount"] == 8
     assert chain["reportSummary"]["invariantCount"] == 10
+    assert chain["hardToFindDrilldown"]["classification"] == "breakage.hard-to-find"
+    assert chain["hardToFindDrilldown"]["easierBreakagesRankedBefore"] >= 1
+    assert chain["hardToFindDrilldown"]["sameRouteBrowserEvidence"]
+    assert chain["hardToFindDrilldown"]["sweep"]["candidateCount"] >= 10
+    assert chain["hardToFindDrilldown"]["sweep"]["discoveryIndex"] >= 1
     assert chain["deterministicVerdict"]["observedResult"] == "fail"
     assert chain["issuePayload"]["issuePayloadSource"] == "verifiedByBayesilisk"
 
@@ -893,6 +898,13 @@ def test_bayesilisk_demo_text_output_explains_trust_boundaries() -> None:
     assert "deterministic rules: 10 invariants" in output
     assert "generated scenarios: 8 catalog/attention composites" in output
     assert "deterministicChecksOnAcceptedProposal=" in output
+    assert "Hard-to-find drill-down:" in output
+    assert "easierBreakagesRankedBefore=" in output
+    assert "sameRouteBrowserEvidence:" in output
+    assert "sweep=seed 150 found this at candidate" in output
+    assert "sweepMeaning=The verifier is deterministic for a seed" in output
+    assert "nearbySweepCandidates:" in output
+    assert "A human tester would need to connect support takeover state" in output
     assert "Classification legend:" in output
     assert "breakage.easy:" in output
     assert "breakage.hard-to-find:" in output
