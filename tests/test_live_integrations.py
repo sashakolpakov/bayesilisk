@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -43,8 +45,31 @@ def test_live_ollama_scenario_proposer_when_enabled(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "1")
     monkeypatch.setenv(
         "BAYESILISK_OLLAMA_SCENARIO_MODEL",
-        os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", "gemma4:e2b"),
+        os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", "qwen2.5-coder:3b"),
     )
+    model = os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", "qwen2.5-coder:3b")
+    base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
+    try:
+        request = urllib.request.Request(
+            f"{base_url.rstrip('/')}/api/chat",
+            data=json.dumps(
+                {
+                    "model": model,
+                    "messages": [{"role": "user", "content": "Return JSON only: {}"}],
+                    "stream": False,
+                    "options": {"num_predict": 1, "temperature": 0.0},
+                }
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(
+            request,
+            timeout=float(os.environ.get("BAYESILISK_OLLAMA_WARMUP_TIMEOUT", "30")),
+        ) as response:
+            response.read()
+    except Exception as exc:
+        pytest.skip(f"Ollama scenario proposer warm-up unavailable: {exc}")
     monkeypatch.setenv("BAYESILISK_OLLAMA_SCENARIO_TIMEOUT", os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TIMEOUT", "20"))
 
     context = {
