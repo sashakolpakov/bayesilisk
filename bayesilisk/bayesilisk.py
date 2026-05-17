@@ -2129,6 +2129,18 @@ def build_report(
     if limit is not None:
         findings = findings[:limit]
     sections = report_sections(findings)
+    verified_ledger = [
+        {
+            "classification": finding["classification"],
+            "fingerprint": finding["fingerprint"],
+            "invariantId": finding["invariantId"],
+            "issueReadiness": finding["issueReadiness"],
+            "observedResult": finding["observedResult"],
+            "riskScore": finding["riskScore"],
+            "scenarioId": finding["scenarioId"],
+        }
+        for finding in findings
+    ]
     return {
         "tool": VERSION,
         "seed": seed,
@@ -2145,6 +2157,18 @@ def build_report(
         "weakModelScenarioGeneration": grassmann.get("weakModelScenarioGeneration", {"enabled": False})
         if grassmann
         else {"enabled": False},
+        "observedByPlaywright": [],
+        "selectedByGrassmannAttention": [
+            {
+                "attentionScore": plane.get("attentionScore", 0.0),
+                "invariantId": plane.get("invariantId"),
+                "reasons": plane.get("reasons", []),
+            }
+            for plane in grassmann.get("planes", [])
+            if plane.get("invariantId") in set(grassmann.get("selectedPlaneIds", []))
+        ],
+        "proposedByModel": [],
+        "verifiedByBayesilisk": verified_ledger,
         "domains": ["Travel", "Expenses", "Billing", "HR", "Support", "DMS", "module entitlements"],
         "prioritizationPolicy": (
             "Sort by posterior fault probability first. Fix or document breakage.easy findings, rerun with the "
@@ -2190,6 +2214,35 @@ def build_contextual_report(
     )
     report["contextSummary"] = summary
     report["contextObservationSource"] = merged_observations.get("source", "none")
+    report["observedByPlaywright"] = [
+        {
+            "actorRole": fact.get("actorRole"),
+            "expectedStatus": fact.get("expectedStatus"),
+            "invariantId": fact.get("invariantId"),
+            "observedStatus": fact.get("observedStatus"),
+            "passed": fact.get("passed"),
+            "route": fact.get("route"),
+            "source": fact.get("source"),
+            "title": fact.get("title"),
+        }
+        for fact in (context or {}).get("repositoryFacts", [])
+        if isinstance(fact, dict) and fact.get("source") == "microsoft-playwright"
+    ]
+    report["selectedByGrassmannAttention"] = [
+        {
+            "attentionScore": plane.get("attentionScore", 0.0),
+            "invariantId": plane.get("invariantId"),
+            "reasons": plane.get("reasons", []),
+        }
+        for plane in attention.get("planes", [])
+        if plane.get("invariantId") in set(attention.get("selectedPlaneIds", []))
+    ]
+    report["proposedByModel"] = {
+        "acceptedCount": model_generation.get("acceptedCount", 0),
+        "enabled": model_generation.get("enabled", False),
+        "provider": model_generation.get("source", "disabled"),
+        "rejectedCount": model_generation.get("rejectedCount", 0),
+    }
     report["rankedProbes"] = ranked_probes(report, limit=limit)
     report["issuePayloads"] = issue_payloads(report, context=context, limit=limit)
     return report
@@ -2269,6 +2322,7 @@ def issue_payloads(
                 "fingerprint": finding["fingerprint"],
                 "invariantId": finding["invariantId"],
                 "issueReadiness": finding["issueReadiness"],
+                "issuePayloadSource": "verifiedByBayesilisk",
                 "labels": labels,
                 "attentionReasons": finding.get("attentionReasons", []),
                 "attentionScore": finding.get("attentionScore", 0.0),

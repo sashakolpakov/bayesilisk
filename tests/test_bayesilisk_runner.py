@@ -337,6 +337,11 @@ def test_playwright_probe_context_promotes_browser_observed_route_failures() -> 
     assert "hr.documents_customer_role_boundary" in attention["selectedPlaneIds"]
     assert attention["planes"][0]["attentionScore"] > 0
     assert any("playwright-evidence" in plane["reasons"] for plane in attention["planes"])
+    assert report["observedByPlaywright"]
+    assert report["observedByPlaywright"][0]["source"] == "microsoft-playwright"
+    assert report["selectedByGrassmannAttention"]
+    assert report["proposedByModel"]["enabled"] is False
+    assert report["verifiedByBayesilisk"]
     assert any(
         finding["generatedScenario"]
         and finding["generationBasis"].startswith("grassmann-attention:")
@@ -481,6 +486,7 @@ def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:
     assert payloads
     assert {"title", "body", "fingerprint", "dedupeState", "labels"} <= set(payloads[0])
     assert payloads[0]["dedupeState"] == "new"
+    assert payloads[0]["issuePayloadSource"] == "verifiedByBayesilisk"
 
 
 def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
