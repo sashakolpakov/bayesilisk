@@ -25,6 +25,13 @@ Run:
 python3 -m pytest
 ```
 
+The required CI path is deterministic and service-free:
+
+```sh
+python3 -m pytest -m "not live_playwright and not live_ollama"
+sphinx-build -b html docs docs/_build/html
+```
+
 The tests should cover:
 
 - every catalog scenario references valid fragments and invariants;
@@ -41,7 +48,9 @@ python3 -m pytest -m live_playwright
 BAYESILISK_LIVE_OLLAMA=1 BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b python3 -m pytest -m live_ollama
 ```
 
-Default CI runs deterministic tests and builds the Sphinx docs only.
+Default CI runs deterministic tests and builds the Sphinx docs only. It does not
+require Ollama, hosted model APIs, Playwright browsers, API keys, or local hidden
+state.
 
 ## Docs Policy
 

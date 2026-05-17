@@ -10,6 +10,8 @@ Bayesilisk is a deterministic local layer for permission, entitlement, route,
 and data-boundary sitting over Playwright, with Grassmann attention, and
 LLM-generated scenario-proposal workflows gated by a finite-state verifier.
 
+**Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle.**
+
 It is built for testers and agents that need reproducible findings, stable
 fingerprints, and issue-ready output without granting a model authority over the
 final verdict.
