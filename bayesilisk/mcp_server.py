@@ -8,7 +8,7 @@ from typing import Any, BinaryIO
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
-    from bayesilisk.engine import VERSION  # type: ignore[no-redef]
+    from bayesilisk.constants import VERSION  # type: ignore[no-redef]
     from bayesilisk.reporting import (  # type: ignore[no-redef]
         build_contextual_report,
         issue_payloads,
@@ -16,7 +16,7 @@ if __package__ in {None, ""}:
     )
 else:
     from .config import effective_runtime_config
-    from .engine import VERSION
+    from .constants import VERSION
     from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
 PROTOCOL_VERSION = "2024-11-05"

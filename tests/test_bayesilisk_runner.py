@@ -193,6 +193,13 @@ def test_focused_modules_expose_expected_boundaries() -> None:
     assert context.context_summary({"agentNotes": ["expense route"]})["textSignalCount"] == 1
     assert cli.main
 
+    engine_path = REPO_ROOT / "bayesilisk" / "engine.py"
+    assert len(engine_path.read_text(encoding="utf-8").splitlines()) <= 40
+    for module_path in (REPO_ROOT / "bayesilisk").glob("*.py"):
+        if module_path.name in {"engine.py", "__init__.py"}:
+            continue
+        assert "from .engine import" not in module_path.read_text(encoding="utf-8")
+
 
 def test_scenario_catalog_has_valid_references_and_invariant_coverage() -> None:
     bayesilisk = importlib.import_module("bayesilisk.engine")
@@ -707,6 +714,7 @@ def test_openai_compatible_provider_requires_api_key() -> None:
 
 def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
     bayesilisk = importlib.import_module("bayesilisk.engine")
+    model_proposals = importlib.import_module("bayesilisk.model_proposals")
     attention = {
         "source": "unit-test",
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
@@ -716,7 +724,7 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
     def auth_failure(*args: object, **kwargs: object) -> dict[str, object]:
         raise urllib.error.HTTPError("https://llm.example.test/v1", 401, "Unauthorized Bearer sk-secret", {}, None)
 
-    monkeypatch.setattr(bayesilisk, "_openai_compatible_chat_json", auth_failure)
+    monkeypatch.setattr(model_proposals, "_openai_compatible_chat_json", auth_failure)
     _, auth_generation = bayesilisk.weak_model_scenarios(
         attention,
         runtime_config={
@@ -732,7 +740,7 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
     def unavailable(*args: object, **kwargs: object) -> dict[str, object]:
         raise OSError("connection refused Bearer sk-ollama-leak")
 
-    monkeypatch.setattr(bayesilisk, "_ollama_chat_json", unavailable)
+    monkeypatch.setattr(model_proposals, "_ollama_chat_json", unavailable)
     _, ollama_generation = bayesilisk.weak_model_scenarios(
         attention,
         runtime_config={"enableScenarioProposer": True, "scenarioProvider": "ollama"},
@@ -744,6 +752,7 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
 
 def test_provider_output_remains_untrusted_and_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
     bayesilisk = importlib.import_module("bayesilisk.engine")
+    model_proposals = importlib.import_module("bayesilisk.model_proposals")
     attention = {
         "source": "unit-test",
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
@@ -770,7 +779,7 @@ def test_provider_output_remains_untrusted_and_redacted(monkeypatch: pytest.Monk
             ]
         }
 
-    monkeypatch.setattr(bayesilisk, "_openai_compatible_chat_json", fake_chat)
+    monkeypatch.setattr(model_proposals, "_openai_compatible_chat_json", fake_chat)
     scenarios, generation = bayesilisk.weak_model_scenarios(
         attention,
         runtime_config={

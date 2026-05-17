@@ -1,5 +1,5 @@
 """Bayesilisk deterministic permission and scenario verifier."""
 
-from .engine import VERSION
+from .constants import VERSION
 
 __all__ = ["VERSION"]

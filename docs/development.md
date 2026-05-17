@@ -4,7 +4,7 @@
 
 ```text
 bayesilisk/
-  engine.py              shared verifier implementation
+  engine.py              compact aggregate import surface
   catalog.py             scenario fragments, invariants, and catalog surfaces
   attention.py           Grassmann attention surfaces
   model_proposals.py     scenario proposer provider surfaces
