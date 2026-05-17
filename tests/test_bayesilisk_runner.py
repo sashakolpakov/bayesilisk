@@ -917,6 +917,60 @@ def test_bayesilisk_demo_text_output_explains_trust_boundaries() -> None:
     assert "bayesilisk-demo --recording" in output
 
 
+def test_realistic_demo_runs_permission_harness_without_playwright(tmp_path: Path) -> None:
+    context_path = tmp_path / "realistic-context.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "bayesilisk.realistic_demo",
+            "--no-playwright",
+            "--context-output",
+            str(context_path),
+            "--json",
+        ],
+        check=True,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+    payload = json.loads(result.stdout)
+    context = json.loads(context_path.read_text(encoding="utf-8"))
+
+    assert payload["demo"] == "realistic-app-permission-harness"
+    assert payload["probeCount"] == 8
+    assert payload["probeFailures"] == 4
+    assert payload["probePasses"] == 4
+    assert payload["reportSummary"]["issuePayloadCount"] >= 1
+    assert payload["topFindings"]
+    assert context["source"] == "realistic-app-demo"
+    assert context["playwrightProbe"]["failedCount"] == 4
+    assert any(
+        fact["title"] == "Support takeover reaches HR document"
+        and fact["observedStatus"] == 200
+        and fact["expectedStatus"] == 403
+        for fact in context["repositoryFacts"]
+    )
+
+
+def test_realistic_demo_text_explains_real_app_probe_contract() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "bayesilisk.realistic_demo", "--no-playwright"],
+        check=True,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+    output = result.stdout
+
+    assert "Bayesilisk realistic app integration demo" in output
+    assert "the app exposes /internal/bayesilisk-probes" in output
+    assert "each button calls a local permission handler" in output
+    assert "Probe harness: 4 failing observations, 4 controls, 8 total" in output
+    assert "Equivalent real-app flow:" in output
+    assert "tools/playwright_probe.py --url http://localhost:3000/internal/bayesilisk-probes" in output
+
+
 def test_bayesilisk_cli_reports_effective_runtime_configuration() -> None:
     report = json.loads(
         run_bayesilisk(
@@ -1090,9 +1144,14 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "synthetic local fixture",
         "bayesilisk/demo.py::DEMO_PROBES",
         "tools/playwright_probe.py --url",
+        "Realistic App Integration Demo",
+        "python3 -m bayesilisk.realistic_demo --recording",
+        "python3 -m bayesilisk.realistic_demo --serve-only",
+        "bayesilisk-realistic-demo --recording",
     ):
         assert fragment in readme
     assert 'bayesilisk-demo = "bayesilisk.demo:main"' in pyproject
+    assert 'bayesilisk-realistic-demo = "bayesilisk.realistic_demo:main"' in pyproject
 
 
 def test_proof_artifacts_are_linked_and_explain_trust_boundaries() -> None:

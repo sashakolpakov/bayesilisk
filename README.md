@@ -231,6 +231,56 @@ python3 tools/playwright_probe.py --url http://localhost:3000/probe-page \
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-real-context.json --format markdown
 ```
 
+### Realistic App Integration Demo
+
+The realistic demo is a small local permission app, not a static table. It has
+users, tenants, module flags, support takeover state, HR documents, DMS
+receipts, billing exports, and expense approvals. The page at
+`/internal/bayesilisk-probes` exposes `data-bayesilisk-probe` rows, and each
+button calls a local permission handler before writing the observed status back
+to the page. Bayesilisk then consumes the captured context exactly like it would
+for a caller-provided app.
+
+Run it without launching a browser:
+
+```sh
+python3 -m bayesilisk.realistic_demo --no-playwright
+```
+
+Run the screen-recordable browser flow:
+
+```sh
+python3 -m bayesilisk.realistic_demo --recording
+```
+
+Write the captured context and inspect it through the normal verifier:
+
+```sh
+python3 -m bayesilisk.realistic_demo \
+  --context-output /tmp/bayesilisk-realistic-context.json \
+  --no-playwright
+python3 -m bayesilisk \
+  --seed 150 \
+  --context /tmp/bayesilisk-realistic-context.json \
+  --format markdown
+```
+
+After editable install, the console script is:
+
+```sh
+bayesilisk-realistic-demo --recording
+```
+
+To run it like a real app integration, keep the local app serving in one
+terminal:
+
+```sh
+python3 -m bayesilisk.realistic_demo --serve-only
+```
+
+Then copy the printed `/internal/bayesilisk-probes` URL into the normal
+Playwright bridge command from a second terminal.
+
 ## Grassmann Attention
 
 Contextual reports include a bounded Grassmann-style attention layer. It treats
