@@ -116,6 +116,35 @@ should be opened automatically. `probe-only`, `regression-watch`,
 `do-not-open-muted`, and `no-issue-control` findings are intentionally not
 automatic issue material.
 
+## Proof Artifacts
+
+![Bayesilisk proof loop](docs/assets/bayesilisk-proof-loop.gif)
+
+The proof loop is deliberately split:
+
+```text
+Playwright evidence -> Grassmann attention -> model proposal -> Bayesilisk verification -> issue payload
+```
+
+Example artifacts:
+
+- [example JSON report](docs/examples/example-report.json)
+- [example GitHub issue payloads](docs/examples/example-issue-payloads.json)
+
+### Why This Is Not a Black Box
+
+Bayesilisk exposes separate ledgers for `observedByPlaywright`,
+`selectedByGrassmannAttention`, `proposedByModel`, and `verifiedByBayesilisk`.
+Only `verifiedByBayesilisk` contains deterministic invariant results that can
+feed issue payloads. Model output remains untrusted candidate input.
+
+### Model Unavailable? Still Works
+
+The default verifier path requires no model provider. With no Ollama or hosted
+model configured, Bayesilisk still composes deterministic scenarios, evaluates
+finite-state invariants, ranks findings, validates report schemas, and emits
+issue payloads from verified failures.
+
 ## Microsoft Playwright Bridge
 
 Bayesilisk includes a static demo target and an optional Microsoft Playwright

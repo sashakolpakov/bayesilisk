@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC = REPO_ROOT / "docs" / "bayesilisk.md"
 DESIGN = REPO_ROOT / "DESIGN.md"
 README = REPO_ROOT / "README.md"
+REPORTS_DOC = REPO_ROOT / "docs" / "reports.md"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -771,3 +772,38 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "without granting a model authority",
     ):
         assert fragment in readme
+
+
+def test_proof_artifacts_are_linked_and_explain_trust_boundaries() -> None:
+    readme = README.read_text(encoding="utf-8")
+    reports = REPORTS_DOC.read_text(encoding="utf-8")
+
+    for path in (
+        REPO_ROOT / "docs" / "assets" / "bayesilisk-proof-loop.gif",
+        REPO_ROOT / "docs" / "examples" / "example-report.json",
+        REPO_ROOT / "docs" / "examples" / "example-issue-payloads.json",
+    ):
+        assert path.exists()
+        assert path.stat().st_size > 0
+
+    for fragment in (
+        "docs/assets/bayesilisk-proof-loop.gif",
+        "docs/examples/example-report.json",
+        "docs/examples/example-issue-payloads.json",
+        "Why This Is Not a Black Box",
+        "Model Unavailable? Still Works",
+        "Playwright evidence -> Grassmann attention -> model proposal -> Bayesilisk verification -> issue payload",
+        "Model output remains untrusted candidate input.",
+        "Only `verifiedByBayesilisk` contains deterministic invariant results",
+    ):
+        assert fragment in readme
+
+    for fragment in (
+        "Example JSON report",
+        "Example GitHub issue payloads",
+        "Why This Is Not a Black Box",
+        "Model Unavailable? Still Works",
+        "The issue-worthy result must come from `verifiedByBayesilisk`.",
+        "does not require Ollama",
+    ):
+        assert fragment in reports
