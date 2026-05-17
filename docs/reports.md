@@ -80,3 +80,33 @@ The CLI does not mutate issue trackers. It returns payloads that another trusted
 When a finding came from a model-proposed scenario, issue payloads include the
 same safe `modelProvenance` object as the report. This provenance is intended for
 auditability only; it does not make the model output trusted.
+
+## Proof Artifacts
+
+Downloadable examples:
+
+- {download}`Example JSON report <examples/example-report.json>`
+- {download}`Example GitHub issue payloads <examples/example-issue-payloads.json>`
+
+The README also includes a short GIF showing the Bayesilisk proof loop:
+
+```text
+Playwright evidence -> Grassmann attention -> model proposal -> Bayesilisk verification -> issue payload
+```
+
+### Why This Is Not a Black Box
+
+Bayesilisk reports keep evidence, routing, proposal, and verification separate:
+
+- `observedByPlaywright` is browser evidence;
+- `selectedByGrassmannAttention` is routing telemetry;
+- `proposedByModel` is untrusted candidate scenario activity;
+- `verifiedByBayesilisk` is the deterministic verifier ledger.
+
+The issue-worthy result must come from `verifiedByBayesilisk`.
+
+### Model Unavailable? Still Works
+
+The default report path does not require Ollama, hosted model APIs, API keys, or
+browser services. A fixed seed with the same local inputs still produces the
+same report, schema validation, fingerprints, risk scores, and issue payloads.

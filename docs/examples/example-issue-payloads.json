@@ -1,0 +1,350 @@
+[
+  {
+    "attentionReasons": [
+      "no-grassmann-attention"
+    ],
+    "attentionScore": 0.0,
+    "body": "Scenario `creative.support_foreign_dms_expense_review`: Expired support session tries to inspect a foreign DMS receipt during expense review.\n\nFingerprint: `bayesilisk:e83da420e134ddd8`\n\nClassification: `breakage.easy`\n\nIssue readiness: `ready-for-issue`\n\nPosterior mode: `highest-fault-probability`\n\nExpected invariant: Expense approvals require expenses entitlement and usable required receipt evidence.\n\nObserved: expense approval reached while expenses module is disabled or absent\n\nRisk score: 0.949640\n\nObservation basis:\n```json\n{\n  \"priorDelta\": 0.0,\n  \"source\": \"none\",\n  \"tags\": [\n    \"fresh-prior\"\n  ]\n}\n```\n\nAccess pattern:\n```json\n{\n  \"actorRole\": \"support\",\n  \"businessFlow\": [],\n  \"dataSignals\": {\n    \"allRequiredReceiptsUsable\": false,\n    \"documentTenantMatches\": false\n  },\n  \"decision\": \"approve\",\n  \"expenseCategories\": [],\n  \"modules\": {},\n  \"routes\": [\n    \"/api/expense-claims/{claimId}/review\"\n  ],\n  \"transportModes\": []\n}\n```\n\nFragments:\n- `role.support_takeover_expired` (Support): Support actor has an expired takeover session.\n- `route.expense_approve` (Expenses): Expense review endpoint receives an approve decision.\n- `expense.receipt_missing` (Expenses): Hotel claim item has no usable linked DMS receipt.\n- `dms.foreign_tenant_document` (DMS): DMS document belongs to another tenant.\n- `creative.travel_expense_roundup` (Travel): Creative round-up composes travel, expense, support, and DMS fragments.\n\nReproduce with `python3 -m bayesilisk --seed <seed> --format json`.",
+    "classification": "breakage.easy",
+    "dedupeKey": "bayesilisk:e83da420e134ddd8:modules.expense_approval_requires_module_and_receipt",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:e83da420e134ddd8",
+    "invariantId": "modules.expense_approval_requires_module_and_receipt",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": null,
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.94964,
+    "scenarioId": "creative.support_foreign_dms_expense_review",
+    "title": "Bayesilisk breakage.easy: creative scenario violates modules.expense_approval_requires_module_and_receipt"
+  },
+  {
+    "attentionReasons": [
+      "no-grassmann-attention"
+    ],
+    "attentionScore": 0.0,
+    "body": "Scenario `generated.01.employee_self.funding_approved.legs_consistent_multimodal`: Generated composite travel expense probe\n\nFingerprint: `bayesilisk:94c40203fb79d8ff`\n\nClassification: `breakage.easy`\n\nIssue readiness: `ready-for-issue`\n\nPosterior mode: `highest-fault-probability`\n\nExpected invariant: Expense approvals require expenses entitlement and usable required receipt evidence.\n\nObserved: expense approval reached while expenses module is disabled or absent\n\nRisk score: 0.949640\n\nObservation basis:\n```json\n{\n  \"priorDelta\": 0.0,\n  \"source\": \"none\",\n  \"tags\": [\n    \"fresh-prior\"\n  ]\n}\n```\n\nAccess pattern:\n```json\n{\n  \"actorRole\": \"employee\",\n  \"businessFlow\": [\n    \"travel funding request\",\n    \"travel funding approval\"\n  ],\n  \"dataSignals\": {\n    \"allRequiredReceiptsUsable\": true,\n    \"documentTenantMatches\": true,\n    \"itineraryCoversExpenseDates\": true,\n    \"segmentsChronological\": true,\n    \"targetEmployeeId\": \"emp-001\",\n    \"transportModesCoveredByItinerary\": true\n  },\n  \"decision\": \"approve\",\n  \"expenseCategories\": [\n    \"rental_car\",\n    \"train\"\n  ],\n  \"modules\": {\n    \"expenses\": false,\n    \"travel\": true\n  },\n  \"routes\": [\n    \"/api/travel/funding-requests\",\n    \"/api/travel/funding-requests/{requestId}/approve\",\n    \"/api/expense-claims/{claimId}/review\"\n  ],\n  \"transportModes\": [\n    \"rental_car\",\n    \"train\"\n  ]\n}\n```\n\nOriginal generated scenario:\n```json\n{\n  \"accessPattern\": {\n    \"actorRole\": \"employee\",\n    \"businessFlow\": [\n      \"travel funding request\",\n      \"travel funding approval\"\n    ],\n    \"dataSignals\": {\n      \"allRequiredReceiptsUsable\": true,\n      \"documentTenantMatches\": true,\n      \"itineraryCoversExpenseDates\": true,\n      \"segmentsChronological\": true,\n      \"targetEmployeeId\": \"emp-001\",\n      \"transportModesCoveredByItinerary\": true\n    },\n    \"decision\": \"approve\",\n    \"expenseCategories\": [\n      \"rental_car\",\n      \"train\"\n    ],\n    \"modules\": {\n      \"expenses\": false,\n      \"travel\": true\n    },\n    \"routes\": [\n      \"/api/travel/funding-requests\",\n      \"/api/travel/funding-requests/{requestId}/approve\",\n      \"/api/expense-claims/{claimId}/review\"\n    ],\n    \"transportModes\": [\n      \"rental_car\",\n      \"train\"\n    ]\n  },\n  \"fragmentIds\": [\n    \"role.employee_self\",\n    \"module.travel_on\",\n    \"module.expenses_off\",\n    \"route.travel_funding_request\",\n    \"route.travel_funding_approve\",\n    \"travel.funding_approved\",\n    \"route.expense_approve\",\n    \"expense.rental_car\",\n    \"expense.train_ticket\",\n    \"dms.wrong_process_document\",\n    \"travel.legs_consistent_multimodal\",\n    \"creative.travel_expense_roundup\"\n  ],\n  \"observation\": \"expense approval reached while expenses module is disabled or absent\"\n}\n```\n\nMinimized reproducer:\n```json\n{\n  \"accessPattern\": {\n    \"actorRole\": \"unknown\",\n    \"businessFlow\": [],\n    \"dataSignals\": {},\n    \"decision\": \"approve\",\n    \"expenseCategories\": [],\n    \"modules\": {},\n    \"routes\": [\n      \"/api/expense-claims/{claimId}/review\"\n    ],\n    \"transportModes\": []\n  },\n  \"fragmentIds\": [\n    \"route.expense_approve\"\n  ],\n  \"observation\": \"expense approval reached while expenses module is disabled or absent\",\n  \"removedFragmentIds\": [\n    \"role.employee_self\",\n    \"module.travel_on\",\n    \"module.expenses_off\",\n    \"route.travel_funding_request\",\n    \"route.travel_funding_approve\",\n    \"travel.funding_approved\",\n    \"expense.rental_car\",\n    \"expense.train_ticket\",\n    \"dms.wrong_process_document\",\n    \"travel.legs_consistent_multimodal\",\n    \"creative.travel_expense_roundup\"\n  ]\n}\n```\n\nFragments:\n- `role.employee_self` (HR): Employee actor targets their own record.\n- `module.travel_on` (module entitlements): Travel module is enabled.\n- `module.expenses_off` (module entitlements): Expenses module is disabled for the organization.\n- `route.travel_funding_request` (Travel): Travel funding request route receives a request.\n- `route.travel_funding_approve` (Travel): Travel funding approval route receives an approve decision.\n- `travel.funding_approved` (Travel): Travel funding is approved before expenses are submitted.\n- `route.expense_approve` (Expenses): Expense review endpoint receives an approve decision.\n- `expense.rental_car` (Expenses): Rental car expense has a usable receipt and a trip-date service date.\n- `expense.train_ticket` (Expenses): Train ticket expense has a usable receipt.\n- `dms.wrong_process_document` (DMS): DMS document is tenant-scoped but belongs to the wrong process.\n- `travel.legs_consistent_multimodal` (Travel): Train, rental car, and airplane legs are chronological and cover expense dates.\n- `creative.travel_expense_roundup` (Travel): Creative round-up composes travel, expense, support, and DMS fragments.\n\nReproduce with `python3 -m bayesilisk --seed <seed> --format json`.",
+    "classification": "breakage.easy",
+    "dedupeKey": "bayesilisk:94c40203fb79d8ff:modules.expense_approval_requires_module_and_receipt",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:94c40203fb79d8ff",
+    "invariantId": "modules.expense_approval_requires_module_and_receipt",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa",
+      "generated-scenario"
+    ],
+    "minimizedReproducer": {
+      "accessPattern": {
+        "actorRole": "unknown",
+        "businessFlow": [],
+        "dataSignals": {},
+        "decision": "approve",
+        "expenseCategories": [],
+        "modules": {},
+        "routes": [
+          "/api/expense-claims/{claimId}/review"
+        ],
+        "transportModes": []
+      },
+      "fragmentIds": [
+        "route.expense_approve"
+      ],
+      "fragments": [
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "id": "route.expense_approve",
+          "kind": "route",
+          "summary": "Expense review endpoint receives an approve decision."
+        }
+      ],
+      "generatedScenario": true,
+      "generationBasis": "seeded composite fragment generator",
+      "invariantId": "modules.expense_approval_requires_module_and_receipt",
+      "minimized": true,
+      "minimizedFragmentCount": 1,
+      "observation": "expense approval reached while expenses module is disabled or absent",
+      "originalFragmentCount": 12,
+      "preservedInvariantFailure": true,
+      "removedFragmentIds": [
+        "role.employee_self",
+        "module.travel_on",
+        "module.expenses_off",
+        "route.travel_funding_request",
+        "route.travel_funding_approve",
+        "travel.funding_approved",
+        "expense.rental_car",
+        "expense.train_ticket",
+        "dms.wrong_process_document",
+        "travel.legs_consistent_multimodal",
+        "creative.travel_expense_roundup"
+      ],
+      "scenarioId": "generated.01.employee_self.funding_approved.legs_consistent_multimodal",
+      "scenarioTitle": "Generated composite travel expense probe",
+      "scenarioTone": "generated-round-up",
+      "subScenarios": [
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "fragmentId": "route.expense_approve",
+          "id": "subscenario.1.route.expense_approve",
+          "kind": "route",
+          "summary": "Expense review endpoint receives an approve decision."
+        }
+      ]
+    },
+    "modelProvenance": null,
+    "originalScenario": {
+      "accessPattern": {
+        "actorRole": "employee",
+        "businessFlow": [
+          "travel funding request",
+          "travel funding approval"
+        ],
+        "dataSignals": {
+          "allRequiredReceiptsUsable": true,
+          "documentTenantMatches": true,
+          "itineraryCoversExpenseDates": true,
+          "segmentsChronological": true,
+          "targetEmployeeId": "emp-001",
+          "transportModesCoveredByItinerary": true
+        },
+        "decision": "approve",
+        "expenseCategories": [
+          "rental_car",
+          "train"
+        ],
+        "modules": {
+          "expenses": false,
+          "travel": true
+        },
+        "routes": [
+          "/api/travel/funding-requests",
+          "/api/travel/funding-requests/{requestId}/approve",
+          "/api/expense-claims/{claimId}/review"
+        ],
+        "transportModes": [
+          "rental_car",
+          "train"
+        ]
+      },
+      "fragmentIds": [
+        "role.employee_self",
+        "module.travel_on",
+        "module.expenses_off",
+        "route.travel_funding_request",
+        "route.travel_funding_approve",
+        "travel.funding_approved",
+        "route.expense_approve",
+        "expense.rental_car",
+        "expense.train_ticket",
+        "dms.wrong_process_document",
+        "travel.legs_consistent_multimodal",
+        "creative.travel_expense_roundup"
+      ],
+      "fragments": [
+        {
+          "completeAlone": false,
+          "domain": "HR",
+          "id": "role.employee_self",
+          "kind": "actor",
+          "summary": "Employee actor targets their own record."
+        },
+        {
+          "completeAlone": false,
+          "domain": "module entitlements",
+          "id": "module.travel_on",
+          "kind": "entitlement",
+          "summary": "Travel module is enabled."
+        },
+        {
+          "completeAlone": false,
+          "domain": "module entitlements",
+          "id": "module.expenses_off",
+          "kind": "entitlement",
+          "summary": "Expenses module is disabled for the organization."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "id": "route.travel_funding_request",
+          "kind": "route",
+          "summary": "Travel funding request route receives a request."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "id": "route.travel_funding_approve",
+          "kind": "route",
+          "summary": "Travel funding approval route receives an approve decision."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "id": "travel.funding_approved",
+          "kind": "data",
+          "summary": "Travel funding is approved before expenses are submitted."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "id": "route.expense_approve",
+          "kind": "route",
+          "summary": "Expense review endpoint receives an approve decision."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "id": "expense.rental_car",
+          "kind": "data",
+          "summary": "Rental car expense has a usable receipt and a trip-date service date."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "id": "expense.train_ticket",
+          "kind": "data",
+          "summary": "Train ticket expense has a usable receipt."
+        },
+        {
+          "completeAlone": false,
+          "domain": "DMS",
+          "id": "dms.wrong_process_document",
+          "kind": "data",
+          "summary": "DMS document is tenant-scoped but belongs to the wrong process."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "id": "travel.legs_consistent_multimodal",
+          "kind": "data",
+          "summary": "Train, rental car, and airplane legs are chronological and cover expense dates."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "id": "creative.travel_expense_roundup",
+          "kind": "scenario",
+          "summary": "Creative round-up composes travel, expense, support, and DMS fragments."
+        }
+      ],
+      "generatedScenario": true,
+      "generationBasis": "seeded composite fragment generator",
+      "observation": "expense approval reached while expenses module is disabled or absent",
+      "scenarioId": "generated.01.employee_self.funding_approved.legs_consistent_multimodal",
+      "scenarioTitle": "Generated composite travel expense probe",
+      "scenarioTone": "generated-round-up",
+      "subScenarios": [
+        {
+          "completeAlone": false,
+          "domain": "HR",
+          "fragmentId": "role.employee_self",
+          "id": "subscenario.1.role.employee_self",
+          "kind": "actor",
+          "summary": "Employee actor targets their own record."
+        },
+        {
+          "completeAlone": false,
+          "domain": "module entitlements",
+          "fragmentId": "module.travel_on",
+          "id": "subscenario.2.module.travel_on",
+          "kind": "entitlement",
+          "summary": "Travel module is enabled."
+        },
+        {
+          "completeAlone": false,
+          "domain": "module entitlements",
+          "fragmentId": "module.expenses_off",
+          "id": "subscenario.3.module.expenses_off",
+          "kind": "entitlement",
+          "summary": "Expenses module is disabled for the organization."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "fragmentId": "route.travel_funding_request",
+          "id": "subscenario.4.route.travel_funding_request",
+          "kind": "route",
+          "summary": "Travel funding request route receives a request."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "fragmentId": "route.travel_funding_approve",
+          "id": "subscenario.5.route.travel_funding_approve",
+          "kind": "route",
+          "summary": "Travel funding approval route receives an approve decision."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "fragmentId": "travel.funding_approved",
+          "id": "subscenario.6.travel.funding_approved",
+          "kind": "data",
+          "summary": "Travel funding is approved before expenses are submitted."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "fragmentId": "route.expense_approve",
+          "id": "subscenario.7.route.expense_approve",
+          "kind": "route",
+          "summary": "Expense review endpoint receives an approve decision."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "fragmentId": "expense.rental_car",
+          "id": "subscenario.8.expense.rental_car",
+          "kind": "data",
+          "summary": "Rental car expense has a usable receipt and a trip-date service date."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Expenses",
+          "fragmentId": "expense.train_ticket",
+          "id": "subscenario.9.expense.train_ticket",
+          "kind": "data",
+          "summary": "Train ticket expense has a usable receipt."
+        },
+        {
+          "completeAlone": false,
+          "domain": "DMS",
+          "fragmentId": "dms.wrong_process_document",
+          "id": "subscenario.10.dms.wrong_process_document",
+          "kind": "data",
+          "summary": "DMS document is tenant-scoped but belongs to the wrong process."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "fragmentId": "travel.legs_consistent_multimodal",
+          "id": "subscenario.11.travel.legs_consistent_multimodal",
+          "kind": "data",
+          "summary": "Train, rental car, and airplane legs are chronological and cover expense dates."
+        },
+        {
+          "completeAlone": false,
+          "domain": "Travel",
+          "fragmentId": "creative.travel_expense_roundup",
+          "id": "subscenario.12.creative.travel_expense_roundup",
+          "kind": "scenario",
+          "summary": "Creative round-up composes travel, expense, support, and DMS fragments."
+        }
+      ]
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.94964,
+    "scenarioId": "generated.01.employee_self.funding_approved.legs_consistent_multimodal",
+    "title": "Bayesilisk breakage.easy: generated-round-up scenario violates modules.expense_approval_requires_module_and_receipt"
+  }
+]
