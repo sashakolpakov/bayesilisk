@@ -169,10 +169,14 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
 ```
 
-`bayesilisk-demo` serves a local intentionally brittle app with stale workflow
-state, impossible ordering, duplicate submission, feature-flag exposure, and one
-auth lane. Its output shows the chain: Playwright evidence -> Grassmann plane ->
-optional model-style proposal -> deterministic verdict -> issue payload. Use
+`bayesilisk-demo` serves a synthetic local fixture defined in
+`bayesilisk/demo.py::DEMO_PROBES`. Those rows are not claims about an existing
+customer app; they are twelve deliberately brittle product-like workflows across
+Travel, Expenses, Billing, HR, Support, and DMS, with stale state, impossible
+ordering, duplicate submission, feature-flag exposure, tenant boundaries, two
+controls, and role lanes. Its output shows the chain: Playwright evidence ->
+Grassmann plane -> generated catalog/attention scenarios -> optional
+model-style proposal -> deterministic verdict -> issue payload. Use
 `bayesilisk-demo --recording` to open headed Chromium, slow the probe clicks, and
 hold the browser long enough to screen-record the local workflow pressure. Use
 `bayesilisk-demo --no-playwright` to see the same local loop without launching a
@@ -182,6 +186,15 @@ browser. The transcript explains every finding class: `breakage.easy`,
 failed only after context narrowed the search to a cross-role, cross-module,
 stale-state, or unusual workflow path; it does not mean the model guessed the
 verdict.
+
+For a real app, serve a page that exposes `data-bayesilisk-probe` rows with
+actor, route, invariant, expected status, and actual click behavior, then run:
+
+```sh
+python3 tools/playwright_probe.py --url http://localhost:3000/probe-page \
+  --output /tmp/bayesilisk-real-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-real-context.json --format markdown
+```
 
 ## Grassmann Attention
 

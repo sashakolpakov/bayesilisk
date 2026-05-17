@@ -53,10 +53,12 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-
 
 ## Run the Playwright Demo
 
-The bundled workflow demo is local-only. It intentionally contains stale state,
-impossible ordering, duplicate submission, feature-flag exposure, and one auth
-lane so Bayesilisk can receive browser evidence without contacting production
-systems.
+The bundled workflow demo is local-only. It contains twelve synthetic
+product-like user actions across Travel, Expenses, Billing, HR, Support, and
+DMS. Some are controls and some intentionally contain stale state, impossible
+ordering, duplicate submission, feature-flag exposure, tenant-boundary, and role
+lane failures so Bayesilisk can receive browser evidence without contacting
+production systems.
 
 ```sh
 bayesilisk-demo
@@ -68,13 +70,24 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 `bayesilisk-demo --recording` opens headed Chromium, slows the probe clicks, and
 holds the browser briefly for screen recording. The transcript explains the
 trust boundary: Playwright observes, Grassmann routes, the scenario proposer lane
-is untrusted, and Bayesilisk's deterministic invariants judge. A
+is untrusted, generated catalog/attention scenarios expand coverage, and
+Bayesilisk's deterministic invariants judge. A
 `breakage.hard-to-find` verdict is still a deterministic invariant failure; the
 label means it required cross-role, cross-module, stale-state, or unusual
 workflow context to surface. The transcript also defines `breakage.easy`,
 `finding.candidate-breakage`, and `control-confirmed`, and it translates status
 pairs such as `expected=409 observed=200` into the product meaning: a workflow
 that should reject inconsistent state returned success.
+
+The demo rows are synthetic fixtures from `bayesilisk/demo.py::DEMO_PROBES`, not
+claims about an existing product. To test a real app, expose probe rows in that
+app and point Playwright at it:
+
+```sh
+python3 tools/playwright_probe.py --url http://localhost:3000/probe-page \
+  --output /tmp/bayesilisk-real-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-real-context.json --format markdown
+```
 
 ## Enable Optional Ollama Layers
 

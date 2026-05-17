@@ -849,13 +849,20 @@ def test_bayesilisk_demo_command_shows_full_loop_without_playwright() -> None:
     chain = payload["chain"]
 
     assert payload["demo"] == "workflow-pressure"
+    assert payload["fixtureKind"] == "synthetic-local-fixture"
+    assert payload["fixtureSource"] == "bayesilisk/demo.py::DEMO_PROBES"
     assert payload["playwrightMode"].startswith("fallback:")
-    assert payload["playwrightProbe"]["failedCount"] >= 4
+    assert payload["playwrightProbe"]["failedCount"] == 10
+    assert payload["playwrightProbe"]["passedCount"] == 2
+    assert payload["playwrightProbe"]["resultCount"] == 12
     assert chain["playwrightEvidence"]["source"] == "microsoft-playwright"
     assert chain["grassmannPlane"]["invariantId"]
     assert chain["modelProposal"]["mode"] == "canned-local-optional"
     assert chain["modelProposal"]["acceptedCount"] == 1
+    assert chain["modelProposal"]["deterministicFindingCount"] >= 1
     assert chain["modelProposal"]["rejectedReasons"] == ["unknown-target-plane"]
+    assert chain["reportSummary"]["generatedScenarioCount"] == 8
+    assert chain["reportSummary"]["invariantCount"] == 10
     assert chain["deterministicVerdict"]["observedResult"] == "fail"
     assert chain["issuePayload"]["issuePayloadSource"] == "verifiedByBayesilisk"
 
@@ -871,10 +878,21 @@ def test_bayesilisk_demo_text_output_explains_trust_boundaries() -> None:
     output = result.stdout
 
     assert "What this proves:" in output
+    assert "Fixture provenance:" in output
+    assert "kind: synthetic-local-fixture" in output
+    assert "source: bayesilisk/demo.py::DEMO_PROBES" in output
+    assert "not claims about an existing app" in output
+    assert "tools/playwright_probe.py --url <url>" in output
     assert "Playwright is only the sensor" in output
     assert "Grassmann attention is only the router" in output
+    assert "Catalog and attention-generated scenarios expand the search space" in output
     assert "scenario proposer lane is not trusted" in output
     assert "Bayesilisk is the judge" in output
+    assert "Scale of this local run:" in output
+    assert "browser fixtures: 12 user actions (10 failing, 2 controls)" in output
+    assert "deterministic rules: 10 invariants" in output
+    assert "generated scenarios: 8 catalog/attention composites" in output
+    assert "deterministicChecksOnAcceptedProposal=" in output
     assert "Classification legend:" in output
     assert "breakage.easy:" in output
     assert "breakage.hard-to-find:" in output
@@ -882,7 +900,7 @@ def test_bayesilisk_demo_text_output_explains_trust_boundaries() -> None:
     assert "control-confirmed:" in output
     assert "meaning: workflow should reject inconsistent state, but the app accepted it" in output
     assert "meaning: role/module boundary should deny access, but the app allowed it" in output
-    assert "classificationMeaning=An invariant fails only after context narrows the search" in output
+    assert "classificationMeaning=An invariant fails" in output
     assert "Recording command:" in output
     assert "bayesilisk-demo --recording" in output
 
@@ -1057,6 +1075,9 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "breakage.hard-to-find",
         "finding.candidate-breakage",
         "control-confirmed",
+        "synthetic local fixture",
+        "bayesilisk/demo.py::DEMO_PROBES",
+        "tools/playwright_probe.py --url",
     ):
         assert fragment in readme
     assert 'bayesilisk-demo = "bayesilisk.demo:main"' in pyproject
