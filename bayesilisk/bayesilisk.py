@@ -1584,6 +1584,104 @@ def access_pattern(facts: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def scenario_fragment_payload(fragments: list[Fragment]) -> list[dict[str, Any]]:
+    return [
+        {
+            "completeAlone": fragment.complete_alone,
+            "domain": fragment.domain,
+            "id": fragment.id,
+            "kind": fragment.kind,
+            "summary": fragment.summary,
+        }
+        for fragment in fragments
+    ]
+
+
+def scenario_reproducer_payload(
+    scenario: Scenario,
+    fragments: list[Fragment],
+    observation: str | None = None,
+) -> dict[str, Any]:
+    facts = merge_facts(fragments)
+    payload = {
+        "accessPattern": access_pattern(facts),
+        "fragmentIds": [fragment.id for fragment in fragments],
+        "fragments": scenario_fragment_payload(fragments),
+        "generatedScenario": scenario.generated,
+        "generationBasis": scenario.generation_basis,
+        "scenarioId": scenario.id,
+        "scenarioTitle": scenario.title,
+        "scenarioTone": scenario.tone,
+        "subScenarios": sub_scenarios(fragments),
+    }
+    if observation is not None:
+        payload["observation"] = observation
+    return payload
+
+
+def _preserves_minimization_context(
+    original_facts: dict[str, Any],
+    candidate_facts: dict[str, Any],
+    invariant: Invariant,
+) -> bool:
+    if invariant.id in {
+        "roles.route_matrix_allowed",
+        "support.takeover_session_required",
+        "hr.documents_customer_role_boundary",
+    }:
+        original_actor = original_facts.get("actorRole")
+        if original_actor is not None and candidate_facts.get("actorRole") != original_actor:
+            return False
+    if invariant.id == "hr.documents_customer_role_boundary" and has_route(original_facts, HR_DOCUMENT_ROUTE):
+        return has_route(candidate_facts, HR_DOCUMENT_ROUTE)
+    return True
+
+
+def minimize_failing_generated_scenario(
+    scenario: Scenario,
+    invariant: Invariant,
+    fragments: list[Fragment],
+    original_observation: str,
+) -> dict[str, Any] | None:
+    if not scenario.generated:
+        return None
+    original_facts = merge_facts(fragments)
+    passed, observation = invariant.evaluator(original_facts)
+    if passed or observation != original_observation:
+        return None
+
+    minimized = list(fragments)
+    changed = True
+    while changed:
+        changed = False
+        for index in range(len(minimized)):
+            candidate = [fragment for candidate_index, fragment in enumerate(minimized) if candidate_index != index]
+            if not candidate:
+                continue
+            candidate_facts = merge_facts(candidate)
+            if not _preserves_minimization_context(original_facts, candidate_facts, invariant):
+                continue
+            candidate_passed, candidate_observation = invariant.evaluator(candidate_facts)
+            if not candidate_passed and candidate_observation == original_observation:
+                minimized = candidate
+                changed = True
+                break
+
+    removed_ids = [fragment.id for fragment in fragments if fragment not in minimized]
+    payload = scenario_reproducer_payload(scenario, minimized, observation=original_observation)
+    payload.update(
+        {
+            "invariantId": invariant.id,
+            "minimized": len(minimized) < len(fragments),
+            "minimizedFragmentCount": len(minimized),
+            "originalFragmentCount": len(fragments),
+            "preservedInvariantFailure": True,
+            "removedFragmentIds": removed_ids,
+        }
+    )
+    return payload
+
+
 def finding_fingerprint(scenario: Scenario, invariant: Invariant, fragments: list[Fragment]) -> str:
     payload = {
         "fragments": [fragment.id for fragment in fragments],
@@ -2176,6 +2274,15 @@ def build_report(
             title = suggested_title(scenario, invariant, observed_result, classification)
             attention_plane = attention_by_invariant.get(invariant.id, {})
             model_provenance = model_provenance_by_scenario.get(scenario.id)
+            original_scenario = scenario_reproducer_payload(scenario, fragments, observation=observation)
+            minimized_reproducer = None
+            if not passed:
+                minimized_reproducer = minimize_failing_generated_scenario(
+                    scenario,
+                    invariant,
+                    fragments,
+                    observation,
+                )
             body = suggested_body(
                 scenario,
                 invariant,
@@ -2188,6 +2295,8 @@ def build_report(
                 fingerprint,
                 readiness,
                 basis,
+                original_scenario=original_scenario if minimized_reproducer else None,
+                minimized_reproducer=minimized_reproducer,
             )
             findings.append(
                 {
@@ -2200,17 +2309,10 @@ def build_report(
                     "generatedScenario": scenario.generated,
                     "generationBasis": scenario.generation_basis,
                     "modelProvenance": model_provenance,
+                    "originalScenario": original_scenario if minimized_reproducer else None,
+                    "minimizedReproducer": minimized_reproducer,
                     "subScenarios": entries,
-                    "fragments": [
-                        {
-                            "completeAlone": fragment.complete_alone,
-                            "domain": fragment.domain,
-                            "id": fragment.id,
-                            "kind": fragment.kind,
-                            "summary": fragment.summary,
-                        }
-                        for fragment in fragments
-                    ],
+                    "fragments": scenario_fragment_payload(fragments),
                     "accessPattern": pattern,
                     "expectedInvariant": invariant.expected,
                     "invariantId": invariant.id,
@@ -2436,7 +2538,9 @@ def issue_payloads(
                 "labels": labels,
                 "attentionReasons": finding.get("attentionReasons", []),
                 "attentionScore": finding.get("attentionScore", 0.0),
+                "minimizedReproducer": finding.get("minimizedReproducer"),
                 "modelProvenance": finding.get("modelProvenance"),
+                "originalScenario": finding.get("originalScenario"),
                 "posteriorMode": finding["posteriorMode"],
                 "riskScore": finding["riskScore"],
                 "scenarioId": finding["scenarioId"],
@@ -2471,10 +2575,39 @@ def suggested_body(
     fingerprint: str,
     readiness: str,
     basis: dict[str, Any],
+    original_scenario: dict[str, Any] | None = None,
+    minimized_reproducer: dict[str, Any] | None = None,
 ) -> str:
     fragment_lines = "\n".join(f"- `{fragment.id}` ({fragment.domain}): {fragment.summary}" for fragment in fragments)
     pattern_json = json.dumps(pattern, indent=2, sort_keys=True)
     basis_json = json.dumps(basis, indent=2, sort_keys=True)
+    minimization_section = ""
+    if original_scenario and minimized_reproducer:
+        original_json = json.dumps(
+            {
+                "accessPattern": original_scenario["accessPattern"],
+                "fragmentIds": original_scenario["fragmentIds"],
+                "observation": original_scenario.get("observation"),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        minimized_json = json.dumps(
+            {
+                "accessPattern": minimized_reproducer["accessPattern"],
+                "fragmentIds": minimized_reproducer["fragmentIds"],
+                "observation": minimized_reproducer["observation"],
+                "removedFragmentIds": minimized_reproducer["removedFragmentIds"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        minimization_section = (
+            "Original generated scenario:\n"
+            f"```json\n{original_json}\n```\n\n"
+            "Minimized reproducer:\n"
+            f"```json\n{minimized_json}\n```\n\n"
+        )
     return (
         f"Scenario `{scenario.id}`: {scenario.title}\n\n"
         f"Fingerprint: `{fingerprint}`\n\n"
@@ -2486,6 +2619,7 @@ def suggested_body(
         f"Risk score: {risk_score:.6f}\n\n"
         f"Observation basis:\n```json\n{basis_json}\n```\n\n"
         f"Access pattern:\n```json\n{pattern_json}\n```\n\n"
+        f"{minimization_section}"
         f"Fragments:\n{fragment_lines}\n\n"
         "Reproduce with `python3 -m bayesilisk --seed <seed> --format json`."
     )
