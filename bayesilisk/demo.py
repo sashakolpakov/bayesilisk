@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 import threading
 import time
@@ -497,6 +498,102 @@ def classification_counts(findings: list[dict[str, Any]]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def sweep_path(report: dict[str, Any], *, seed: int, target_fingerprint: str) -> dict[str, Any]:
+    candidates = [
+        {
+            "classification": finding["classification"],
+            "fingerprint": finding["fingerprint"],
+            "invariantId": finding["invariantId"],
+            "riskScore": finding["riskScore"],
+            "scenarioId": finding["scenarioId"],
+        }
+        for finding in report["findings"]
+        if finding["observedResult"] == "fail"
+    ]
+    rng = random.Random(seed + 404)
+    shuffled = list(candidates)
+    rng.shuffle(shuffled)
+    weighted = sorted(
+        enumerate(shuffled),
+        key=lambda item: (
+            -item[1]["riskScore"] + rng.uniform(-0.045, 0.045),
+            item[0],
+        ),
+    )
+    ordered = [item for _, item in weighted]
+    discovery_index = next(
+        (index for index, item in enumerate(ordered, start=1) if item["fingerprint"] == target_fingerprint),
+        len(ordered),
+    )
+    return {
+        "candidateCount": len(ordered),
+        "discoveryIndex": discovery_index,
+        "seed": seed,
+        "targetFingerprint": target_fingerprint,
+        "window": ordered[max(0, discovery_index - 3):discovery_index + 2],
+        "whyVariable": (
+            "The verifier is deterministic for a seed, but the sweep order mixes risk, attention, and seeded exploration. "
+            "The same buried failure can surface earlier or later when the seed changes."
+        ),
+    }
+
+
+def hard_to_find_drilldown(report: dict[str, Any], *, seed: int) -> dict[str, Any]:
+    finding = next(
+        (
+            item
+            for item in report["findings"]
+            if item.get("classification") == "breakage.hard-to-find"
+            and item.get("issueReadiness") == "ready-for-issue"
+        ),
+        next(item for item in report["findings"] if item.get("classification") == "breakage.hard-to-find"),
+    )
+    same_route_evidence = [
+        fact
+        for fact in report.get("observedByPlaywright", [])
+        if fact.get("route") in set(finding.get("accessPattern", {}).get("routes", []))
+    ]
+    easy_before = [
+        item
+        for item in report["findings"]
+        if item.get("classification") == "breakage.easy" and item.get("riskScore", 0) >= finding.get("riskScore", 0)
+    ]
+    drilldown = {
+        "accessPattern": finding["accessPattern"],
+        "attentionReasons": finding.get("attentionReasons", []),
+        "classification": finding["classification"],
+        "easierBreakagesRankedBefore": len(easy_before),
+        "fingerprint": finding["fingerprint"],
+        "fragments": [fragment["id"] for fragment in finding["fragments"]],
+        "invariantId": finding["invariantId"],
+        "issueReadiness": finding["issueReadiness"],
+        "observation": finding["observation"],
+        "posteriorMode": finding["posteriorMode"],
+        "riskScore": finding["riskScore"],
+        "scenarioId": finding["scenarioId"],
+        "scenarioTitle": finding["scenarioTitle"],
+        "sameRouteBrowserEvidence": [
+            {
+                "actorRole": fact.get("actorRole"),
+                "expectedStatus": fact.get("expectedStatus"),
+                "invariantId": fact.get("invariantId"),
+                "observedStatus": fact.get("observedStatus"),
+                "route": fact.get("route"),
+                "title": fact.get("title"),
+            }
+            for fact in same_route_evidence[:3]
+        ],
+        "whyHard": (
+            "The first browser symptom says an HR document route returned 200 for support, but the deeper defect is a "
+            "general route-matrix violation assembled from role, route, and module fragments. A human tester would need "
+            "to connect support takeover state, HR document access, route permissions, and non-HR module context before "
+            "writing this scenario explicitly."
+        ),
+    }
+    drilldown["sweep"] = sweep_path(report, seed=seed, target_fingerprint=finding["fingerprint"])
+    return drilldown
+
+
 def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any], *, seed: int) -> dict[str, Any]:
     attention = report["grassmannAttention"]
     provider = {
@@ -543,6 +640,7 @@ def demo_chain(report: dict[str, Any], model_proposal: dict[str, Any], *, seed: 
             "scenarioId": verdict["scenarioId"],
         },
         "grassmannPlane": report["selectedByGrassmannAttention"][0] if report["selectedByGrassmannAttention"] else {},
+        "hardToFindDrilldown": hard_to_find_drilldown(report, seed=seed),
         "issuePayload": payloads[0] if payloads else {},
         "modelProposal": {
             "acceptedCount": len(accepted),
@@ -648,6 +746,7 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
 
 def render_text(payload: dict[str, Any]) -> str:
     chain = payload["chain"]
+    hard = chain["hardToFindDrilldown"]
     issue = chain["issuePayload"]
     summary = chain["reportSummary"]
     verdict = chain["deterministicVerdict"]
@@ -718,6 +817,35 @@ def render_text(payload: dict[str, Any]) -> str:
                 f"score={chain['grassmannPlane'].get('attentionScore', 0)}"
             ),
             "  reasons=" + ", ".join(chain["grassmannPlane"].get("reasons", [])),
+            "",
+            "Hard-to-find drill-down:",
+            f"  scenario={hard['scenarioId']}",
+            f"  title={hard['scenarioTitle']}",
+            f"  invariant={hard['invariantId']}",
+            f"  observation={hard['observation']}",
+            f"  risk={hard['riskScore']} readiness={hard['issueReadiness']} mode={hard['posteriorMode']}",
+            f"  easierBreakagesRankedBefore={hard['easierBreakagesRankedBefore']}",
+            "  whyHard=" + hard["whyHard"],
+            (
+                "  sweep="
+                f"seed {hard['sweep']['seed']} found this at candidate "
+                f"{hard['sweep']['discoveryIndex']} of {hard['sweep']['candidateCount']}"
+            ),
+            "  sweepMeaning=" + hard["sweep"]["whyVariable"],
+            "  fragments=" + ", ".join(hard["fragments"]),
+            "  nearbySweepCandidates:",
+            *[
+                "    "
+                f"{item['classification']} | {item['scenarioId']} | {item['invariantId']} | risk={item['riskScore']}"
+                for item in hard["sweep"]["window"]
+            ],
+            "  sameRouteBrowserEvidence:",
+            *[
+                "    "
+                f"{item['title']} | actor={item['actorRole']} | expected={item['expectedStatus']} "
+                f"observed={item['observedStatus']} | invariant={item['invariantId']}"
+                for item in hard["sameRouteBrowserEvidence"]
+            ],
             "",
             "Untrusted proposal lane:",
             (

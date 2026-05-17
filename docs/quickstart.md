@@ -79,6 +79,14 @@ workflow context to surface. The transcript also defines `breakage.easy`,
 pairs such as `expected=409 observed=200` into the product meaning: a workflow
 that should reject inconsistent state returned success.
 
+The transcript has two parts: a general multi-fixture verifier run, then a
+hard-to-find drill-down. The drill-down shows a route-matrix failure that is not
+the first obvious browser symptom; it requires connecting support takeover
+state, HR document access, route permissions, and module context before the
+deterministic verifier emits an issue-ready finding. It also shows a seeded
+sweep order. Changing `--seed` can make the same buried failure appear earlier
+or later, while remaining reproducible for that seed.
+
 The demo rows are synthetic fixtures from `bayesilisk/demo.py::DEMO_PROBES`, not
 claims about an existing product. To test a real app, expose probe rows in that
 app and point Playwright at it:
