@@ -15,6 +15,7 @@ DOC = REPO_ROOT / "docs" / "bayesilisk.md"
 DESIGN = REPO_ROOT / "DESIGN.md"
 README = REPO_ROOT / "README.md"
 REPORTS_DOC = REPO_ROOT / "docs" / "reports.md"
+PYPROJECT = REPO_ROOT / "pyproject.toml"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -803,6 +804,29 @@ def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:
     assert payloads[0]["issuePayloadSource"] == "verifiedByBayesilisk"
 
 
+def test_bayesilisk_demo_command_shows_full_loop_without_playwright() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "bayesilisk.demo", "--no-playwright", "--json"],
+        check=True,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+    payload = json.loads(result.stdout)
+    chain = payload["chain"]
+
+    assert payload["demo"] == "workflow-pressure"
+    assert payload["playwrightMode"].startswith("fallback:")
+    assert payload["playwrightProbe"]["failedCount"] >= 4
+    assert chain["playwrightEvidence"]["source"] == "microsoft-playwright"
+    assert chain["grassmannPlane"]["invariantId"]
+    assert chain["modelProposal"]["mode"] == "canned-local-optional"
+    assert chain["modelProposal"]["acceptedCount"] == 1
+    assert chain["modelProposal"]["rejectedReasons"] == ["unknown-target-plane"]
+    assert chain["deterministicVerdict"]["observedResult"] == "fail"
+    assert chain["issuePayload"]["issuePayloadSource"] == "verifiedByBayesilisk"
+
+
 def test_bayesilisk_cli_reports_effective_runtime_configuration() -> None:
     report = json.loads(
         run_bayesilisk(
@@ -951,6 +975,7 @@ def test_design_document_pins_trust_boundaries() -> None:
 
 def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
     readme = README.read_text(encoding="utf-8")
+    pyproject = PYPROJECT.read_text(encoding="utf-8")
 
     for fragment in (
         "actions/workflows/ci.yml/badge.svg",
@@ -967,8 +992,10 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "--scenario-proposal-limit",
         "effectiveConfiguration",
         "ollamaBaseUrl",
+        "bayesilisk-demo",
     ):
         assert fragment in readme
+    assert 'bayesilisk-demo = "bayesilisk.demo:main"' in pyproject
 
 
 def test_proof_artifacts_are_linked_and_explain_trust_boundaries() -> None:

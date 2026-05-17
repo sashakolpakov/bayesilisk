@@ -17,6 +17,7 @@ playwright = ["playwright>=1.44"]
 
 [project.scripts]
 bayesilisk = "bayesilisk.bayesilisk:main"
+bayesilisk-demo = "bayesilisk.demo:main"
 bayesilisk-mcp = "bayesilisk.mcp_server:main"
 
 [tool.setuptools.packages.find]
