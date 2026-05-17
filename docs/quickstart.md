@@ -53,9 +53,13 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-
 
 ## Run the Playwright Demo
 
-The bundled demo target is static and local. It intentionally contains mismatched route outcomes so Bayesilisk can receive browser evidence without contacting production systems.
+The bundled workflow demo is local-only. It intentionally contains stale state,
+impossible ordering, duplicate submission, feature-flag exposure, and one auth
+lane so Bayesilisk can receive browser evidence without contacting production
+systems.
 
 ```sh
+bayesilisk-demo
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
 ```

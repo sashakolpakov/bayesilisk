@@ -156,6 +156,7 @@ Install the optional browser dependency and run the bundled target:
 ```sh
 python3 -m pip install -e '.[playwright]'
 python3 -m playwright install chromium
+bayesilisk-demo
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
 ```
@@ -171,7 +172,7 @@ The target contract is intentionally small. Each probe row needs:
 - a clickable child marked `data-run-probe`
 - a status child marked `data-observed-status`
 
-The bundled `demo/playwright_target.html` is static and includes deliberate permission mismatches. The generated context uses `agentNotes`, `repositoryFacts`, and explicit `priorAdjustments` to promote related Bayesilisk invariants, but it still does not prove a production defect by itself.
+The `bayesilisk-demo` command serves a local brittle workflow app and prints the loop from browser evidence to issue payload. The older bundled `demo/playwright_target.html` remains a tiny static target for adapter tests. Generated context uses `agentNotes`, `repositoryFacts`, and explicit `priorAdjustments` to promote related Bayesilisk invariants, but it still does not prove a production defect by itself.
 
 ## Grassmann attention
 

@@ -5,6 +5,7 @@
 ```text
 bayesilisk/
   bayesilisk.py          finite-state verifier, attention, reports, CLI
+  demo.py                local workflow pressure demo command
   playwright_adapter.py  Playwright observation adapter
   mcp_server.py          stdio MCP server
 demo/

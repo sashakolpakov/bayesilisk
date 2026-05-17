@@ -147,9 +147,10 @@ issue payloads from verified failures.
 
 ## Microsoft Playwright Bridge
 
-Bayesilisk includes a static demo target and an optional Microsoft Playwright
-probe. Playwright observes concrete browser behavior and writes Bayesilisk
-context; Bayesilisk still performs deterministic verification afterward.
+Bayesilisk includes a local workflow pressure demo and an optional Microsoft
+Playwright probe. Playwright observes concrete browser behavior and writes
+Bayesilisk context; Bayesilisk still performs deterministic verification
+afterward.
 
 Install the optional browser dependency:
 
@@ -161,14 +162,18 @@ python3 -m playwright install chromium
 Run the bundled demo probe:
 
 ```sh
+bayesilisk-demo
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
 ```
 
-The demo page is local and static. It intentionally includes a few wrong observed
-statuses so the probe can produce route, role, and invariant context without
-touching production systems.
+`bayesilisk-demo` serves a local intentionally brittle app with stale workflow
+state, impossible ordering, duplicate submission, feature-flag exposure, and one
+auth lane. Its output shows the chain: Playwright evidence -> Grassmann plane ->
+optional model-style proposal -> deterministic verdict -> issue payload. Use
+`bayesilisk-demo --no-playwright` to see the same local loop without launching a
+browser.
 
 ## Grassmann Attention
 

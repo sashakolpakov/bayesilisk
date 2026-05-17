@@ -16,9 +16,15 @@ python3 -m playwright install chromium
 Run the local demo:
 
 ```sh
+bayesilisk-demo
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
 ```
+
+`bayesilisk-demo` serves an intentionally brittle local workflow app and prints
+Playwright evidence -> Grassmann plane -> optional model-style proposal ->
+deterministic verdict -> issue payload. It can run with `--no-playwright` when a
+tester wants deterministic local evidence without launching Chromium.
 
 Capture evidence artifacts:
 
