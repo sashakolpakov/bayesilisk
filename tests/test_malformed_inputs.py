@@ -4,11 +4,12 @@ import importlib
 
 
 def test_malformed_context_and_observations_do_not_crash_report_building() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    context_module = importlib.import_module("bayesilisk.context")
+    reporting = importlib.import_module("bayesilisk.reporting")
 
     for malformed_context in (None, "agent note text", ["not", "an", "object"], 42):
-        summary = bayesilisk.context_summary(malformed_context)
-        report = bayesilisk.build_contextual_report(
+        summary = context_module.context_summary(malformed_context)
+        report = reporting.build_contextual_report(
             150,
             limit=2,
             generated_count=0,
@@ -23,7 +24,8 @@ def test_malformed_context_and_observations_do_not_crash_report_building() -> No
 
 
 def test_malformed_context_objects_ignore_unknown_ids_and_invalid_status_values() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    attention_module = importlib.import_module("bayesilisk.attention")
+    context_module = importlib.import_module("bayesilisk.context")
     context = {
         "source": 123,
         "agentNotes": "support takeover route 403",
@@ -54,8 +56,8 @@ def test_malformed_context_objects_ignore_unknown_ids_and_invalid_status_values(
         "mutedInvariantIds": ["unknown.invariant", "hr.documents_customer_role_boundary", 17],
     }
 
-    observations = bayesilisk.context_observations(context)
-    attention = bayesilisk.grassmann_attention(context)
+    observations = context_module.context_observations(context)
+    attention = attention_module.grassmann_attention(context)
     invalid_status_plane = next(
         plane for plane in attention["planes"] if plane["invariantId"] == "hr.documents_customer_role_boundary"
     )
@@ -70,7 +72,7 @@ def test_malformed_context_objects_ignore_unknown_ids_and_invalid_status_values(
 
 def test_malformed_playwright_probe_results_are_normalized_and_bounded() -> None:
     adapter = importlib.import_module("bayesilisk.playwright_adapter")
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    reporting = importlib.import_module("bayesilisk.reporting")
     context = adapter.build_context_from_probe_results(
         [
             None,
@@ -111,13 +113,13 @@ def test_malformed_playwright_probe_results_are_normalized_and_bounded() -> None
     assert context["repositoryFacts"][2]["expectedStatus"] is None
     assert context["repositoryFacts"][2]["route"] == "123"
 
-    report = bayesilisk.build_contextual_report(150, limit=3, generated_count=0, context=context)
+    report = reporting.build_contextual_report(150, limit=3, generated_count=0, context=context)
     assert report["contextSummary"]["source"] == "playwright-probe"
     assert report["observedByPlaywright"]
 
 
 def test_model_proposal_validation_rejects_mutations_and_accepts_one_valid_candidate() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    model_proposals = importlib.import_module("bayesilisk.model_proposals")
     valid = {
         "title": "Valid support HR document proposal",
         "targetPlane": "hr.documents_customer_role_boundary",
@@ -139,7 +141,7 @@ def test_model_proposal_validation_rejects_mutations_and_accepts_one_valid_candi
         dict(valid),
     ]
 
-    scenarios, rejected = bayesilisk.validate_model_scenario_proposals(
+    scenarios, rejected = model_proposals.validate_model_scenario_proposals(
         proposals,
         {"selectedPlaneIds": ["unknown.plane", 17]},
         provider={"provider": "unit-test"},

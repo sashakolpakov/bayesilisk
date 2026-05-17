@@ -126,8 +126,8 @@ def test_bayesilisk_json_report_is_seeded_and_reproducible() -> None:
 
 
 def test_expanded_catalog_catches_distinct_bad_spots() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
-    report = bayesilisk.build_report(150, generated_count=0)
+    reporting = importlib.import_module("bayesilisk.reporting")
+    report = reporting.build_report(150, generated_count=0)
     findings = report["findings"]
 
     wrong_process = next(
@@ -194,27 +194,29 @@ def test_focused_modules_expose_expected_boundaries() -> None:
     assert cli.main
 
     engine_path = REPO_ROOT / "bayesilisk" / "engine.py"
-    assert len(engine_path.read_text(encoding="utf-8").splitlines()) <= 40
+    assert not engine_path.exists()
     for module_path in (REPO_ROOT / "bayesilisk").glob("*.py"):
-        if module_path.name in {"engine.py", "__init__.py"}:
+        if module_path.name == "__init__.py":
             continue
         assert "from .engine import" not in module_path.read_text(encoding="utf-8")
 
 
 def test_scenario_catalog_has_valid_references_and_invariant_coverage() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
-    fragment_ids = {fragment.id for fragment in bayesilisk.FRAGMENTS}
-    invariant_ids = {invariant.id for invariant in bayesilisk.INVARIANTS}
+    catalog = importlib.import_module("bayesilisk.catalog")
+    invariants = importlib.import_module("bayesilisk.invariants")
+    reporting = importlib.import_module("bayesilisk.reporting")
+    fragment_ids = {fragment.id for fragment in catalog.FRAGMENTS}
+    invariant_ids = {invariant.id for invariant in invariants.INVARIANTS}
 
-    for scenario in bayesilisk.SCENARIOS:
+    for scenario in catalog.SCENARIOS:
         assert scenario.fragment_ids
         assert scenario.invariant_ids
         assert set(scenario.fragment_ids) <= fragment_ids
         assert set(scenario.invariant_ids) <= invariant_ids
 
-    report = bayesilisk.build_report(150, generated_count=0)
+    report = reporting.build_report(150, generated_count=0)
     scenario_ids = {finding["scenarioId"] for finding in report["findings"]}
-    assert {scenario.id for scenario in bayesilisk.SCENARIOS} <= scenario_ids
+    assert {scenario.id for scenario in catalog.SCENARIOS} <= scenario_ids
 
     invariant_results: dict[str, set[str]] = {}
     for finding in report["findings"]:
@@ -290,8 +292,8 @@ def test_bayesilisk_observation_history_dampens_fixed_findings(tmp_path: Path) -
 
 
 def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
-    baseline = bayesilisk.build_report(150, limit=8, generated_count=8)
+    reporting = importlib.import_module("bayesilisk.reporting")
+    baseline = reporting.build_report(150, limit=8, generated_count=8)
     existing = next(finding for finding in baseline["findings"] if finding["issueReadiness"] == "ready-for-issue")
     context = {
         "source": "unit-test-agent-tracker-context",
@@ -310,7 +312,7 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
         "pullRequests": [{"number": 170, "state": "open", "title": "Bayesilisk verifier hardening"}],
     }
 
-    report = bayesilisk.build_contextual_report(150, generated_count=8, context=context)
+    report = reporting.build_contextual_report(150, generated_count=8, context=context)
     context_summary = report["contextSummary"]
 
     assert context_summary["source"] == "unit-test-agent-tracker-context"
@@ -331,7 +333,8 @@ def test_bayesilisk_context_promotes_related_modes_and_dedupes_existing_payloads
 
 def test_playwright_probe_context_promotes_browser_observed_route_failures() -> None:
     adapter = importlib.import_module("bayesilisk.playwright_adapter")
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    context_module = importlib.import_module("bayesilisk.context")
+    reporting = importlib.import_module("bayesilisk.reporting")
     context = adapter.build_context_from_probe_results(
         [
             {
@@ -361,8 +364,8 @@ def test_playwright_probe_context_promotes_browser_observed_route_failures() -> 
     assert "Microsoft Playwright observed route permission behavior" in context["agentNotes"][0]
     assert context["repositoryFacts"][0]["source"] == "microsoft-playwright"
 
-    report = bayesilisk.build_contextual_report(150, limit=12, context=context)
-    observations = bayesilisk.context_observations(context)
+    report = reporting.build_contextual_report(150, limit=12, context=context)
+    observations = context_module.context_observations(context)
     assert report["contextSummary"]["source"] == "playwright-probe"
     assert observations["priorAdjustments"]["hr.documents_customer_role_boundary"] == 0.06
     attention = report["grassmannAttention"]
@@ -386,7 +389,8 @@ def test_playwright_probe_context_promotes_browser_observed_route_failures() -> 
 
 
 def test_fixed_or_muted_context_decays_attention_without_hiding_failures() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    attention = importlib.import_module("bayesilisk.attention")
+    reporting = importlib.import_module("bayesilisk.reporting")
     context = {
         "source": "unit-test-muted-attention",
         "mutedInvariantIds": ["hr.documents_customer_role_boundary"],
@@ -402,10 +406,10 @@ def test_fixed_or_muted_context_decays_attention_without_hiding_failures() -> No
             }
         ],
     }
-    undecayed = bayesilisk.grassmann_attention(
+    undecayed = attention.grassmann_attention(
         {key: value for key, value in context.items() if key != "mutedInvariantIds"}
     )
-    decayed = bayesilisk.grassmann_attention(context)
+    decayed = attention.grassmann_attention(context)
     undecayed_plane = next(
         plane for plane in undecayed["planes"] if plane["invariantId"] == "hr.documents_customer_role_boundary"
     )
@@ -417,7 +421,7 @@ def test_fixed_or_muted_context_decays_attention_without_hiding_failures() -> No
     assert decayed_plane["attentionScore"] < undecayed_plane["attentionScore"]
     assert "fixed-or-muted-attention-decay" in decayed_plane["reasons"]
 
-    report = bayesilisk.build_contextual_report(150, generated_count=0, context=context)
+    report = reporting.build_contextual_report(150, generated_count=0, context=context)
     assert any(
         finding["invariantId"] == "hr.documents_customer_role_boundary"
         and finding["observedResult"] == "fail"
@@ -458,7 +462,7 @@ def test_playwright_context_preserves_probe_evidence_metadata() -> None:
 
 
 def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    reporting = importlib.import_module("bayesilisk.reporting")
     context = {
         "source": "unit-test-travel-plane",
         "repositoryFacts": [
@@ -475,8 +479,8 @@ def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> 
         ],
     }
 
-    baseline = bayesilisk.build_report(150, generated_count=8)
-    contextual = bayesilisk.build_contextual_report(150, generated_count=8, context=context)
+    baseline = reporting.build_report(150, generated_count=8)
+    contextual = reporting.build_contextual_report(150, generated_count=8, context=context)
 
     assert "travel.expense_items_match_itinerary" in contextual["grassmannAttention"]["selectedPlaneIds"]
     assert not any(
@@ -504,14 +508,14 @@ def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> 
 
 
 def test_generated_failure_minimization_covers_travel_dms_support_and_hr() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    reporting = importlib.import_module("bayesilisk.reporting")
     selected_planes = [
         "travel.expense_items_match_itinerary",
         "dms.tenant_process_boundary",
         "support.takeover_session_required",
         "hr.documents_customer_role_boundary",
     ]
-    report = bayesilisk.build_report(
+    report = reporting.build_report(
         150,
         generated_count=4,
         grassmann={
@@ -561,7 +565,7 @@ def test_generated_failure_minimization_covers_travel_dms_support_and_hr() -> No
         "hr.documents_customer_role_boundary",
     ) == ["role.support_takeover_expired", "hr.payroll_file_route"]
 
-    payloads = bayesilisk.issue_payloads(report)
+    payloads = reporting.issue_payloads(report)
     payload = next(
         payload
         for payload in payloads
@@ -574,7 +578,8 @@ def test_generated_failure_minimization_covers_travel_dms_support_and_hr() -> No
 
 
 def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    model_proposals = importlib.import_module("bayesilisk.model_proposals")
+    reporting = importlib.import_module("bayesilisk.reporting")
     attention = {
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
         "planes": [],
@@ -606,7 +611,7 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
         "source": "ollama-chat",
         "sourceContext": "unit-test",
     }
-    scenarios, rejected = bayesilisk.validate_model_scenario_proposals(proposals, attention, provider=provider)
+    scenarios, rejected = model_proposals.validate_model_scenario_proposals(proposals, attention, provider=provider)
     assert len(scenarios) == 1
     assert scenarios[0].id.startswith("generated.model.01.hr_documents_customer_role_boundary")
     assert scenarios[0].generation_basis == "weak-model-proposal:hr.documents_customer_role_boundary"
@@ -618,7 +623,7 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
     assert rejected[0]["reason"] == "unknown-fragment-id"
     assert rejected[0]["proposalHash"]
 
-    report = bayesilisk.build_report(
+    report = reporting.build_report(
         150,
         generated_count=1,
         grassmann={
@@ -645,7 +650,7 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
     assert all(finding["generationBasis"].startswith("weak-model-proposal:") for finding in model_findings)
     assert all(finding["modelProvenance"]["proposalHash"] == scenarios[0].provenance["proposalHash"] for finding in model_findings)
 
-    payloads = bayesilisk.issue_payloads(report)
+    payloads = reporting.issue_payloads(report)
     model_payloads = [payload for payload in payloads if payload["scenarioId"] == scenarios[0].id]
     assert model_payloads
     assert all(payload["modelProvenance"]["provider"] == "ollama" for payload in model_payloads)
@@ -664,14 +669,14 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
 
 
 def test_scenario_proposer_config_precedence_and_report_redaction(monkeypatch: pytest.MonkeyPatch) -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    config_module = importlib.import_module("bayesilisk.config")
     monkeypatch.setenv("BAYESILISK_SCENARIO_PROVIDER", "openai-compatible")
     monkeypatch.setenv("BAYESILISK_SCENARIO_API_KEY_ENV", "BAYESILISK_UNIT_SCENARIO_KEY")
     monkeypatch.setenv("BAYESILISK_UNIT_SCENARIO_KEY", "sk-unit-secret")
     monkeypatch.setenv("BAYESILISK_SCENARIO_BASE_URL", "https://llm.example.test/v1")
 
-    config = bayesilisk.effective_runtime_config({})
-    report_config = bayesilisk.report_runtime_config(config)
+    config = config_module.effective_runtime_config({})
+    report_config = config_module.report_runtime_config(config)
 
     assert config["scenarioProvider"] == "openai-compatible"
     assert config["scenarioApiKey"] == "sk-unit-secret"
@@ -680,8 +685,8 @@ def test_scenario_proposer_config_precedence_and_report_redaction(monkeypatch: p
     assert report_config["scenarioBaseUrlClass"] == "remote-host"
     assert "sk-unit-secret" not in json.dumps(report_config)
 
-    override = bayesilisk.effective_runtime_config({"scenarioProvider": "ollama", "scenarioApiKey": "override-secret"})
-    override_report = bayesilisk.report_runtime_config(override)
+    override = config_module.effective_runtime_config({"scenarioProvider": "ollama", "scenarioApiKey": "override-secret"})
+    override_report = config_module.report_runtime_config(override)
     assert override["scenarioProvider"] == "ollama"
     assert override["scenarioApiKey"] == "override-secret"
     assert override_report["scenarioProvider"] == "ollama"
@@ -689,14 +694,14 @@ def test_scenario_proposer_config_precedence_and_report_redaction(monkeypatch: p
 
 
 def test_openai_compatible_provider_requires_api_key() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
+    model_proposals = importlib.import_module("bayesilisk.model_proposals")
     attention = {
         "source": "unit-test",
         "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
         "planes": [],
     }
 
-    scenarios, generation = bayesilisk.weak_model_scenarios(
+    scenarios, generation = model_proposals.weak_model_scenarios(
         attention,
         runtime_config={
             "enableScenarioProposer": True,
@@ -713,7 +718,6 @@ def test_openai_compatible_provider_requires_api_key() -> None:
 
 
 def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
     model_proposals = importlib.import_module("bayesilisk.model_proposals")
     attention = {
         "source": "unit-test",
@@ -725,7 +729,7 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
         raise urllib.error.HTTPError("https://llm.example.test/v1", 401, "Unauthorized Bearer sk-secret", {}, None)
 
     monkeypatch.setattr(model_proposals, "_openai_compatible_chat_json", auth_failure)
-    _, auth_generation = bayesilisk.weak_model_scenarios(
+    _, auth_generation = model_proposals.weak_model_scenarios(
         attention,
         runtime_config={
             "enableScenarioProposer": True,
@@ -741,7 +745,7 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
         raise OSError("connection refused Bearer sk-ollama-leak")
 
     monkeypatch.setattr(model_proposals, "_ollama_chat_json", unavailable)
-    _, ollama_generation = bayesilisk.weak_model_scenarios(
+    _, ollama_generation = model_proposals.weak_model_scenarios(
         attention,
         runtime_config={"enableScenarioProposer": True, "scenarioProvider": "ollama"},
     )
@@ -751,7 +755,6 @@ def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pyt
 
 
 def test_provider_output_remains_untrusted_and_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
-    bayesilisk = importlib.import_module("bayesilisk.engine")
     model_proposals = importlib.import_module("bayesilisk.model_proposals")
     attention = {
         "source": "unit-test",
@@ -780,7 +783,7 @@ def test_provider_output_remains_untrusted_and_redacted(monkeypatch: pytest.Monk
         }
 
     monkeypatch.setattr(model_proposals, "_openai_compatible_chat_json", fake_chat)
-    scenarios, generation = bayesilisk.weak_model_scenarios(
+    scenarios, generation = model_proposals.weak_model_scenarios(
         attention,
         runtime_config={
             "enableScenarioProposer": True,
