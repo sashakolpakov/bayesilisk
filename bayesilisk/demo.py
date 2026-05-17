@@ -12,7 +12,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .catalog import attention_composite_scenarios
-from .engine import VERSION
+from .constants import VERSION
 from .model_proposals import (
     SCENARIO_PROPOSER_PROMPT_VERSION,
     validate_model_scenario_proposals,
