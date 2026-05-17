@@ -5,6 +5,18 @@ from typing import Any
 
 PLAYWRIGHT_PRIOR_STEP = 0.06
 PLAYWRIGHT_PRIOR_MAX = 0.18
+PLAYWRIGHT_KNOWN_INVARIANT_IDS = {
+    "billing.export_requires_role_and_module",
+    "dms.tenant_process_boundary",
+    "hr.documents_customer_role_boundary",
+    "modules.expense_approval_requires_module_and_receipt",
+    "roles.employee_self_review_forbidden",
+    "roles.route_matrix_allowed",
+    "support.takeover_session_required",
+    "travel.expense_items_match_itinerary",
+    "travel.funding_before_expense",
+    "travel.itinerary_chronology",
+}
 
 
 def _string_value(value: Any, default: str = "unknown") -> str:
@@ -27,7 +39,9 @@ def _int_value(value: Any) -> int | None:
     return None
 
 
-def normalize_probe_result(result: dict[str, Any]) -> dict[str, Any]:
+def normalize_probe_result(result: dict[str, Any] | Any) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        result = {}
     expected_status = _int_value(result.get("expectedStatus"))
     observed_status = _int_value(result.get("observedStatus"))
     passed = expected_status is not None and observed_status is not None and expected_status == observed_status
@@ -59,7 +73,7 @@ def build_context_from_probe_results(
     prior_adjustments: dict[str, float] = {}
     for failure in failures:
         invariant_id = failure["invariantId"]
-        if invariant_id == "unknown":
+        if invariant_id not in PLAYWRIGHT_KNOWN_INVARIANT_IDS:
             continue
         prior_adjustments[invariant_id] = round(
             min(PLAYWRIGHT_PRIOR_MAX, prior_adjustments.get(invariant_id, 0.0) + PLAYWRIGHT_PRIOR_STEP),
