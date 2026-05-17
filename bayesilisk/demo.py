@@ -11,15 +11,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from .bayesilisk import (
+from .catalog import attention_composite_scenarios
+from .engine import VERSION
+from .model_proposals import (
     SCENARIO_PROPOSER_PROMPT_VERSION,
-    VERSION,
-    attention_composite_scenarios,
-    build_contextual_report,
-    issue_payloads,
     validate_model_scenario_proposals,
 )
 from .playwright_adapter import build_context_from_probe_results
+from .reporting import build_contextual_report, issue_payloads
 
 
 DEMO_PROBES: tuple[dict[str, str], ...] = (

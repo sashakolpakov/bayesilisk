@@ -282,7 +282,7 @@ Implementations must not:
 
 ## Current Implementation Map
 
-- Deterministic verifier: `bayesilisk/bayesilisk.py`
+- Deterministic verifier: `bayesilisk/engine.py`
 - Playwright context adapter: `bayesilisk/playwright_adapter.py`
 - Playwright demo runner: `tools/playwright_probe.py`
 - Static demo target: `demo/playwright_target.html`

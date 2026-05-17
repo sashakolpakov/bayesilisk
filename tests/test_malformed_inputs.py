@@ -4,7 +4,7 @@ import importlib
 
 
 def test_malformed_context_and_observations_do_not_crash_report_building() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
 
     for malformed_context in (None, "agent note text", ["not", "an", "object"], 42):
         summary = bayesilisk.context_summary(malformed_context)
@@ -23,7 +23,7 @@ def test_malformed_context_and_observations_do_not_crash_report_building() -> No
 
 
 def test_malformed_context_objects_ignore_unknown_ids_and_invalid_status_values() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     context = {
         "source": 123,
         "agentNotes": "support takeover route 403",
@@ -70,7 +70,7 @@ def test_malformed_context_objects_ignore_unknown_ids_and_invalid_status_values(
 
 def test_malformed_playwright_probe_results_are_normalized_and_bounded() -> None:
     adapter = importlib.import_module("bayesilisk.playwright_adapter")
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     context = adapter.build_context_from_probe_results(
         [
             None,
@@ -117,7 +117,7 @@ def test_malformed_playwright_probe_results_are_normalized_and_bounded() -> None
 
 
 def test_model_proposal_validation_rejects_mutations_and_accepts_one_valid_candidate() -> None:
-    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    bayesilisk = importlib.import_module("bayesilisk.engine")
     valid = {
         "title": "Valid support HR document proposal",
         "targetPlane": "hr.documents_customer_role_boundary",

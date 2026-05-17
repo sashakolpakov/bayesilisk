@@ -4,7 +4,12 @@
 
 ```text
 bayesilisk/
-  bayesilisk.py          finite-state verifier, attention, reports, CLI
+  engine.py              shared verifier implementation
+  catalog.py             scenario fragments, invariants, and catalog surfaces
+  attention.py           Grassmann attention surfaces
+  model_proposals.py     scenario proposer provider surfaces
+  reporting.py           report and issue-payload surfaces
+  cli.py                 command-line entry point
   demo.py                local workflow pressure demo command
   playwright_adapter.py  Playwright observation adapter
   mcp_server.py          stdio MCP server
