@@ -860,6 +860,33 @@ def test_bayesilisk_demo_command_shows_full_loop_without_playwright() -> None:
     assert chain["issuePayload"]["issuePayloadSource"] == "verifiedByBayesilisk"
 
 
+def test_bayesilisk_demo_text_output_explains_trust_boundaries() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "bayesilisk.demo", "--no-playwright"],
+        check=True,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+    output = result.stdout
+
+    assert "What this proves:" in output
+    assert "Playwright is only the sensor" in output
+    assert "Grassmann attention is only the router" in output
+    assert "scenario proposer lane is not trusted" in output
+    assert "Bayesilisk is the judge" in output
+    assert "Classification legend:" in output
+    assert "breakage.easy:" in output
+    assert "breakage.hard-to-find:" in output
+    assert "finding.candidate-breakage:" in output
+    assert "control-confirmed:" in output
+    assert "meaning: workflow should reject inconsistent state, but the app accepted it" in output
+    assert "meaning: role/module boundary should deny access, but the app allowed it" in output
+    assert "classificationMeaning=An invariant fails only after context narrows the search" in output
+    assert "Recording command:" in output
+    assert "bayesilisk-demo --recording" in output
+
+
 def test_bayesilisk_cli_reports_effective_runtime_configuration() -> None:
     report = json.loads(
         run_bayesilisk(
@@ -1026,6 +1053,10 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "effectiveConfiguration",
         "ollamaBaseUrl",
         "bayesilisk-demo",
+        "bayesilisk-demo --recording",
+        "breakage.hard-to-find",
+        "finding.candidate-breakage",
+        "control-confirmed",
     ):
         assert fragment in readme
     assert 'bayesilisk-demo = "bayesilisk.demo:main"' in pyproject
