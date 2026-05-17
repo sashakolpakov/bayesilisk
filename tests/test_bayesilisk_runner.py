@@ -469,6 +469,76 @@ def test_grassmann_attention_biases_generation_without_overriding_verdicts() -> 
     assert "playwright-evidence" in transport_match["attentionReasons"]
 
 
+def test_generated_failure_minimization_covers_travel_dms_support_and_hr() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    selected_planes = [
+        "travel.expense_items_match_itinerary",
+        "dms.tenant_process_boundary",
+        "support.takeover_session_required",
+        "hr.documents_customer_role_boundary",
+    ]
+    report = bayesilisk.build_report(
+        150,
+        generated_count=4,
+        grassmann={
+            "embeddingMode": "unit-test",
+            "planes": [
+                {
+                    "attentionScore": 0.8,
+                    "invariantId": invariant_id,
+                    "reasons": ["unit-test-minimization"],
+                }
+                for invariant_id in selected_planes
+            ],
+            "selectedPlaneIds": selected_planes,
+        },
+    )
+
+    def minimized_fragment_ids(scenario_id: str, invariant_id: str) -> list[str]:
+        finding = next(
+            finding
+            for finding in report["findings"]
+            if finding["scenarioId"] == scenario_id and finding["invariantId"] == invariant_id
+        )
+        assert finding["observedResult"] == "fail"
+        assert finding["originalScenario"]["fragmentIds"] == [fragment["id"] for fragment in finding["fragments"]]
+        assert finding["minimizedReproducer"]["preservedInvariantFailure"] is True
+        assert finding["minimizedReproducer"]["minimizedFragmentCount"] < finding["minimizedReproducer"][
+            "originalFragmentCount"
+        ]
+        assert finding["observation"] == finding["minimizedReproducer"]["observation"]
+        assert set(finding["minimizedReproducer"]["removedFragmentIds"]) < set(finding["originalScenario"]["fragmentIds"])
+        return finding["minimizedReproducer"]["fragmentIds"]
+
+    assert minimized_fragment_ids(
+        "generated.attention.01.travel_expense_items_match_itinerary",
+        "travel.expense_items_match_itinerary",
+    ) == ["expense.airfare", "travel.legs_missing_airplane"]
+    assert minimized_fragment_ids(
+        "generated.attention.02.dms_tenant_process_boundary",
+        "dms.tenant_process_boundary",
+    ) == ["dms.foreign_tenant_document"]
+    assert minimized_fragment_ids(
+        "generated.attention.03.support_takeover_session_required",
+        "support.takeover_session_required",
+    ) == ["role.support_takeover_expired"]
+    assert minimized_fragment_ids(
+        "generated.attention.04.hr_documents_customer_role_boundary",
+        "hr.documents_customer_role_boundary",
+    ) == ["role.support_takeover_expired", "hr.payroll_file_route"]
+
+    payloads = bayesilisk.issue_payloads(report)
+    payload = next(
+        payload
+        for payload in payloads
+        if payload["scenarioId"] == "generated.attention.01.travel_expense_items_match_itinerary"
+        and payload["invariantId"] == "travel.expense_items_match_itinerary"
+    )
+    assert payload["originalScenario"]["fragmentIds"] != payload["minimizedReproducer"]["fragmentIds"]
+    assert "Original generated scenario:" in payload["body"]
+    assert "Minimized reproducer:" in payload["body"]
+
+
 def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -> None:
     bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
     attention = {
@@ -545,6 +615,18 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
     model_payloads = [payload for payload in payloads if payload["scenarioId"] == scenarios[0].id]
     assert model_payloads
     assert all(payload["modelProvenance"]["provider"] == "ollama" for payload in model_payloads)
+    hr_payload = next(
+        payload for payload in model_payloads if payload["invariantId"] == "hr.documents_customer_role_boundary"
+    )
+    assert hr_payload["originalScenario"]["fragmentIds"] == [
+        "role.support_takeover_active",
+        "hr.payroll_file_route",
+    ]
+    assert hr_payload["minimizedReproducer"]["fragmentIds"] == [
+        "role.support_takeover_active",
+        "hr.payroll_file_route",
+    ]
+    assert hr_payload["minimizedReproducer"]["preservedInvariantFailure"] is True
 
 
 def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:
