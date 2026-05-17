@@ -116,11 +116,11 @@ def type_matches(instance: Any, schema_type: str | list[str]) -> bool:
 def test_golden_baseline_report_matches_report_schema(monkeypatch: Any) -> None:
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
-    from bayesilisk import engine as bayesilisk
+    from bayesilisk import reporting
 
     registry = schema_registry()
     golden = load_json(FIXTURE_DIR / "baseline_report.json")
-    current = bayesilisk.build_report(150)
+    current = reporting.build_report(150)
 
     validate_schema(golden, registry["report.schema.json"], registry=registry)
     validate_schema(current, registry["report.schema.json"], registry=registry)
@@ -130,12 +130,12 @@ def test_golden_baseline_report_matches_report_schema(monkeypatch: Any) -> None:
 def test_golden_playwright_context_report_matches_schemas(monkeypatch: Any) -> None:
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
-    from bayesilisk import engine as bayesilisk
+    from bayesilisk import reporting
 
     registry = schema_registry()
     context = load_json(FIXTURE_DIR / "playwright_context.json")
     golden = load_json(FIXTURE_DIR / "playwright_context_report.json")
-    current = bayesilisk.build_contextual_report(150, context=context)
+    current = reporting.build_contextual_report(150, context=context)
 
     validate_schema(context, registry["playwright-context.schema.json"], registry=registry)
     validate_schema(golden, registry["report.schema.json"], registry=registry)
@@ -144,11 +144,11 @@ def test_golden_playwright_context_report_matches_schemas(monkeypatch: Any) -> N
 
 
 def test_current_issue_payloads_match_schema() -> None:
-    from bayesilisk import engine as bayesilisk
+    from bayesilisk import reporting
 
     registry = schema_registry()
-    report = bayesilisk.build_report(150)
-    payloads = bayesilisk.issue_payloads(report)
+    report = reporting.build_report(150)
+    payloads = reporting.issue_payloads(report)
 
     assert payloads
     for payload in payloads:

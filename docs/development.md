@@ -4,8 +4,12 @@
 
 ```text
 bayesilisk/
-  engine.py              compact aggregate import surface
-  catalog.py             scenario fragments, invariants, and catalog surfaces
+  constants.py           shared constant data and public version string
+  types.py               core dataclasses
+  catalog.py             scenario fragments and scenario catalog
+  invariants.py          deterministic invariant evaluators
+  facts.py               scenario fact derivation and minimization helpers
+  context.py             context, observations, and probe-fact ingestion
   attention.py           Grassmann attention surfaces
   model_proposals.py     scenario proposer provider surfaces
   reporting.py           report and issue-payload surfaces
