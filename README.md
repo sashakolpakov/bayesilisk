@@ -169,7 +169,9 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
 ```
 
-`bayesilisk-demo` serves a local intentionally brittle app with stale workflow
+`bayesilisk-demo` serves a synthetic local fixture defined in
+`bayesilisk/demo.py::DEMO_PROBES`. Those rows are not claims about an existing
+customer app; they are deliberately brittle product-like workflows with stale
 state, impossible ordering, duplicate submission, feature-flag exposure, and one
 auth lane. Its output shows the chain: Playwright evidence -> Grassmann plane ->
 optional model-style proposal -> deterministic verdict -> issue payload. Use
@@ -182,6 +184,15 @@ browser. The transcript explains every finding class: `breakage.easy`,
 failed only after context narrowed the search to a cross-role, cross-module,
 stale-state, or unusual workflow path; it does not mean the model guessed the
 verdict.
+
+For a real app, serve a page that exposes `data-bayesilisk-probe` rows with
+actor, route, invariant, expected status, and actual click behavior, then run:
+
+```sh
+python3 tools/playwright_probe.py --url http://localhost:3000/probe-page \
+  --output /tmp/bayesilisk-real-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-real-context.json --format markdown
+```
 
 ## Grassmann Attention
 

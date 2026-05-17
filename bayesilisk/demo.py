@@ -40,6 +40,10 @@ CLASSIFICATION_LEGEND: dict[str, str] = {
 }
 
 
+DEMO_FIXTURE_SOURCE = "bayesilisk/demo.py::DEMO_PROBES"
+DEMO_FIXTURE_KIND = "synthetic-local-fixture"
+
+
 DEMO_PROBES: tuple[dict[str, str], ...] = (
     {
         "actorRole": "manager",
@@ -104,6 +108,7 @@ def demo_html() -> str:
               data-expected-status="{probe['expectedStatus']}"
               data-actual-status="{probe['actualStatus']}"
               data-api-path="/api/probe/{index}"
+              data-fixture-source="{DEMO_FIXTURE_SOURCE}"
             >
               <td>{probe['title']}</td>
               <td><code>{probe['actorRole']}</code></td>
@@ -137,13 +142,20 @@ def demo_html() -> str:
         max-width: 1120px;
         padding: 28px 20px 44px;
       }}
-      h1 {{
-        font-size: 28px;
-        margin: 0 0 8px;
-      }}
-      p {{
-        color: #526070;
-        margin: 0 0 18px;
+	      h1 {{
+	        font-size: 28px;
+	        margin: 0 0 8px;
+	      }}
+	      .notice {{
+	        background: #fff7da;
+	        border: 1px solid #dcc36b;
+	        color: #3d3212;
+	        margin: 0 0 18px;
+	        padding: 12px 14px;
+	      }}
+	      p {{
+	        color: #526070;
+	        margin: 0 0 18px;
       }}
       table {{
         background: #ffffff;
@@ -185,12 +197,17 @@ def demo_html() -> str:
     </style>
   </head>
   <body>
-    <main>
-      <h1>Bayesilisk Workflow Pressure Demo</h1>
-      <p>
-        Local brittle product workflows: stale state, impossible ordering, duplicate submission,
-        feature-flag exposure, and one auth lane. The browser observes behavior; Bayesilisk judges it.
-      </p>
+	    <main>
+	      <h1>Bayesilisk Workflow Pressure Demo</h1>
+	      <div class="notice">
+	        Synthetic local fixture. These rows are not imported from an existing customer app.
+	        They are defined in <code>{DEMO_FIXTURE_SOURCE}</code> to demonstrate the verifier loop.
+	      </div>
+	      <p>
+	        Local brittle product-like workflows: stale state, impossible ordering, duplicate submission,
+	        feature-flag exposure, and one auth lane. The browser observes this fixture; Bayesilisk judges
+	        deterministic invariants from the resulting context.
+	      </p>
       <table aria-label="Bayesilisk workflow pressure probes">
         <thead>
           <tr>
@@ -298,15 +315,16 @@ def run_playwright_probe(
                         "expectedStatus": probe.get_attribute("data-expected-status"),
                         "failureDetail": "",
                         "invariantId": probe.get_attribute("data-invariant-id"),
-                        "networkResponses": network_responses[-12:],
-                        "observedStatus": observed,
-                        "route": probe.get_attribute("data-route"),
-                        "selector": f"[data-bayesilisk-probe] >> nth={index}",
-                        "targetUrl": url,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "title": probe.get_attribute("data-title"),
-                    }
-                )
+                "networkResponses": network_responses[-12:],
+                "observedStatus": observed,
+                "route": probe.get_attribute("data-route"),
+                "selector": f"[data-bayesilisk-probe] >> nth={index}",
+                "targetUrl": url,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "title": probe.get_attribute("data-title"),
+                "fixtureSource": probe.get_attribute("data-fixture-source"),
+            }
+        )
                 if step_delay_ms:
                     page.wait_for_timeout(step_delay_ms)
             if hold_ms:
@@ -331,6 +349,7 @@ def fallback_probe_results(url: str) -> list[dict[str, Any]]:
             "targetUrl": url,
             "timestamp": timestamp,
             "title": probe["title"],
+            "fixtureSource": DEMO_FIXTURE_SOURCE,
         }
         for index, probe in enumerate(DEMO_PROBES, start=1)
     ]
@@ -474,6 +493,8 @@ def run_demo(args: argparse.Namespace) -> dict[str, Any]:
         "classificationLegend": CLASSIFICATION_LEGEND,
         "demo": "workflow-pressure",
         "evidence": evidence_rows(report),
+        "fixtureKind": DEMO_FIXTURE_KIND,
+        "fixtureSource": DEMO_FIXTURE_SOURCE,
         "playwrightMode": mode,
         "playwrightProbe": context["playwrightProbe"],
         "recordingCommand": "bayesilisk-demo --recording",
@@ -490,8 +511,14 @@ def render_text(payload: dict[str, Any]) -> str:
     lines = [
         "Bayesilisk local workflow pressure demo",
         "",
+        "Fixture provenance:",
+        f"- kind: {payload['fixtureKind']}",
+        f"- source: {payload['fixtureSource']}",
+        "- these workflows are synthetic local fixtures, not claims about an existing app",
+        "- to test a real app, instrument its page with data-bayesilisk-probe rows and run tools/playwright_probe.py --url <url>",
+        "",
         "What this proves:",
-        "- Playwright is only the sensor: it clicks a local brittle app and records expected vs observed status.",
+        "- Playwright is only the sensor: it clicks a local fixture or caller-provided app and records expected vs observed status.",
         "- Grassmann attention is only the router: it selects where to spend verifier budget.",
         "- The scenario proposer lane is not trusted: one local model-style proposal is accepted, one invented target is rejected.",
         "- Bayesilisk is the judge: deterministic invariants produce the verdict and issue payload.",

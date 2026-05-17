@@ -76,6 +76,16 @@ workflow context to surface. The transcript also defines `breakage.easy`,
 pairs such as `expected=409 observed=200` into the product meaning: a workflow
 that should reject inconsistent state returned success.
 
+The demo rows are synthetic fixtures from `bayesilisk/demo.py::DEMO_PROBES`, not
+claims about an existing product. To test a real app, expose probe rows in that
+app and point Playwright at it:
+
+```sh
+python3 tools/playwright_probe.py --url http://localhost:3000/probe-page \
+  --output /tmp/bayesilisk-real-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-real-context.json --format markdown
+```
+
 ## Enable Optional Ollama Layers
 
 Embeddings add a plane-similarity signal to Grassmann attention:
