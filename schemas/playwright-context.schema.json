@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bayesilisk.local/schemas/playwright-context.schema.json",
+  "title": "Bayesilisk Playwright context",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["agentNotes", "playwrightProbe", "priorAdjustments", "repositoryFacts", "source"],
+  "properties": {
+    "agentNotes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "playwrightProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactCount", "failedCount", "passedCount", "resultCount", "target"],
+      "properties": {
+        "artifactCount": {"type": "integer", "minimum": 0},
+        "failedCount": {"type": "integer", "minimum": 0},
+        "passedCount": {"type": "integer", "minimum": 0},
+        "resultCount": {"type": "integer", "minimum": 0},
+        "target": {"type": ["string", "null"]}
+      }
+    },
+    "priorAdjustments": {"type": "object"},
+    "repositoryFacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actorRole",
+          "artifactPaths",
+          "expectedStatus",
+          "failureDetail",
+          "invariantId",
+          "networkResponses",
+          "observedStatus",
+          "passed",
+          "route",
+          "selector",
+          "source",
+          "targetUrl",
+          "timestamp",
+          "title"
+        ],
+        "properties": {
+          "actorRole": {"type": "string"},
+          "artifactPaths": {"type": "array", "items": {"type": "string"}},
+          "expectedStatus": {"type": ["integer", "null"]},
+          "failureDetail": {"type": "string"},
+          "invariantId": {"type": "string"},
+          "networkResponses": {"type": "array"},
+          "observedStatus": {"type": ["integer", "null"]},
+          "passed": {"type": "boolean"},
+          "route": {"type": "string"},
+          "selector": {"type": "string"},
+          "source": {"type": "string", "const": "microsoft-playwright"},
+          "targetUrl": {"type": ["string", "null"]},
+          "timestamp": {"type": "string"},
+          "title": {"type": "string"}
+        }
+      }
+    },
+    "source": {"type": "string"}
+  }
+}
