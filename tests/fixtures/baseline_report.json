@@ -9,6 +9,16 @@
     "DMS",
     "module entitlements"
   ],
+  "effectiveConfiguration": {
+    "attentionSelectionLimit": 4,
+    "attentionThreshold": 0.35,
+    "embeddingModel": "nomic-embed-text",
+    "embeddingsEnabled": false,
+    "ollamaBaseUrlClass": "loopback",
+    "scenarioModel": "gemma4:e2b",
+    "scenarioProposalLimit": 3,
+    "scenarioProposerEnabled": false
+  },
   "findings": [
     {
       "accessPattern": {

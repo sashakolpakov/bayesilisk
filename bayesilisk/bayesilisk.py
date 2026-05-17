@@ -1194,6 +1194,88 @@ def _safe_hash(payload: Any) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _config_bool(overrides: dict[str, Any], key: str, default: bool) -> bool:
+    value = overrides.get(key)
+    if value is None:
+        return default
+    return bool(value)
+
+
+def _config_int(overrides: dict[str, Any], key: str, default: int) -> int:
+    value = overrides.get(key)
+    if value is None:
+        return default
+    return int(value)
+
+
+def _config_float(overrides: dict[str, Any], key: str, default: float) -> float:
+    value = overrides.get(key)
+    if value is None:
+        return default
+    return float(value)
+
+
+def _config_str(overrides: dict[str, Any], key: str, default: str) -> str:
+    value = overrides.get(key)
+    if value is None:
+        return default
+    return str(value)
+
+
+def effective_runtime_config(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    overrides = _dict_or_empty(overrides)
+    env_ollama_base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
+    return {
+        "attentionSelectionLimit": max(1, _config_int(overrides, "attentionSelectionLimit", 4)),
+        "attentionThreshold": max(0.0, min(1.0, _config_float(overrides, "attentionThreshold", 0.35))),
+        "enableEmbeddings": _config_bool(
+            overrides,
+            "enableEmbeddings",
+            _env_bool("BAYESILISK_USE_OLLAMA_EMBEDDINGS"),
+        ),
+        "enableScenarioProposer": _config_bool(
+            overrides,
+            "enableScenarioProposer",
+            _env_bool("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL"),
+        ),
+        "embeddingModel": _config_str(overrides, "embeddingModel", os.environ.get("BAYESILISK_OLLAMA_MODEL", "nomic-embed-text")),
+        "embeddingTimeout": _config_float(overrides, "embeddingTimeout", float(os.environ.get("BAYESILISK_OLLAMA_TIMEOUT", "30"))),
+        "ollamaBaseUrl": _config_str(overrides, "ollamaBaseUrl", env_ollama_base_url),
+        "scenarioModel": _config_str(
+            overrides,
+            "scenarioModel",
+            os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", os.environ.get("OLLAMA_MODEL", "gemma4:e2b")),
+        ),
+        "scenarioProposalLimit": max(0, _config_int(overrides, "scenarioProposalLimit", int(os.environ.get("BAYESILISK_MODEL_SCENARIO_LIMIT", "3")))),
+        "scenarioTimeout": _config_float(
+            overrides,
+            "scenarioTimeout",
+            float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TIMEOUT", "45")),
+        ),
+    }
+
+
+def report_runtime_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    effective = effective_runtime_config(config)
+    return {
+        "attentionSelectionLimit": effective["attentionSelectionLimit"],
+        "attentionThreshold": effective["attentionThreshold"],
+        "embeddingModel": effective["embeddingModel"],
+        "embeddingsEnabled": effective["enableEmbeddings"],
+        "ollamaBaseUrlClass": _safe_url_class(effective["ollamaBaseUrl"]),
+        "scenarioModel": effective["scenarioModel"],
+        "scenarioProposalLimit": effective["scenarioProposalLimit"],
+        "scenarioProposerEnabled": effective["enableScenarioProposer"],
+    }
+
+
 def _ollama_chat_json(
     messages: list[dict[str, str]],
     *,
@@ -1262,16 +1344,20 @@ def _model_prompt(attention: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def weak_model_raw_scenario_proposals(attention: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def weak_model_raw_scenario_proposals(
+    attention: dict[str, Any],
+    runtime_config: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    config = effective_runtime_config(runtime_config)
     provider = {
-        "enabled": os.environ.get("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL") == "1",
+        "enabled": config["enableScenarioProposer"],
         "source": "disabled",
     }
     if not provider["enabled"]:
         return [], provider
-    model = os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", os.environ.get("OLLAMA_MODEL", "gemma4:e2b"))
-    base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
-    timeout = float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TIMEOUT", "45"))
+    model = config["scenarioModel"]
+    base_url = config["ollamaBaseUrl"]
+    timeout = config["scenarioTimeout"]
     prompt = _model_prompt(attention)
     provider.update(
         {
@@ -1389,9 +1475,13 @@ def validate_model_scenario_proposals(
     return scenarios, rejected
 
 
-def weak_model_scenarios(attention: dict[str, Any]) -> tuple[list[Scenario], dict[str, Any]]:
-    limit = int(os.environ.get("BAYESILISK_MODEL_SCENARIO_LIMIT", "3"))
-    raw, provider = weak_model_raw_scenario_proposals(attention)
+def weak_model_scenarios(
+    attention: dict[str, Any],
+    runtime_config: dict[str, Any] | None = None,
+) -> tuple[list[Scenario], dict[str, Any]]:
+    config = effective_runtime_config(runtime_config)
+    limit = config["scenarioProposalLimit"]
+    raw, provider = weak_model_raw_scenario_proposals(attention, runtime_config=config)
     scenarios, rejected = validate_model_scenario_proposals(raw, attention, limit=limit, provider=provider)
     provider.update(
         {
@@ -1917,12 +2007,16 @@ def _context_attention_texts(context: dict[str, Any] | None) -> list[str]:
     return texts[:24]
 
 
-def embedding_plane_similarities(context: dict[str, Any] | None) -> tuple[dict[str, float], dict[str, Any]]:
-    if os.environ.get("BAYESILISK_USE_OLLAMA_EMBEDDINGS") != "1":
+def embedding_plane_similarities(
+    context: dict[str, Any] | None,
+    runtime_config: dict[str, Any] | None = None,
+) -> tuple[dict[str, float], dict[str, Any]]:
+    config = effective_runtime_config(runtime_config)
+    if not config["enableEmbeddings"]:
         return {}, {"enabled": False}
-    model = os.environ.get("BAYESILISK_OLLAMA_MODEL", "nomic-embed-text")
-    base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", "http://localhost:11434")
-    timeout = float(os.environ.get("BAYESILISK_OLLAMA_TIMEOUT", "30"))
+    model = config["embeddingModel"]
+    base_url = config["ollamaBaseUrl"]
+    timeout = config["embeddingTimeout"]
     context_texts = _context_attention_texts(context)
     if not context_texts:
         return {}, {"enabled": True, "model": model, "baseUrl": base_url, "textCount": 0}
@@ -2025,14 +2119,18 @@ def _attention_decay_by_invariant(
 def grassmann_attention(
     context: dict[str, Any] | None,
     observations: dict[str, Any] | None = None,
+    runtime_config: dict[str, Any] | None = None,
     *,
     selection_limit: int = 4,
     selection_threshold: float = 0.35,
 ) -> dict[str, Any]:
+    config = effective_runtime_config(runtime_config)
+    selection_limit = config["attentionSelectionLimit"] if runtime_config is not None else selection_limit
+    selection_threshold = config["attentionThreshold"] if runtime_config is not None else selection_threshold
     summary = context_summary(context)
     merged_observations = merge_observations(observations, context_observations(context))
     facts = _context_plane_facts(context)
-    embedding_similarities, embedding_provider = embedding_plane_similarities(context)
+    embedding_similarities, embedding_provider = embedding_plane_similarities(context, runtime_config=config)
     decay_by_invariant = _attention_decay_by_invariant(context, merged_observations)
     planes: list[dict[str, Any]] = []
     for invariant in INVARIANTS:
@@ -2228,9 +2326,11 @@ def build_report(
     observations: dict[str, Any] | None = None,
     grassmann: dict[str, Any] | None = None,
     model_scenarios: list[Scenario] | None = None,
+    runtime_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     observations = _dict_or_empty(observations)
     grassmann = _dict_or_empty(grassmann)
+    effective_config = effective_runtime_config(runtime_config)
     attention_by_invariant = {
         plane["invariantId"]: plane
         for plane in grassmann.get("planes", [])
@@ -2357,6 +2457,7 @@ def build_report(
         "deterministic": True,
         "productionAccess": False,
         "generatedScenarioCount": len(generated_scenarios),
+        "effectiveConfiguration": report_runtime_config(effective_config),
         "grassmannAttention": grassmann or {
             "boundedFeedback": True,
             "embeddingMode": "disabled",
@@ -2408,13 +2509,15 @@ def build_contextual_report(
     generated_count: int = 8,
     observations: dict[str, Any] | None = None,
     context: dict[str, Any] | None = None,
+    runtime_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     context = _dict_or_empty(context)
     observations = _dict_or_empty(observations)
+    effective_config = effective_runtime_config(runtime_config)
     summary = context_summary(context)
     merged_observations = merge_observations(observations, context_observations(context))
-    attention = grassmann_attention(context, observations)
-    model_scenarios, model_generation = weak_model_scenarios(attention)
+    attention = grassmann_attention(context, observations, runtime_config=effective_config)
+    model_scenarios, model_generation = weak_model_scenarios(attention, runtime_config=effective_config)
     attention["weakModelScenarioGeneration"] = model_generation
     report = build_report(
         seed,
@@ -2423,6 +2526,7 @@ def build_contextual_report(
         observations=merged_observations,
         grassmann=attention,
         model_scenarios=model_scenarios,
+        runtime_config=effective_config,
     )
     report["contextSummary"] = summary
     report["contextObservationSource"] = merged_observations.get("source", "none")
@@ -2706,6 +2810,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--generated-count", type=int, default=8, help="Number of seeded generated composite scenarios.")
     parser.add_argument("--observations", type=Path, default=None, help="Optional JSON observation history.")
     parser.add_argument("--context", type=Path, default=None, help="Optional JSON context from agents, trackers, or repo scans.")
+    embedding_group = parser.add_mutually_exclusive_group()
+    embedding_group.add_argument(
+        "--enable-embeddings",
+        dest="enable_embeddings",
+        action="store_true",
+        default=None,
+        help="Enable Ollama embedding similarities for Grassmann attention.",
+    )
+    embedding_group.add_argument(
+        "--disable-embeddings",
+        dest="enable_embeddings",
+        action="store_false",
+        help="Disable Ollama embedding similarities even if enabled by environment.",
+    )
+    proposer_group = parser.add_mutually_exclusive_group()
+    proposer_group.add_argument(
+        "--enable-scenario-proposer",
+        dest="enable_scenario_proposer",
+        action="store_true",
+        default=None,
+        help="Enable local Ollama scenario proposer generation.",
+    )
+    proposer_group.add_argument(
+        "--disable-scenario-proposer",
+        dest="enable_scenario_proposer",
+        action="store_false",
+        help="Disable scenario proposer generation even if enabled by environment.",
+    )
+    parser.add_argument("--embedding-model", default=None, help="Ollama embedding model name.")
+    parser.add_argument("--scenario-model", default=None, help="Ollama scenario proposer model name.")
+    parser.add_argument("--ollama-base-url", default=None, help="Ollama base URL for embeddings and scenario proposals.")
+    parser.add_argument("--attention-threshold", type=float, default=None, help="Minimum attention score for selected planes.")
+    parser.add_argument("--attention-selection-limit", type=int, default=None, help="Maximum selected attention planes.")
+    parser.add_argument("--scenario-proposal-limit", type=int, default=None, help="Maximum accepted model-proposed scenarios.")
     parser.add_argument(
         "--issue-payloads",
         action="store_true",
@@ -2714,10 +2852,30 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def runtime_config_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    config: dict[str, Any] = {}
+    cli_to_config = {
+        "attention_selection_limit": "attentionSelectionLimit",
+        "attention_threshold": "attentionThreshold",
+        "embedding_model": "embeddingModel",
+        "enable_embeddings": "enableEmbeddings",
+        "enable_scenario_proposer": "enableScenarioProposer",
+        "ollama_base_url": "ollamaBaseUrl",
+        "scenario_model": "scenarioModel",
+        "scenario_proposal_limit": "scenarioProposalLimit",
+    }
+    for cli_name, config_name in cli_to_config.items():
+        value = getattr(args, cli_name)
+        if value is not None:
+            config[config_name] = value
+    return config
+
+
 def main() -> int:
     args = parse_args()
     observations = load_observations(args.observations)
     context = load_context(args.context)
+    runtime_config = runtime_config_from_args(args)
     if context:
         report = build_contextual_report(
             args.seed,
@@ -2725,6 +2883,7 @@ def main() -> int:
             generated_count=args.generated_count,
             observations=observations,
             context=context,
+            runtime_config=runtime_config,
         )
     else:
         report = build_report(
@@ -2732,6 +2891,7 @@ def main() -> int:
             limit=args.limit,
             generated_count=args.generated_count,
             observations=observations,
+            runtime_config=runtime_config,
         )
     if args.issue_payloads:
         content = json.dumps(issue_payloads(report, context=context, limit=args.limit), indent=2, sort_keys=True) + "\n"

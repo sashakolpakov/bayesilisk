@@ -665,6 +665,41 @@ def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:
     assert payloads[0]["issuePayloadSource"] == "verifiedByBayesilisk"
 
 
+def test_bayesilisk_cli_reports_effective_runtime_configuration() -> None:
+    report = json.loads(
+        run_bayesilisk(
+            "--seed",
+            "150",
+            "--limit",
+            "1",
+            "--enable-embeddings",
+            "--embedding-model",
+            "unit-embed",
+            "--enable-scenario-proposer",
+            "--scenario-model",
+            "unit-scenario",
+            "--scenario-proposal-limit",
+            "5",
+            "--attention-threshold",
+            "0.9",
+            "--attention-selection-limit",
+            "2",
+            "--ollama-base-url",
+            "http://localhost:11435",
+        ).stdout
+    )
+    config = report["effectiveConfiguration"]
+
+    assert config["attentionSelectionLimit"] == 2
+    assert config["attentionThreshold"] == 0.9
+    assert config["embeddingModel"] == "unit-embed"
+    assert config["embeddingsEnabled"] is True
+    assert config["ollamaBaseUrlClass"] == "loopback"
+    assert config["scenarioModel"] == "unit-scenario"
+    assert config["scenarioProposalLimit"] == 5
+    assert config["scenarioProposerEnabled"] is True
+
+
 def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     server = importlib.import_module("bayesilisk.mcp_server")
 
@@ -683,6 +718,12 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
                     "context": {
                         "agentNotes": ["HR documents DMS tenant scope and travel expense itinerary probe"],
                     },
+                    "attentionThreshold": 0.9,
+                    "attentionSelectionLimit": 1,
+                    "enableEmbeddings": False,
+                    "enableScenarioProposer": False,
+                    "embeddingModel": "mcp-embed",
+                    "scenarioModel": "mcp-scenario",
                 },
             },
         }
@@ -698,6 +739,10 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     assert payload["tool"] == "bayesilisk.v1.2"
     assert payload["contextSummary"]["textSignalCount"] >= 1
     assert len(payload["rankedProbes"]) == 2
+    assert payload["effectiveConfiguration"]["attentionThreshold"] == 0.9
+    assert payload["effectiveConfiguration"]["attentionSelectionLimit"] == 1
+    assert payload["effectiveConfiguration"]["embeddingModel"] == "mcp-embed"
+    assert payload["effectiveConfiguration"]["scenarioModel"] == "mcp-scenario"
 
     raw = io.BytesIO()
     server.write_message(raw, {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}})
@@ -769,5 +814,10 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "BAYESILISK_LIVE_OLLAMA=1",
         "without Ollama",
         "without granting a model authority",
+        "--enable-embeddings",
+        "--enable-scenario-proposer",
+        "--scenario-proposal-limit",
+        "effectiveConfiguration",
+        "ollamaBaseUrl",
     ):
         assert fragment in readme

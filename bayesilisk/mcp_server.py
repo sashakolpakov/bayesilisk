@@ -12,11 +12,23 @@ if __package__ in {None, ""}:
         build_contextual_report,
         issue_payloads,
         ranked_probes,
+        effective_runtime_config,
     )
 else:
-    from .bayesilisk import VERSION, build_contextual_report, issue_payloads, ranked_probes
+    from .bayesilisk import VERSION, build_contextual_report, effective_runtime_config, issue_payloads, ranked_probes
 
 PROTOCOL_VERSION = "2024-11-05"
+
+RUNTIME_CONFIG_SCHEMA: dict[str, Any] = {
+    "attentionSelectionLimit": {"type": "integer", "default": 4},
+    "attentionThreshold": {"type": "number", "default": 0.35},
+    "enableEmbeddings": {"type": "boolean", "default": False},
+    "enableScenarioProposer": {"type": "boolean", "default": False},
+    "embeddingModel": {"type": "string", "default": "nomic-embed-text"},
+    "ollamaBaseUrl": {"type": "string", "default": "http://localhost:11434"},
+    "scenarioModel": {"type": "string", "default": "gemma4:e2b"},
+    "scenarioProposalLimit": {"type": "integer", "default": 3},
+}
 
 TOOLS: tuple[dict[str, Any], ...] = (
     {
@@ -30,6 +42,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "generatedCount": {"type": "integer", "default": 8},
                 "context": {"type": "object"},
                 "observations": {"type": "object"},
+                **RUNTIME_CONFIG_SCHEMA,
             },
         },
     },
@@ -44,6 +57,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "generatedCount": {"type": "integer", "default": 8},
                 "context": {"type": "object"},
                 "observations": {"type": "object"},
+                **RUNTIME_CONFIG_SCHEMA,
             },
         },
     },
@@ -59,6 +73,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "context": {"type": "object"},
                 "observations": {"type": "object"},
                 "includeExisting": {"type": "boolean", "default": False},
+                **RUNTIME_CONFIG_SCHEMA,
             },
         },
     },
@@ -97,12 +112,18 @@ def _report_from_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("context must be an object")
     if not isinstance(observations, dict):
         raise ValueError("observations must be an object")
+    runtime_config = {
+        key: arguments[key]
+        for key in RUNTIME_CONFIG_SCHEMA
+        if key in arguments
+    }
     return build_contextual_report(
         seed,
         limit=limit,
         generated_count=generated_count,
         observations=observations,
         context=context,
+        runtime_config=effective_runtime_config(runtime_config),
     )
 
 
@@ -142,6 +163,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
         elif name == "bayesilisk.rank_context":
             payload = {
                 "contextSummary": report["contextSummary"],
+                "effectiveConfiguration": report["effectiveConfiguration"],
                 "rankedProbes": ranked_probes(report, limit=arguments.get("limit", 10)),
                 "sections": report["sections"],
                 "tool": report["tool"],
@@ -149,6 +171,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
         elif name == "bayesilisk.issue_payloads":
             payload = {
                 "contextSummary": report["contextSummary"],
+                "effectiveConfiguration": report["effectiveConfiguration"],
                 "issuePayloads": issue_payloads(
                     report,
                     context=arguments.get("context", {}),
