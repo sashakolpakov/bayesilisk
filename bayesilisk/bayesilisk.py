@@ -6,9 +6,10 @@ import json
 import os
 import random
 import re
+import urllib.parse
 import urllib.request
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -348,6 +349,7 @@ class Scenario:
     invariant_ids: tuple[str, ...]
     generated: bool = False
     generation_basis: str = "catalog"
+    provenance: dict[str, Any] = field(default_factory=dict)
 
 
 FRAGMENTS: tuple[Fragment, ...] = (
@@ -1173,6 +1175,25 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+SCENARIO_PROPOSER_PROMPT_VERSION = "scenario-proposer.v1"
+
+
+def _safe_url_class(base_url: str) -> str:
+    parsed = urllib.parse.urlparse(base_url)
+    host = (parsed.hostname or "").lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return "loopback"
+    if host.startswith("10.") or host.startswith("192.168.") or re.match(r"^172\.(1[6-9]|2\d|3[0-1])\.", host):
+        return "private-network"
+    if not host:
+        return "unknown"
+    return "remote-host"
+
+
+def _safe_hash(payload: Any) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
 def _ollama_chat_json(
     messages: list[dict[str, str]],
     *,
@@ -1251,10 +1272,22 @@ def weak_model_raw_scenario_proposals(attention: dict[str, Any]) -> tuple[list[d
     model = os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", os.environ.get("OLLAMA_MODEL", "gemma4:e2b"))
     base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
     timeout = float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TIMEOUT", "45"))
-    provider.update({"baseUrl": base_url, "model": model, "source": "ollama-chat"})
+    prompt = _model_prompt(attention)
+    provider.update(
+        {
+            "baseUrlClass": _safe_url_class(base_url),
+            "model": model,
+            "modelName": model,
+            "promptHash": _safe_hash(prompt),
+            "promptVersion": SCENARIO_PROPOSER_PROMPT_VERSION,
+            "provider": "ollama",
+            "source": "ollama-chat",
+            "sourceContext": attention.get("source", "none"),
+        }
+    )
     try:
         payload = _ollama_chat_json(
-            _model_prompt(attention),
+            prompt,
             base_url=base_url,
             model=model,
             timeout=timeout,
@@ -1275,6 +1308,7 @@ def validate_model_scenario_proposals(
     attention: dict[str, Any],
     *,
     limit: int = 3,
+    provider: dict[str, Any] | None = None,
 ) -> tuple[list[Scenario], list[dict[str, Any]]]:
     fragment_ids = {fragment.id for fragment in FRAGMENTS}
     invariant_ids = {invariant.id for invariant in INVARIANTS}
@@ -1282,43 +1316,58 @@ def validate_model_scenario_proposals(
     scenarios: list[Scenario] = []
     rejected: list[dict[str, Any]] = []
     seen: set[tuple[tuple[str, ...], tuple[str, ...]]] = set()
+    provider = provider or {}
     for proposal in proposals:
+        proposal_hash = _safe_hash(proposal)
         title = proposal.get("title")
         target_plane = proposal.get("targetPlane")
         fragments = proposal.get("fragments")
         invariants = proposal.get("invariants")
         if not isinstance(title, str) or not title.strip():
-            rejected.append({"reason": "missing-title", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "missing-title", "proposal": proposal})
             continue
         if not isinstance(target_plane, str) or target_plane not in invariant_ids:
-            rejected.append({"reason": "unknown-target-plane", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-target-plane", "proposal": proposal})
             continue
         if selected_planes and target_plane not in selected_planes:
-            rejected.append({"reason": "target-plane-not-selected", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "target-plane-not-selected", "proposal": proposal})
             continue
         if not isinstance(fragments, list) or not 2 <= len(fragments) <= 12:
-            rejected.append({"reason": "invalid-fragment-count", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-fragment-count", "proposal": proposal})
             continue
         if not isinstance(invariants, list) or not 1 <= len(invariants) <= 6:
-            rejected.append({"reason": "invalid-invariant-count", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-invariant-count", "proposal": proposal})
             continue
         fragment_tuple = tuple(item for item in fragments if isinstance(item, str))
         invariant_tuple = tuple(item for item in invariants if isinstance(item, str))
         if len(fragment_tuple) != len(fragments) or any(item not in fragment_ids for item in fragment_tuple):
-            rejected.append({"reason": "unknown-fragment-id", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-fragment-id", "proposal": proposal})
             continue
         if len(invariant_tuple) != len(invariants) or any(item not in invariant_ids for item in invariant_tuple):
-            rejected.append({"reason": "unknown-invariant-id", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-invariant-id", "proposal": proposal})
             continue
         if target_plane not in invariant_tuple:
-            rejected.append({"reason": "target-plane-not-in-invariants", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "target-plane-not-in-invariants", "proposal": proposal})
             continue
         key = (fragment_tuple, invariant_tuple)
         if key in seen:
-            rejected.append({"reason": "duplicate-proposal", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "duplicate-proposal", "proposal": proposal})
             continue
         seen.add(key)
-        digest = hashlib.sha256(json.dumps(proposal, sort_keys=True).encode("utf-8")).hexdigest()[:8]
+        digest = proposal_hash[:8]
+        provenance = {
+            "accepted": True,
+            "baseUrlClass": provider.get("baseUrlClass", "unknown"),
+            "embeddingModel": attention.get("embeddingProvider", {}).get("model"),
+            "modelName": provider.get("modelName", provider.get("model", "unknown")),
+            "promptHash": provider.get("promptHash"),
+            "promptVersion": provider.get("promptVersion", SCENARIO_PROPOSER_PROMPT_VERSION),
+            "proposalHash": proposal_hash,
+            "provider": provider.get("provider", "manual"),
+            "source": provider.get("source", "validated-proposal"),
+            "sourceContext": provider.get("sourceContext", attention.get("source", "none")),
+            "targetPlane": target_plane,
+        }
         scenarios.append(
             Scenario(
                 f"generated.model.{len(scenarios) + 1:02d}.{_slug_id(target_plane)}.{digest}",
@@ -1328,6 +1377,7 @@ def validate_model_scenario_proposals(
                 invariant_tuple,
                 generated=True,
                 generation_basis=f"weak-model-proposal:{target_plane}",
+                provenance=provenance,
             )
         )
         if len(scenarios) >= limit:
@@ -1338,10 +1388,11 @@ def validate_model_scenario_proposals(
 def weak_model_scenarios(attention: dict[str, Any]) -> tuple[list[Scenario], dict[str, Any]]:
     limit = int(os.environ.get("BAYESILISK_MODEL_SCENARIO_LIMIT", "3"))
     raw, provider = weak_model_raw_scenario_proposals(attention)
-    scenarios, rejected = validate_model_scenario_proposals(raw, attention, limit=limit)
+    scenarios, rejected = validate_model_scenario_proposals(raw, attention, limit=limit, provider=provider)
     provider.update(
         {
             "acceptedCount": len(scenarios),
+            "acceptedProposals": [scenario.provenance for scenario in scenarios],
             "rejected": rejected,
             "rejectedCount": len(rejected),
         }
@@ -2037,6 +2088,11 @@ def build_report(
         for plane in grassmann.get("planes", [])
         if isinstance(plane, dict) and isinstance(plane.get("invariantId"), str)
     }
+    model_provenance_by_scenario = {
+        scenario.id: scenario.provenance
+        for scenario in model_scenarios or []
+        if isinstance(scenario.provenance, dict) and scenario.provenance
+    }
     rng = random.Random(seed)
     fragment_by_id = {fragment.id: fragment for fragment in FRAGMENTS}
     invariant_by_id = {invariant.id: invariant for invariant in INVARIANTS}
@@ -2069,6 +2125,7 @@ def build_report(
             readiness = issue_readiness(passed, classification, basis)
             title = suggested_title(scenario, invariant, observed_result, classification)
             attention_plane = attention_by_invariant.get(invariant.id, {})
+            model_provenance = model_provenance_by_scenario.get(scenario.id)
             body = suggested_body(
                 scenario,
                 invariant,
@@ -2092,6 +2149,7 @@ def build_report(
                     "scenarioTone": scenario.tone,
                     "generatedScenario": scenario.generated,
                     "generationBasis": scenario.generation_basis,
+                    "modelProvenance": model_provenance,
                     "subScenarios": entries,
                     "fragments": [
                         {
@@ -2326,6 +2384,7 @@ def issue_payloads(
                 "labels": labels,
                 "attentionReasons": finding.get("attentionReasons", []),
                 "attentionScore": finding.get("attentionScore", 0.0),
+                "modelProvenance": finding.get("modelProvenance"),
                 "posteriorMode": finding["posteriorMode"],
                 "riskScore": finding["riskScore"],
                 "scenarioId": finding["scenarioId"],

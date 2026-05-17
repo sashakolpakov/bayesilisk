@@ -216,6 +216,8 @@ If `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` is set, Bayesilisk also runs a local
 
 The proposal is accepted only if every fragment id and invariant id exists, the target plane is selected, and the target invariant is included in the scenario. Accepted proposals appear as `generated.model.*` scenarios. The current report contract still uses `generationBasis=weak-model-proposal:<plane>` and `weakModelScenarioGeneration.rejected` for compatibility with earlier Bayesilisk reports.
 
+Accepted model-proposed findings include safe `modelProvenance`: provider name, model name, base URL class, prompt version, prompt hash, proposal hash, target plane, source context, and embedding model when embeddings were used. Reports never need to include API keys, raw secret headers, or full provider credentials.
+
 The preferred local proposer for scenario generation is:
 
 ```sh
