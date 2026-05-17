@@ -200,7 +200,7 @@ Each plane reports:
 
 High-attention planes are copied to `selectedPlaneIds`. The seeded generator uses those plane ids to add nearby generated scenarios, for example an HR/support plane can produce an expired-support HR document probe. This is the positive feedback loop: bad or under-tested planes receive more deterministic probes on the next report.
 
-If `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` is set, Bayesilisk also runs a local scenario proposer model through Ollama `/api/chat`. The default model is `BAYESILISK_OLLAMA_SCENARIO_MODEL`, then `OLLAMA_MODEL`, then `gemma4:e2b`. The prompt receives only selected planes plus the allowed fragment and invariant ids, and asks for strict JSON:
+If `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` is set, Bayesilisk also runs a scenario proposer provider. The default provider is `ollama`, using Ollama `/api/chat`; the default model is `BAYESILISK_OLLAMA_SCENARIO_MODEL`, then `OLLAMA_MODEL`, then `gemma4:e2b`. `openai-compatible` is available for Chat Completions style endpoints. API keys are read from environment/config and are redacted from reports, issue bodies, and provenance. The prompt receives only selected planes plus the allowed fragment and invariant ids, and asks for strict JSON:
 
 ```json
 {
@@ -217,7 +217,7 @@ If `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` is set, Bayesilisk also runs a local
 
 The proposal is accepted only if every fragment id and invariant id exists, the target plane is selected, and the target invariant is included in the scenario. Accepted proposals appear as `generated.model.*` scenarios. The current report contract still uses `generationBasis=weak-model-proposal:<plane>` and `weakModelScenarioGeneration.rejected` for compatibility with earlier Bayesilisk reports.
 
-Accepted model-proposed findings include safe `modelProvenance`: provider name, model name, base URL class, prompt version, prompt hash, proposal hash, target plane, source context, and embedding model when embeddings were used. Reports never need to include API keys, raw secret headers, or full provider credentials.
+Accepted model-proposed findings include safe `modelProvenance`: provider name, model name, base URL or hostname class, prompt version, prompt hash, proposal hash, target plane, source context, and embedding model when embeddings were used. Reports never include API keys, raw secret headers, or full provider credentials.
 
 The preferred local proposer for scenario generation is:
 

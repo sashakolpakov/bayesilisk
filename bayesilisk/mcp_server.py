@@ -26,8 +26,12 @@ RUNTIME_CONFIG_SCHEMA: dict[str, Any] = {
     "enableScenarioProposer": {"type": "boolean", "default": False},
     "embeddingModel": {"type": "string", "default": "nomic-embed-text"},
     "ollamaBaseUrl": {"type": "string", "default": "http://localhost:11434"},
+    "scenarioApiKey": {"type": "string"},
+    "scenarioApiKeyEnv": {"type": "string"},
+    "scenarioBaseUrl": {"type": "string"},
     "scenarioModel": {"type": "string", "default": "gemma4:e2b"},
     "scenarioProposalLimit": {"type": "integer", "default": 3},
+    "scenarioProvider": {"type": "string", "default": "ollama"},
 }
 
 TOOLS: tuple[dict[str, Any], ...] = (

@@ -85,6 +85,7 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
   --enable-embeddings \
   --embedding-model nomic-embed-text \
   --enable-scenario-proposer \
+  --scenario-provider ollama \
   --scenario-model gemma4:e2b \
   --scenario-proposal-limit 3 \
   --attention-threshold 0.4 \
@@ -93,7 +94,8 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 ```
 
 Reports include `effectiveConfiguration`, so a tester can see which attention,
-embedding, model, proposal-limit, and base-URL-class settings were actually used.
+embedding, provider, model, proposal-limit, key-presence, and base-URL-class
+settings were actually used.
 
 ## Test
 

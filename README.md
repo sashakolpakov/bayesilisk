@@ -208,6 +208,12 @@ Those are deliberately separate.
 
 Set `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` to let a local scenario proposer
 model suggest extra scenario compositions through Ollama `/api/chat`.
+The provider is selected with `BAYESILISK_SCENARIO_PROVIDER`, defaulting to
+`ollama`. API-key backed providers read keys from `BAYESILISK_SCENARIO_API_KEY`
+or the env var named by `BAYESILISK_SCENARIO_API_KEY_ENV`; reports record only
+whether a key was configured, never the key itself.
+Runtime config precedence is explicit CLI/MCP arguments, then environment
+variables, then defaults.
 
 The preferred local proposer is `gemma4:e2b`:
 
@@ -222,6 +228,7 @@ Equivalent CLI controls avoid hidden environment-only behavior:
 ```sh
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json \
   --enable-scenario-proposer \
+  --scenario-provider ollama \
   --scenario-model gemma4:e2b \
   --scenario-proposal-limit 3 \
   --ollama-base-url http://localhost:11434

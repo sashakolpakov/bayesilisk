@@ -56,7 +56,7 @@ If Ollama is unavailable, the dependency-free anchor-plane proxy is still used.
 
 ## Scenario Proposer Model
 
-The proposer model is configured through Ollama today:
+The default proposer provider is Ollama:
 
 ```sh
 BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1 \
@@ -64,7 +64,15 @@ BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
 python3 -m bayesilisk --seed 150 --context /tmp/context.json --format json
 ```
 
-The provider abstraction and API-key handling are tracked as a follow-up issue. The design requires that provider output stay untrusted and schema-validated.
+The provider boundary is explicit. `BAYESILISK_SCENARIO_PROVIDER` defaults to
+`ollama`; `openai-compatible` is available for hosted Chat Completions style
+endpoints. API keys come from `BAYESILISK_SCENARIO_API_KEY`, provider-specific
+environment variables, or the variable named by `BAYESILISK_SCENARIO_API_KEY_ENV`.
+Reports include provider/model/proposal provenance and key-presence booleans,
+but never raw keys or sensitive headers. Provider output stays untrusted and
+schema-validated.
+Configuration precedence is explicit CLI/MCP arguments, then environment
+variables, then defaults.
 
 Environment variables are not required for reproducible runs. The CLI also
 accepts explicit controls:
@@ -74,6 +82,7 @@ python3 -m bayesilisk --seed 150 --context /tmp/context.json \
   --enable-embeddings \
   --embedding-model nomic-embed-text \
   --enable-scenario-proposer \
+  --scenario-provider ollama \
   --scenario-model gemma4:e2b \
   --scenario-proposal-limit 3 \
   --attention-threshold 0.4 \
@@ -82,7 +91,8 @@ python3 -m bayesilisk --seed 150 --context /tmp/context.json \
 ```
 
 Reports include `effectiveConfiguration`, so a tester can see which attention,
-embedding, model, proposal-limit, and base-URL-class settings were actually used.
+embedding, provider, model, proposal-limit, key-presence, and base-URL-class
+settings were actually used.
 
 Live verification is opt-in:
 
@@ -110,7 +120,8 @@ Tools:
 
 The MCP tools accept the same control names as JSON arguments:
 `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
-`scenarioModel`, `scenarioProposalLimit`, `attentionThreshold`,
+`scenarioProvider`, `scenarioModel`, `scenarioProposalLimit`,
+`scenarioBaseUrl`, `scenarioApiKeyEnv`, `attentionThreshold`,
 `attentionSelectionLimit`, and `ollamaBaseUrl`.
 
 The MCP server runs locally and does not mutate issue trackers or production systems.

@@ -38,9 +38,12 @@
         "embeddingModel",
         "embeddingsEnabled",
         "ollamaBaseUrlClass",
+        "scenarioApiKeyConfigured",
+        "scenarioBaseUrlClass",
         "scenarioModel",
         "scenarioProposalLimit",
-        "scenarioProposerEnabled"
+        "scenarioProposerEnabled",
+        "scenarioProvider"
       ],
       "properties": {
         "attentionSelectionLimit": {"type": "integer", "minimum": 1},
@@ -48,9 +51,12 @@
         "embeddingModel": {"type": "string"},
         "embeddingsEnabled": {"type": "boolean"},
         "ollamaBaseUrlClass": {"type": "string"},
+        "scenarioApiKeyConfigured": {"type": "boolean"},
+        "scenarioBaseUrlClass": {"type": "string"},
         "scenarioModel": {"type": "string"},
         "scenarioProposalLimit": {"type": "integer", "minimum": 0},
-        "scenarioProposerEnabled": {"type": "boolean"}
+        "scenarioProposerEnabled": {"type": "boolean"},
+        "scenarioProvider": {"type": "string"}
       }
     },
     "findings": {"type": "array", "items": {"$ref": "finding.schema.json"}},
