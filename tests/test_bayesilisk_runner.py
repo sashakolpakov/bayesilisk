@@ -10,6 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC = REPO_ROOT / "docs" / "bayesilisk.md"
 DESIGN = REPO_ROOT / "DESIGN.md"
+README = REPO_ROOT / "README.md"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -754,3 +755,19 @@ def test_design_document_pins_trust_boundaries() -> None:
         "Model output is untrusted candidate input.",
     ):
         assert fragment in design
+
+
+def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
+    readme = README.read_text(encoding="utf-8")
+
+    for fragment in (
+        "actions/workflows/ci.yml/badge.svg",
+        "Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle.",
+        'python3 -m pytest -m "not live_playwright and not live_ollama"',
+        "sphinx-build -b html docs docs/_build/html",
+        "Live browser/model checks are local opt-in tests",
+        "BAYESILISK_LIVE_OLLAMA=1",
+        "without Ollama",
+        "without granting a model authority",
+    ):
+        assert fragment in readme

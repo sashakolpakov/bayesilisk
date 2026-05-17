@@ -84,6 +84,23 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 python3 -m pytest
 ```
 
+GitHub CI deliberately runs the deterministic suite and docs build without
+Ollama, hosted model APIs, Playwright browsers, or local-only services:
+
+```sh
+python3 -m pytest -m "not live_playwright and not live_ollama"
+sphinx-build -b html docs docs/_build/html
+```
+
+Live checks are opt-in local verification commands. They are useful before
+promotion or release work, but they are not required for the deterministic
+verifier to prove report compatibility:
+
+```sh
+python3 -m pytest tests/test_live_integrations.py -m live_playwright -rs
+BAYESILISK_LIVE_OLLAMA=1 python3 -m pytest tests/test_live_integrations.py -m live_ollama -rs
+```
+
 ## Build Documentation
 
 ```sh

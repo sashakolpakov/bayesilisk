@@ -1,8 +1,12 @@
 # Bayesilisk
 
+[![CI](https://github.com/sashakolpakov/bayesilisk/actions/workflows/ci.yml/badge.svg)](https://github.com/sashakolpakov/bayesilisk/actions/workflows/ci.yml)
+
 <p align="center">
   <img src="logo/bayesilisk_logo.png" alt="Bayesilisk logo" width="220">
 </p>
+
+**Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle.**
 
 Bayesilisk is a deterministic local layer for permission, entitlement, route,
 and data-boundary sitting over Playwright, with Grassmann attention, and
@@ -11,7 +15,8 @@ LLM-generated scenario-proposal workflows gated by a finite-state verifier.
 Bayesilisk is intentionally local-first. It uses static scenario fragments,
 caller-provided context, optional observation history, optional browser evidence,
 and optional local model proposals. It does not connect to production systems or
-inspect live customer data.
+inspect live customer data. It is built for testers and agents that need
+reproducible findings without granting a model authority over the final verdict.
 
 ## What It Is
 
@@ -68,6 +73,21 @@ Run the test suite:
 
 ```sh
 python3 -m pytest
+```
+
+GitHub CI runs deterministic tests and the Sphinx docs build without Ollama,
+hosted models, browser services, or hidden local state:
+
+```sh
+python3 -m pytest -m "not live_playwright and not live_ollama"
+sphinx-build -b html docs docs/_build/html
+```
+
+Live browser/model checks are local opt-in tests:
+
+```sh
+python3 -m pytest tests/test_live_integrations.py -m live_playwright -rs
+BAYESILISK_LIVE_OLLAMA=1 python3 -m pytest tests/test_live_integrations.py -m live_ollama -rs
 ```
 
 ## Reports
