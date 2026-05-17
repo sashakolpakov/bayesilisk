@@ -1312,13 +1312,17 @@ def validate_model_scenario_proposals(
 ) -> tuple[list[Scenario], list[dict[str, Any]]]:
     fragment_ids = {fragment.id for fragment in FRAGMENTS}
     invariant_ids = {invariant.id for invariant in INVARIANTS}
-    selected_planes = set(attention.get("selectedPlaneIds", []))
+    attention = _dict_or_empty(attention)
+    selected_planes = _invariant_id_set(attention, "selectedPlaneIds")
     scenarios: list[Scenario] = []
     rejected: list[dict[str, Any]] = []
     seen: set[tuple[tuple[str, ...], tuple[str, ...]]] = set()
     provider = provider or {}
     for proposal in proposals:
         proposal_hash = _safe_hash(proposal)
+        if not isinstance(proposal, dict):
+            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-proposal-object", "proposal": proposal})
+            continue
         title = proposal.get("title")
         target_plane = proposal.get("targetPlane")
         fragments = proposal.get("fragments")
@@ -1632,6 +1636,10 @@ def _string_list(value: Any) -> list[str]:
     return sorted({item for item in value if isinstance(item, str)})
 
 
+def _dict_or_empty(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _count_context_collection(context: dict[str, Any], key: str) -> int:
     value = context.get(key)
     if isinstance(value, list | tuple):
@@ -1655,7 +1663,7 @@ def _context_prior_adjustments(text: str) -> tuple[dict[str, float], dict[str, i
 
 
 def context_summary(context: dict[str, Any] | None) -> dict[str, Any]:
-    context = context or {}
+    context = _dict_or_empty(context)
     text_values = list(_context_strings(context))
     text = "\n".join(text_values)
     fingerprints = sorted(set(FINGERPRINT_PATTERN.findall(text)))
@@ -1677,7 +1685,7 @@ def context_summary(context: dict[str, Any] | None) -> dict[str, Any]:
 
 def context_observations(context: dict[str, Any] | None) -> dict[str, Any]:
     summary = context_summary(context)
-    context = context or {}
+    context = _dict_or_empty(context)
     muted = set(summary["fingerprints"])
     muted.update(_string_list(context.get("mutedFingerprints")))
     fixed = set(_string_list(context.get("fixedFingerprints")))
@@ -1716,6 +1724,7 @@ def _int_or_none(value: Any) -> int | None:
 
 def _context_plane_facts(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     facts: list[dict[str, Any]] = []
+    context = _dict_or_empty(context)
     if not context:
         return facts
     for item in _context_items(context):
@@ -2003,8 +2012,8 @@ def grassmann_attention(
 
 
 def merge_observations(base: dict[str, Any] | None, incoming: dict[str, Any] | None) -> dict[str, Any]:
-    base = base or {}
-    incoming = incoming or {}
+    base = _dict_or_empty(base)
+    incoming = _dict_or_empty(incoming)
     merged = dict(base)
     merged["source"] = incoming.get("source") or base.get("source", "none")
     for key in ("fixedFingerprints", "confirmedFingerprints", "mutedFingerprints"):
@@ -2122,8 +2131,8 @@ def build_report(
     grassmann: dict[str, Any] | None = None,
     model_scenarios: list[Scenario] | None = None,
 ) -> dict[str, Any]:
-    observations = observations or {}
-    grassmann = grassmann or {}
+    observations = _dict_or_empty(observations)
+    grassmann = _dict_or_empty(grassmann)
     attention_by_invariant = {
         plane["invariantId"]: plane
         for plane in grassmann.get("planes", [])
@@ -2298,6 +2307,8 @@ def build_contextual_report(
     observations: dict[str, Any] | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    context = _dict_or_empty(context)
+    observations = _dict_or_empty(observations)
     summary = context_summary(context)
     merged_observations = merge_observations(observations, context_observations(context))
     attention = grassmann_attention(context, observations)
@@ -2324,7 +2335,7 @@ def build_contextual_report(
             "source": fact.get("source"),
             "title": fact.get("title"),
         }
-        for fact in (context or {}).get("repositoryFacts", [])
+        for fact in context.get("repositoryFacts", [])
         if isinstance(fact, dict) and fact.get("source") == "microsoft-playwright"
     ]
     report["selectedByGrassmannAttention"] = [
