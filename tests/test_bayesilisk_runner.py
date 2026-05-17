@@ -5,7 +5,10 @@ import io
 import json
 import subprocess
 import sys
+import urllib.error
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOC = REPO_ROOT / "docs" / "bayesilisk.md"
@@ -631,6 +634,140 @@ def test_weak_model_proposals_are_schema_validated_before_becoming_scenarios() -
     assert hr_payload["minimizedReproducer"]["preservedInvariantFailure"] is True
 
 
+def test_scenario_proposer_config_precedence_and_report_redaction(monkeypatch: pytest.MonkeyPatch) -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    monkeypatch.setenv("BAYESILISK_SCENARIO_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("BAYESILISK_SCENARIO_API_KEY_ENV", "BAYESILISK_UNIT_SCENARIO_KEY")
+    monkeypatch.setenv("BAYESILISK_UNIT_SCENARIO_KEY", "sk-unit-secret")
+    monkeypatch.setenv("BAYESILISK_SCENARIO_BASE_URL", "https://llm.example.test/v1")
+
+    config = bayesilisk.effective_runtime_config({})
+    report_config = bayesilisk.report_runtime_config(config)
+
+    assert config["scenarioProvider"] == "openai-compatible"
+    assert config["scenarioApiKey"] == "sk-unit-secret"
+    assert report_config["scenarioProvider"] == "openai-compatible"
+    assert report_config["scenarioApiKeyConfigured"] is True
+    assert report_config["scenarioBaseUrlClass"] == "remote-host"
+    assert "sk-unit-secret" not in json.dumps(report_config)
+
+    override = bayesilisk.effective_runtime_config({"scenarioProvider": "ollama", "scenarioApiKey": "override-secret"})
+    override_report = bayesilisk.report_runtime_config(override)
+    assert override["scenarioProvider"] == "ollama"
+    assert override["scenarioApiKey"] == "override-secret"
+    assert override_report["scenarioProvider"] == "ollama"
+    assert "override-secret" not in json.dumps(override_report)
+
+
+def test_openai_compatible_provider_requires_api_key() -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    attention = {
+        "source": "unit-test",
+        "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
+        "planes": [],
+    }
+
+    scenarios, generation = bayesilisk.weak_model_scenarios(
+        attention,
+        runtime_config={
+            "enableScenarioProposer": True,
+            "scenarioProvider": "openai-compatible",
+            "scenarioBaseUrl": "https://llm.example.test/v1",
+            "scenarioApiKey": "",
+        },
+    )
+
+    assert scenarios == []
+    assert generation["provider"] == "openai-compatible"
+    assert generation["error"] == "missing-api-key"
+    assert generation["acceptedCount"] == 0
+
+
+def test_provider_auth_failures_and_unavailable_ollama_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    attention = {
+        "source": "unit-test",
+        "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
+        "planes": [],
+    }
+
+    def auth_failure(*args: object, **kwargs: object) -> dict[str, object]:
+        raise urllib.error.HTTPError("https://llm.example.test/v1", 401, "Unauthorized Bearer sk-secret", {}, None)
+
+    monkeypatch.setattr(bayesilisk, "_openai_compatible_chat_json", auth_failure)
+    _, auth_generation = bayesilisk.weak_model_scenarios(
+        attention,
+        runtime_config={
+            "enableScenarioProposer": True,
+            "scenarioProvider": "openai-compatible",
+            "scenarioBaseUrl": "https://llm.example.test/v1",
+            "scenarioApiKey": "sk-secret",
+        },
+    )
+    assert auth_generation["error"] == "provider-authentication-failed"
+    assert "sk-secret" not in json.dumps(auth_generation)
+
+    def unavailable(*args: object, **kwargs: object) -> dict[str, object]:
+        raise OSError("connection refused Bearer sk-ollama-leak")
+
+    monkeypatch.setattr(bayesilisk, "_ollama_chat_json", unavailable)
+    _, ollama_generation = bayesilisk.weak_model_scenarios(
+        attention,
+        runtime_config={"enableScenarioProposer": True, "scenarioProvider": "ollama"},
+    )
+    assert ollama_generation["provider"] == "ollama"
+    assert "connection refused" in ollama_generation["error"]
+    assert "sk-ollama-leak" not in json.dumps(ollama_generation)
+
+
+def test_provider_output_remains_untrusted_and_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
+    bayesilisk = importlib.import_module("bayesilisk.bayesilisk")
+    attention = {
+        "source": "unit-test",
+        "selectedPlaneIds": ["hr.documents_customer_role_boundary"],
+        "planes": [],
+    }
+
+    def fake_chat(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "scenarios": [
+                {
+                    "title": "Provider proposes support HR probe",
+                    "targetPlane": "hr.documents_customer_role_boundary",
+                    "fragments": ["role.support_takeover_active", "hr.payroll_file_route"],
+                    "invariants": ["support.takeover_session_required", "hr.documents_customer_role_boundary"],
+                },
+                {
+                    "title": "Provider leaks in rejected proposal",
+                    "targetPlane": "hr.documents_customer_role_boundary",
+                    "fragments": ["role.support_takeover_active", "route.invented"],
+                    "invariants": ["hr.documents_customer_role_boundary"],
+                    "apiKey": "sk-provider-secret",
+                    "headers": {"Authorization": "Bearer sk-provider-secret"},
+                },
+            ]
+        }
+
+    monkeypatch.setattr(bayesilisk, "_openai_compatible_chat_json", fake_chat)
+    scenarios, generation = bayesilisk.weak_model_scenarios(
+        attention,
+        runtime_config={
+            "enableScenarioProposer": True,
+            "scenarioProvider": "openai-compatible",
+            "scenarioBaseUrl": "https://llm.example.test/v1",
+            "scenarioApiKey": "sk-config-secret",
+        },
+    )
+
+    assert len(scenarios) == 1
+    assert generation["acceptedCount"] == 1
+    assert generation["rejected"][0]["reason"] == "unknown-fragment-id"
+    serialized = json.dumps(generation)
+    assert "sk-provider-secret" not in serialized
+    assert "sk-config-secret" not in serialized
+    assert "[REDACTED]" in serialized
+
+
 def test_bayesilisk_cli_context_can_emit_issue_payloads(tmp_path: Path) -> None:
     context_path = tmp_path / "context.json"
     context_path.write_text(
@@ -677,8 +814,12 @@ def test_bayesilisk_cli_reports_effective_runtime_configuration() -> None:
             "--embedding-model",
             "unit-embed",
             "--enable-scenario-proposer",
+            "--scenario-provider",
+            "ollama",
             "--scenario-model",
             "unit-scenario",
+            "--scenario-base-url",
+            "https://llm.example.test/v1",
             "--scenario-proposal-limit",
             "5",
             "--attention-threshold",
@@ -696,9 +837,12 @@ def test_bayesilisk_cli_reports_effective_runtime_configuration() -> None:
     assert config["embeddingModel"] == "unit-embed"
     assert config["embeddingsEnabled"] is True
     assert config["ollamaBaseUrlClass"] == "loopback"
+    assert config["scenarioApiKeyConfigured"] is False
+    assert config["scenarioBaseUrlClass"] == "remote-host"
     assert config["scenarioModel"] == "unit-scenario"
     assert config["scenarioProposalLimit"] == 5
     assert config["scenarioProposerEnabled"] is True
+    assert config["scenarioProvider"] == "ollama"
 
 
 def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
@@ -724,6 +868,7 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
                     "enableEmbeddings": False,
                     "enableScenarioProposer": False,
                     "embeddingModel": "mcp-embed",
+                    "scenarioProvider": "ollama",
                     "scenarioModel": "mcp-scenario",
                 },
             },
@@ -744,6 +889,7 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     assert payload["effectiveConfiguration"]["attentionSelectionLimit"] == 1
     assert payload["effectiveConfiguration"]["embeddingModel"] == "mcp-embed"
     assert payload["effectiveConfiguration"]["scenarioModel"] == "mcp-scenario"
+    assert payload["effectiveConfiguration"]["scenarioProvider"] == "ollama"
 
     raw = io.BytesIO()
     server.write_message(raw, {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}})
@@ -817,6 +963,7 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "without granting a model authority",
         "--enable-embeddings",
         "--enable-scenario-proposer",
+        "--scenario-provider",
         "--scenario-proposal-limit",
         "effectiveConfiguration",
         "ollamaBaseUrl",

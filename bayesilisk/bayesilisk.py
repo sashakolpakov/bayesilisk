@@ -7,6 +7,7 @@ import os
 import random
 import re
 import urllib.parse
+import urllib.error
 import urllib.request
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -46,6 +47,7 @@ BOOLEAN_AND_FACT_KEYS = {
 }
 NUMERIC_SUM_FACT_KEYS = {"requiredReceiptCount"}
 FINGERPRINT_PATTERN = re.compile(r"bayesilisk:[0-9a-f]{16}")
+SENSITIVE_FIELD_PATTERN = re.compile(r"(api[_-]?key|authorization|bearer|secret|token|password)", re.IGNORECASE)
 
 CONTEXT_INVARIANT_KEYWORDS: dict[str, tuple[str, ...]] = {
     "roles.route_matrix_allowed": (
@@ -1190,8 +1192,35 @@ def _safe_url_class(base_url: str) -> str:
     return "remote-host"
 
 
+def _safe_hostname_class(base_url: str) -> str:
+    return _safe_url_class(base_url)
+
+
 def _safe_hash(payload: Any) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def _redact_secrets(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        redacted: dict[str, Any] = {}
+        for key, value in payload.items():
+            key_text = str(key)
+            if SENSITIVE_FIELD_PATTERN.search(key_text):
+                redacted[key_text] = "[REDACTED]"
+            else:
+                redacted[key_text] = _redact_secrets(value)
+        return redacted
+    if isinstance(payload, list):
+        return [_redact_secrets(item) for item in payload]
+    if isinstance(payload, str):
+        return re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+", r"\1[REDACTED]", payload)
+    return payload
+
+
+def _safe_error(exc: Exception) -> str:
+    if isinstance(exc, urllib.error.HTTPError) and exc.code in {401, 403}:
+        return "provider-authentication-failed"
+    return str(_redact_secrets(str(exc)))
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -1232,6 +1261,27 @@ def _config_str(overrides: dict[str, Any], key: str, default: str) -> str:
 def effective_runtime_config(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
     overrides = _dict_or_empty(overrides)
     env_ollama_base_url = os.environ.get("BAYESILISK_OLLAMA_BASE_URL", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"))
+    scenario_provider = _config_str(overrides, "scenarioProvider", os.environ.get("BAYESILISK_SCENARIO_PROVIDER", "ollama")).strip().lower()
+    default_scenario_base_url = "https://api.openai.com/v1" if scenario_provider in {"openai", "openai-compatible"} else env_ollama_base_url
+    scenario_base_url = _config_str(
+        overrides,
+        "scenarioBaseUrl",
+        os.environ.get("BAYESILISK_SCENARIO_BASE_URL", default_scenario_base_url),
+    )
+    scenario_api_key_env = _config_str(
+        overrides,
+        "scenarioApiKeyEnv",
+        os.environ.get("BAYESILISK_SCENARIO_API_KEY_ENV", ""),
+    )
+    scenario_api_key = overrides.get("scenarioApiKey")
+    if scenario_api_key is None and scenario_api_key_env:
+        scenario_api_key = os.environ.get(scenario_api_key_env)
+    if scenario_api_key is None:
+        scenario_api_key = os.environ.get("BAYESILISK_SCENARIO_API_KEY")
+    if scenario_api_key is None and scenario_provider in {"openai", "openai-compatible"}:
+        scenario_api_key = os.environ.get("OPENAI_API_KEY")
+    if scenario_api_key is None and scenario_provider == "anthropic":
+        scenario_api_key = os.environ.get("ANTHROPIC_API_KEY")
     return {
         "attentionSelectionLimit": max(1, _config_int(overrides, "attentionSelectionLimit", 4)),
         "attentionThreshold": max(0.0, min(1.0, _config_float(overrides, "attentionThreshold", 0.35))),
@@ -1248,12 +1298,16 @@ def effective_runtime_config(overrides: dict[str, Any] | None = None) -> dict[st
         "embeddingModel": _config_str(overrides, "embeddingModel", os.environ.get("BAYESILISK_OLLAMA_MODEL", "nomic-embed-text")),
         "embeddingTimeout": _config_float(overrides, "embeddingTimeout", float(os.environ.get("BAYESILISK_OLLAMA_TIMEOUT", "30"))),
         "ollamaBaseUrl": _config_str(overrides, "ollamaBaseUrl", env_ollama_base_url),
+        "scenarioApiKey": "" if scenario_api_key is None else str(scenario_api_key),
+        "scenarioApiKeyEnv": scenario_api_key_env,
+        "scenarioBaseUrl": scenario_base_url,
         "scenarioModel": _config_str(
             overrides,
             "scenarioModel",
             os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", os.environ.get("OLLAMA_MODEL", "gemma4:e2b")),
         ),
         "scenarioProposalLimit": max(0, _config_int(overrides, "scenarioProposalLimit", int(os.environ.get("BAYESILISK_MODEL_SCENARIO_LIMIT", "3")))),
+        "scenarioProvider": scenario_provider,
         "scenarioTimeout": _config_float(
             overrides,
             "scenarioTimeout",
@@ -1270,9 +1324,12 @@ def report_runtime_config(config: dict[str, Any] | None = None) -> dict[str, Any
         "embeddingModel": effective["embeddingModel"],
         "embeddingsEnabled": effective["enableEmbeddings"],
         "ollamaBaseUrlClass": _safe_url_class(effective["ollamaBaseUrl"]),
+        "scenarioApiKeyConfigured": bool(effective.get("scenarioApiKey")),
+        "scenarioBaseUrlClass": _safe_hostname_class(effective["scenarioBaseUrl"]),
         "scenarioModel": effective["scenarioModel"],
         "scenarioProposalLimit": effective["scenarioProposalLimit"],
         "scenarioProposerEnabled": effective["enableScenarioProposer"],
+        "scenarioProvider": effective["scenarioProvider"],
     }
 
 
@@ -1306,6 +1363,77 @@ def _ollama_chat_json(
     if not isinstance(content, str):
         return {}
     return _extract_json_object(content)
+
+
+def _openai_compatible_chat_json(
+    messages: list[dict[str, str]],
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
+    timeout: float,
+) -> dict[str, Any]:
+    payload = json.dumps({"model": model, "messages": messages, "temperature": 0.2}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}/chat/completions",
+        data=payload,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    if not isinstance(content, str):
+        return {}
+    return _extract_json_object(content)
+
+
+class ScenarioProposalProvider:
+    name = "unknown"
+    source = "unknown"
+    requires_api_key = False
+
+    def generate(self, prompt: list[dict[str, str]], config: dict[str, Any], api_key: str | None = None) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class OllamaScenarioProposalProvider(ScenarioProposalProvider):
+    name = "ollama"
+    source = "ollama-chat"
+
+    def generate(self, prompt: list[dict[str, str]], config: dict[str, Any], api_key: str | None = None) -> dict[str, Any]:
+        return _ollama_chat_json(
+            prompt,
+            base_url=config["ollamaBaseUrl"],
+            model=config["scenarioModel"],
+            timeout=config["scenarioTimeout"],
+        )
+
+
+class OpenAICompatibleScenarioProposalProvider(ScenarioProposalProvider):
+    name = "openai-compatible"
+    source = "openai-compatible-chat-completions"
+    requires_api_key = True
+
+    def generate(self, prompt: list[dict[str, str]], config: dict[str, Any], api_key: str | None = None) -> dict[str, Any]:
+        return _openai_compatible_chat_json(
+            prompt,
+            api_key=api_key or "",
+            base_url=config["scenarioBaseUrl"],
+            model=config["scenarioModel"],
+            timeout=config["scenarioTimeout"],
+        )
+
+
+SCENARIO_PROPOSAL_PROVIDERS: dict[str, ScenarioProposalProvider] = {
+    "ollama": OllamaScenarioProposalProvider(),
+    "openai": OpenAICompatibleScenarioProposalProvider(),
+    "openai-compatible": OpenAICompatibleScenarioProposalProvider(),
+}
+
+
+def scenario_proposal_provider(name: str) -> ScenarioProposalProvider | None:
+    return SCENARIO_PROPOSAL_PROVIDERS.get(name.strip().lower())
 
 
 def _model_prompt(attention: dict[str, Any]) -> list[dict[str, str]]:
@@ -1355,38 +1483,42 @@ def weak_model_raw_scenario_proposals(
     }
     if not provider["enabled"]:
         return [], provider
-    model = config["scenarioModel"]
-    base_url = config["ollamaBaseUrl"]
-    timeout = config["scenarioTimeout"]
+    provider_impl = scenario_proposal_provider(config["scenarioProvider"])
     prompt = _model_prompt(attention)
     provider.update(
         {
-            "baseUrlClass": _safe_url_class(base_url),
-            "model": model,
-            "modelName": model,
+            "baseUrlClass": _safe_url_class(config["ollamaBaseUrl"]),
+            "hostnameClass": _safe_hostname_class(config["scenarioBaseUrl"]),
+            "model": config["scenarioModel"],
+            "modelName": config["scenarioModel"],
             "promptHash": _safe_hash(prompt),
             "promptVersion": SCENARIO_PROPOSER_PROMPT_VERSION,
-            "provider": "ollama",
-            "source": "ollama-chat",
+            "provider": config["scenarioProvider"],
+            "source": "unknown",
             "sourceContext": attention.get("source", "none"),
         }
     )
+    if provider_impl is None:
+        provider["error"] = "unsupported-scenario-provider"
+        return [], provider
+    provider["provider"] = provider_impl.name
+    provider["source"] = provider_impl.source
+    api_key = config.get("scenarioApiKey") or ""
+    provider["apiKeyConfigured"] = bool(api_key)
+    if provider_impl.requires_api_key and not api_key:
+        provider["error"] = "missing-api-key"
+        return [], provider
     try:
-        payload = _ollama_chat_json(
-            prompt,
-            base_url=base_url,
-            model=model,
-            timeout=timeout,
-        )
+        payload = provider_impl.generate(prompt, config, api_key=api_key)
     except Exception as exc:
-        provider["error"] = str(exc)
+        provider["error"] = _safe_error(exc)
         return [], provider
     scenarios = payload.get("scenarios", [])
     if not isinstance(scenarios, list):
         provider["error"] = "model response did not include a scenarios array"
         return [], provider
     provider["rawCount"] = len(scenarios)
-    return [scenario for scenario in scenarios if isinstance(scenario, dict)], provider
+    return [_redact_secrets(scenario) for scenario in scenarios if isinstance(scenario, dict)], provider
 
 
 def validate_model_scenario_proposals(
@@ -1406,42 +1538,43 @@ def validate_model_scenario_proposals(
     provider = provider or {}
     for proposal in proposals:
         proposal_hash = _safe_hash(proposal)
+        safe_proposal = _redact_secrets(proposal)
         if not isinstance(proposal, dict):
-            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-proposal-object", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-proposal-object", "proposal": safe_proposal})
             continue
         title = proposal.get("title")
         target_plane = proposal.get("targetPlane")
         fragments = proposal.get("fragments")
         invariants = proposal.get("invariants")
         if not isinstance(title, str) or not title.strip():
-            rejected.append({"proposalHash": proposal_hash, "reason": "missing-title", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "missing-title", "proposal": safe_proposal})
             continue
         if not isinstance(target_plane, str) or target_plane not in invariant_ids:
-            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-target-plane", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-target-plane", "proposal": safe_proposal})
             continue
         if selected_planes and target_plane not in selected_planes:
-            rejected.append({"proposalHash": proposal_hash, "reason": "target-plane-not-selected", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "target-plane-not-selected", "proposal": safe_proposal})
             continue
         if not isinstance(fragments, list) or not 2 <= len(fragments) <= 12:
-            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-fragment-count", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-fragment-count", "proposal": safe_proposal})
             continue
         if not isinstance(invariants, list) or not 1 <= len(invariants) <= 6:
-            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-invariant-count", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "invalid-invariant-count", "proposal": safe_proposal})
             continue
         fragment_tuple = tuple(item for item in fragments if isinstance(item, str))
         invariant_tuple = tuple(item for item in invariants if isinstance(item, str))
         if len(fragment_tuple) != len(fragments) or any(item not in fragment_ids for item in fragment_tuple):
-            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-fragment-id", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-fragment-id", "proposal": safe_proposal})
             continue
         if len(invariant_tuple) != len(invariants) or any(item not in invariant_ids for item in invariant_tuple):
-            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-invariant-id", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "unknown-invariant-id", "proposal": safe_proposal})
             continue
         if target_plane not in invariant_tuple:
-            rejected.append({"proposalHash": proposal_hash, "reason": "target-plane-not-in-invariants", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "target-plane-not-in-invariants", "proposal": safe_proposal})
             continue
         key = (fragment_tuple, invariant_tuple)
         if key in seen:
-            rejected.append({"proposalHash": proposal_hash, "reason": "duplicate-proposal", "proposal": proposal})
+            rejected.append({"proposalHash": proposal_hash, "reason": "duplicate-proposal", "proposal": safe_proposal})
             continue
         seen.add(key)
         digest = proposal_hash[:8]
@@ -2839,7 +2972,10 @@ def parse_args() -> argparse.Namespace:
         help="Disable scenario proposer generation even if enabled by environment.",
     )
     parser.add_argument("--embedding-model", default=None, help="Ollama embedding model name.")
-    parser.add_argument("--scenario-model", default=None, help="Ollama scenario proposer model name.")
+    parser.add_argument("--scenario-provider", default=None, help="Scenario proposer provider name, e.g. ollama or openai-compatible.")
+    parser.add_argument("--scenario-model", default=None, help="Scenario proposer model name.")
+    parser.add_argument("--scenario-base-url", default=None, help="Scenario proposer HTTP base URL for non-Ollama providers.")
+    parser.add_argument("--scenario-api-key-env", default=None, help="Environment variable name containing the scenario proposer API key.")
     parser.add_argument("--ollama-base-url", default=None, help="Ollama base URL for embeddings and scenario proposals.")
     parser.add_argument("--attention-threshold", type=float, default=None, help="Minimum attention score for selected planes.")
     parser.add_argument("--attention-selection-limit", type=int, default=None, help="Maximum selected attention planes.")
@@ -2861,8 +2997,11 @@ def runtime_config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         "enable_embeddings": "enableEmbeddings",
         "enable_scenario_proposer": "enableScenarioProposer",
         "ollama_base_url": "ollamaBaseUrl",
+        "scenario_api_key_env": "scenarioApiKeyEnv",
+        "scenario_base_url": "scenarioBaseUrl",
         "scenario_model": "scenarioModel",
         "scenario_proposal_limit": "scenarioProposalLimit",
+        "scenario_provider": "scenarioProvider",
     }
     for cli_name, config_name in cli_to_config.items():
         value = getattr(args, cli_name)

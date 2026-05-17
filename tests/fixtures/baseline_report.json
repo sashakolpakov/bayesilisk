@@ -15,9 +15,12 @@
     "embeddingModel": "nomic-embed-text",
     "embeddingsEnabled": false,
     "ollamaBaseUrlClass": "loopback",
+    "scenarioApiKeyConfigured": false,
+    "scenarioBaseUrlClass": "loopback",
     "scenarioModel": "gemma4:e2b",
     "scenarioProposalLimit": 3,
-    "scenarioProposerEnabled": false
+    "scenarioProposerEnabled": false,
+    "scenarioProvider": "ollama"
   },
   "findings": [
     {
