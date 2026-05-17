@@ -66,6 +66,24 @@ python3 -m bayesilisk --seed 150 --context /tmp/context.json --format json
 
 The provider abstraction and API-key handling are tracked as a follow-up issue. The design requires that provider output stay untrusted and schema-validated.
 
+Environment variables are not required for reproducible runs. The CLI also
+accepts explicit controls:
+
+```sh
+python3 -m bayesilisk --seed 150 --context /tmp/context.json \
+  --enable-embeddings \
+  --embedding-model nomic-embed-text \
+  --enable-scenario-proposer \
+  --scenario-model gemma4:e2b \
+  --scenario-proposal-limit 3 \
+  --attention-threshold 0.4 \
+  --attention-selection-limit 3 \
+  --ollama-base-url http://localhost:11434
+```
+
+Reports include `effectiveConfiguration`, so a tester can see which attention,
+embedding, model, proposal-limit, and base-URL-class settings were actually used.
+
 Live verification is opt-in:
 
 ```sh
@@ -89,6 +107,11 @@ Tools:
 - `bayesilisk.run`: run a contextual report;
 - `bayesilisk.rank_context`: return ranked failed probes from supplied context;
 - `bayesilisk.issue_payloads`: return deduped issue payloads for ready failed findings.
+
+The MCP tools accept the same control names as JSON arguments:
+`enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
+`scenarioModel`, `scenarioProposalLimit`, `attentionThreshold`,
+`attentionSelectionLimit`, and `ollamaBaseUrl`.
 
 The MCP server runs locally and does not mutate issue trackers or production systems.
 

@@ -7,6 +7,7 @@ Bayesilisk emits JSON and Markdown. JSON is the stable integration format. Markd
 A full report includes:
 
 - seed and tool version;
+- effective configuration for attention, embeddings, model proposals, and safe base URL class;
 - production-access boundary;
 - scenario id and title;
 - fragments and generated sub-scenarios;

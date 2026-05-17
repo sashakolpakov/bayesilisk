@@ -78,6 +78,23 @@ BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
 ```
 
+The same controls are available as explicit CLI flags:
+
+```sh
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json \
+  --enable-embeddings \
+  --embedding-model nomic-embed-text \
+  --enable-scenario-proposer \
+  --scenario-model gemma4:e2b \
+  --scenario-proposal-limit 3 \
+  --attention-threshold 0.4 \
+  --attention-selection-limit 3 \
+  --ollama-base-url http://localhost:11434
+```
+
+Reports include `effectiveConfiguration`, so a tester can see which attention,
+embedding, model, proposal-limit, and base-URL-class settings were actually used.
+
 ## Test
 
 ```sh

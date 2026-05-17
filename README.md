@@ -151,6 +151,16 @@ By default this uses a dependency-free anchor-plane proxy. Set
 `BAYESILISK_USE_OLLAMA_EMBEDDINGS=1` to add Ollama `/api/embed` similarities with
 `BAYESILISK_OLLAMA_MODEL`, defaulting to `nomic-embed-text`.
 
+The same behavior can be controlled explicitly from the CLI:
+
+```sh
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json \
+  --enable-embeddings \
+  --embedding-model nomic-embed-text \
+  --attention-threshold 0.4 \
+  --attention-selection-limit 3
+```
+
 Attention scores answer:
 
 ```text
@@ -178,11 +188,24 @@ BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
 ```
 
+Equivalent CLI controls avoid hidden environment-only behavior:
+
+```sh
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json \
+  --enable-scenario-proposer \
+  --scenario-model gemma4:e2b \
+  --scenario-proposal-limit 3 \
+  --ollama-base-url http://localhost:11434
+```
+
 Model output is untrusted. Bayesilisk accepts a proposal only if it uses known
 fragment ids and invariant ids, targets a selected attention plane, and passes
 schema validation. Accepted proposals appear as `generated.model.*` scenarios
 with `weak-model-proposal:*` provenance for compatibility with the earlier
 report field name.
+
+Every JSON report includes `effectiveConfiguration`, recording the effective
+attention/model settings with the Ollama base URL reduced to a safe URL class.
 
 ## MCP Server
 
@@ -197,6 +220,11 @@ It exposes:
 - `bayesilisk.run`;
 - `bayesilisk.rank_context`;
 - `bayesilisk.issue_payloads`.
+
+The MCP tools accept the same control names as JSON arguments, including
+`enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
+`scenarioModel`, `scenarioProposalLimit`, `attentionThreshold`,
+`attentionSelectionLimit`, and `ollamaBaseUrl`.
 
 Agents should pass current issue lists, open PRs, branch facts, local verifier
 notes, Playwright observations, and known Bayesilisk fingerprints as context.
