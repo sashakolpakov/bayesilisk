@@ -159,11 +159,41 @@ python3 -m pip install -e '.[playwright]'
 python3 -m playwright install chromium
 ```
 
-Run the bundled demo probe:
+Run the bundled demo from a repo checkout:
+
+```sh
+cd /path/to/bayesilisk
+python3 -m pip install -e '.[playwright]'
+python3 -m playwright install chromium
+
+# Terminal transcript only; no browser window.
+python3 -m bayesilisk.demo --no-playwright
+
+# Full screen-recordable run with headed Chromium.
+python3 -m bayesilisk.demo --recording
+```
+
+After editable install, the console script is also available from the active
+environment:
 
 ```sh
 bayesilisk-demo
 bayesilisk-demo --recording
+bayesilisk-demo --no-playwright
+```
+
+The demo accepts a deterministic seed. Changing it changes the sweep order while
+keeping that run reproducible:
+
+```sh
+python3 -m bayesilisk.demo --seed 150 --recording
+python3 -m bayesilisk.demo --seed 151 --no-playwright
+```
+
+To run only the lower-level Playwright adapter against the bundled static probe
+target and then feed the captured context to Bayesilisk:
+
+```sh
 python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
 python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
