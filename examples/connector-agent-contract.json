@@ -1,0 +1,101 @@
+{
+  "name": "bayesilisk-connector-agent-contract",
+  "version": 1,
+  "purpose": "Guide a coding agent or LLM team to build app-specific connectors while keeping Bayesilisk core app-agnostic.",
+  "nonNegotiableBoundaries": [
+    "Do not modify Bayesilisk core for one app connector.",
+    "Do not let an LLM write observedStatus.",
+    "Do not let an LLM write passed.",
+    "Do not let prose-only context generate probes; proposalRules or proposalGates are required.",
+    "Do not connect to production systems or use production data.",
+    "Do not open issues from connector output alone; use Bayesilisk verified issue payloads."
+  ],
+  "sourceContextFactRequiredFields": [
+    "source",
+    "title",
+    "invariantId",
+    "routePattern",
+    "params",
+    "expectedBehavior.status",
+    "proposalRules or matching proposalGates",
+    "availableActions"
+  ],
+  "observedFactRequiredFields": [
+    "source",
+    "title",
+    "actorRole",
+    "invariantId",
+    "route",
+    "expectedStatus",
+    "observedStatus",
+    "passed",
+    "targetUrl",
+    "failureDetail",
+    "artifactPaths",
+    "networkResponses",
+    "selector",
+    "timestamp"
+  ],
+  "allowedAgentSteps": [
+    {
+      "step": "collect_context",
+      "description": "Read local tests, route handlers, schemas, TODOs, and product rules. Produce source facts with explicit proposal rules."
+    },
+    {
+      "step": "ask_bayesilisk_for_proposals",
+      "description": "Call bayesilisk.propose_probes over MCP or `python3 -m bayesilisk --probe-proposals-output`."
+    },
+    {
+      "step": "execute_connector",
+      "description": "Run app-specific Playwright/API code against local fixtures only. Map connectorAction to real app behavior."
+    },
+    {
+      "step": "verify_with_bayesilisk",
+      "description": "Call bayesilisk.run or bayesilisk.issue_payloads with observed evidence."
+    },
+    {
+      "step": "act_on_verified_output",
+      "description": "Create issues or patch code only from Bayesilisk verified findings and issue payloads."
+    }
+  ],
+  "sourceContextFactTemplate": {
+    "source": "repository-scan",
+    "path": "app/routes/resource_action.ts",
+    "title": "Resource action validates target identifier",
+    "invariantId": "myapp.unknown_target_id_rejected",
+    "routePattern": "/resource/{resourceId}/action?targetId={targetId}",
+    "params": [
+      {"name": "resourceId", "kind": "id", "location": "path", "required": true},
+      {"name": "targetId", "kind": "id", "location": "query", "required": true}
+    ],
+    "expectedBehavior": {
+      "description": "Unknown target IDs should return not found.",
+      "status": 404
+    },
+    "proposalRules": {
+      "targetId": [
+        {"id": "unknown-id", "value": "missing-targetId"},
+        {"id": "stale-id", "value": "stale-targetId"}
+      ]
+    },
+    "availableActions": ["open-resource-action"],
+    "nearbyTests": ["direct route returns 404 when the target ID is missing"],
+    "sourceText": "TODO: force 404 when targetId is not found."
+  },
+  "observedFactTemplate": {
+    "source": "connector-observation",
+    "title": "Unknown target identifier must not open protected action",
+    "actorRole": "operator",
+    "invariantId": "myapp.unknown_target_id_rejected",
+    "route": "/resource/{resourceId}/action?targetId={targetId}",
+    "expectedStatus": 404,
+    "observedStatus": 200,
+    "passed": false,
+    "targetUrl": "http://localhost:3000/resource/123/action?targetId=missing",
+    "failureDetail": "Unknown target ID was ignored and the protected action was visible.",
+    "artifactPaths": [],
+    "networkResponses": [{"status": 200, "url": "http://localhost:3000/resource/123/action?targetId=missing"}],
+    "selector": "connector:open-resource-action",
+    "timestamp": "2026-05-18T00:00:00Z"
+  }
+}

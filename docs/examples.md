@@ -4,6 +4,11 @@ Worked examples live in the repository-level
 [examples](https://github.com/sashakolpakov/bayesilisk/tree/main/examples)
 folder.
 
+Coding agents should ingest
+[examples/connector-agent-contract.json](https://github.com/sashakolpakov/bayesilisk/blob/main/examples/connector-agent-contract.json)
+before writing a connector. It lists the required source-context fields,
+observed-evidence fields, allowed agent steps, and non-negotiable boundaries.
+
 ## Cal.com Connector Evidence
 
 The [Cal.com example](https://github.com/sashakolpakov/bayesilisk/tree/main/examples/calcom)

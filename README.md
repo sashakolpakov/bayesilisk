@@ -139,6 +139,11 @@ observed local execution context, and reports. In that run Bayesilisk generated
 6 proposals from explicit connector rules and verified 6 local observations
 where expected `404` was observed as `200`.
 
+For coding agents and LLM teams building connectors, use the ingestible contract
+at [examples/connector-agent-contract.json](examples/connector-agent-contract.json).
+It spells out required source-context fields, observed-evidence fields, allowed
+agent steps, and boundaries that keep app-specific logic out of Bayesilisk core.
+
 ### Why This Is Not a Black Box
 
 Bayesilisk exposes separate ledgers for `observedByPlaywright`,

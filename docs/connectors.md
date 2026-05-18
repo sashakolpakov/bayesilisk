@@ -4,6 +4,10 @@ This page is for test teams writing connectors only. Do not modify Bayesilisk
 core for an app integration. Keep all app knowledge in the target app, a test
 repo, or a small connector package owned by the test team.
 
+For coding agents and LLM teams, the machine-readable summary is
+[examples/connector-agent-contract.json](https://github.com/sashakolpakov/bayesilisk/blob/main/examples/connector-agent-contract.json).
+Use it as the ingestion contract before writing connector code.
+
 The connector contract is now two-stage:
 
 ```text
@@ -248,6 +252,26 @@ LLMs must not:
 - set `passed` without executing the app;
 - decide that a result is a bug after execution;
 - open issues without Bayesilisk output and human/workflow approval.
+
+## Coding Agent Contract
+
+Coding agents should follow this sequence exactly:
+
+```text
+read local app tests/source
+write source context facts with explicit proposalRules/proposalGates
+call bayesilisk.propose_probes or --probe-proposals-output
+run only app-specific connector actions against local fixtures
+write observed evidence facts
+call bayesilisk.run or bayesilisk.issue_payloads
+open issues or patch code only from verified Bayesilisk output
+```
+
+The ingestible contract file is:
+
+```text
+examples/connector-agent-contract.json
+```
 
 ## Human Review Checklist
 
