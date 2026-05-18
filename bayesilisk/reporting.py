@@ -21,7 +21,9 @@ from .facts import (
 )
 from .invariants import INVARIANTS, bayesian_posterior, clamp_probability, finding_classification, issue_readiness, posterior_mode
 from .model_proposals import weak_model_scenarios
+from .probe_proposals import generate_probe_proposals
 from .types import Fragment, Invariant, Scenario
+from .utils import _safe_hash
 
 def report_sections(findings: list[dict[str, Any]]) -> dict[str, list[str]]:
     return {
@@ -289,6 +291,30 @@ def build_contextual_report(
         "provider": model_generation.get("source", "disabled"),
         "rejectedCount": model_generation.get("rejectedCount", 0),
     }
+    generated_probe_proposals = generate_probe_proposals(context)
+    if generated_probe_proposals:
+        report["generatedProbeProposals"] = generated_probe_proposals
+    external_findings = _external_observed_findings(context)
+    if external_findings:
+        report["findings"] = sorted(
+            [*external_findings, *report["findings"]],
+            key=lambda item: (-item["riskScore"], item["posteriorMode"], item["id"]),
+        )
+        if limit is not None:
+            report["findings"] = report["findings"][:limit]
+        report["sections"] = report_sections(report["findings"])
+        report["verifiedByBayesilisk"] = [
+            {
+                "classification": finding["classification"],
+                "fingerprint": finding["fingerprint"],
+                "invariantId": finding["invariantId"],
+                "issueReadiness": finding["issueReadiness"],
+                "observedResult": finding["observedResult"],
+                "riskScore": finding["riskScore"],
+                "scenarioId": finding["scenarioId"],
+            }
+            for finding in report["findings"]
+        ]
     report["rankedProbes"] = ranked_probes(report, limit=limit)
     report["issuePayloads"] = issue_payloads(report, context=context, limit=limit)
     return report
@@ -384,6 +410,139 @@ def issue_payloads(
         if limit is not None and len(payloads) >= limit:
             break
     return payloads
+
+
+def _external_source_context(context: dict[str, Any], invariant_id: str) -> list[str]:
+    signals: list[str] = []
+    for fact in context.get("repositoryFacts", []):
+        if not isinstance(fact, dict):
+            continue
+        if _is_observed_status_fact(fact):
+            continue
+        if fact.get("invariantId") != invariant_id:
+            continue
+        path = fact.get("path")
+        title = fact.get("title")
+        text = fact.get("text")
+        parts = [str(value) for value in (path, title, text) if isinstance(value, str) and value.strip()]
+        if parts:
+            signals.append(" | ".join(parts))
+    return signals
+
+
+def _is_observed_status_fact(fact: dict[str, Any]) -> bool:
+    if fact.get("source") == "repository-scan":
+        return False
+    expected_status = fact.get("expectedStatus")
+    observed_status = fact.get("observedStatus")
+    return isinstance(expected_status, int) and isinstance(observed_status, int)
+
+
+def _external_observed_findings(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    context = _dict_or_empty(context)
+    built_in_invariant_ids = {invariant.id for invariant in INVARIANTS}
+    for index, fact in enumerate(context.get("repositoryFacts", []), start=1):
+        if not isinstance(fact, dict) or not _is_observed_status_fact(fact):
+            continue
+        if fact.get("passed") is True:
+            continue
+        expected_status = fact.get("expectedStatus")
+        observed_status = fact.get("observedStatus")
+        if expected_status == observed_status:
+            continue
+        invariant_id = str(fact.get("invariantId") or "external.connector_probe")
+        if invariant_id in built_in_invariant_ids:
+            continue
+        title = str(fact.get("title") or f"External connector observation {index}")
+        route = str(fact.get("route") or fact.get("targetUrl") or "unknown")
+        fingerprint = f"bayesilisk:{_safe_hash({'invariantId': invariant_id, 'route': route, 'title': title})[:16]}"
+        source_context = _external_source_context(context, invariant_id)
+        observation = (
+            f"expected semantic status {expected_status}, observed {observed_status} on `{route}`"
+        )
+        failure_detail = fact.get("failureDetail")
+        if isinstance(failure_detail, str) and failure_detail.strip():
+            observation = f"{observation}; {failure_detail.strip()}"
+        body = "\n\n".join(
+            [
+                f"Scenario `{invariant_id}`: {title}.",
+                f"Fingerprint: `{fingerprint}`",
+                "Classification: `breakage.context-observed`",
+                "Issue readiness: `ready-for-issue`",
+                f"Expected: semantic status `{expected_status}`",
+                f"Observed: semantic status `{observed_status}`",
+                f"Route: `{route}`",
+                f"Target URL: `{fact.get('targetUrl', route)}`",
+                f"Actor role: `{fact.get('actorRole', 'unknown')}`",
+                "Source context:\n"
+                + (
+                    "\n".join(f"- {signal}" for signal in source_context)
+                    if source_context
+                    else "- No repository source signal supplied."
+                ),
+                "Evidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.",
+                "Artifacts:\n"
+                + "\n".join(f"- `{artifact}`" for artifact in fact.get("artifactPaths", []) if isinstance(artifact, str)),
+            ]
+        )
+        findings.append(
+            {
+                "id": f"external.{index}:{invariant_id}",
+                "fingerprint": fingerprint,
+                "dedupeKey": f"{fingerprint}:{invariant_id}",
+                "scenarioId": f"external.{index}",
+                "scenarioTitle": title,
+                "scenarioTone": "context-observed",
+                "generatedScenario": False,
+                "generationBasis": "external-observed-context",
+                "modelProvenance": None,
+                "originalScenario": {
+                    "route": route,
+                    "targetUrl": fact.get("targetUrl", route),
+                    "expectedStatus": expected_status,
+                    "observedStatus": observed_status,
+                    "source": fact.get("source"),
+                },
+                "minimizedReproducer": None,
+                "subScenarios": [],
+                "fragments": [],
+                "accessPattern": {
+                    "actorRole": fact.get("actorRole"),
+                    "businessFlow": [],
+                    "dataSignals": {
+                        "expectedStatus": expected_status,
+                        "observedStatus": observed_status,
+                        "sourceContext": source_context,
+                        "targetUrl": fact.get("targetUrl", route),
+                    },
+                    "decision": None,
+                    "expenseCategories": [],
+                    "modules": {},
+                    "routes": [route],
+                    "transportModes": [],
+                },
+                "expectedInvariant": f"External app invariant `{invariant_id}` must hold.",
+                "invariantId": invariant_id,
+                "invariantLayer": "external app connector",
+                "observedResult": "fail",
+                "observation": observation,
+                "classification": "breakage.context-observed",
+                "issueReadiness": "ready-for-issue",
+                "attentionScore": 1.0,
+                "attentionReasons": ["connector-evidence", "external-context-failure"],
+                "observationBasis": {"source": context.get("source", "context"), "tags": ["confirmed-local-breakage"], "priorDelta": 0.0},
+                "prior": 0.5,
+                "adjustedPrior": 0.5,
+                "likelihood": 0.95,
+                "posteriorProbability": 0.99,
+                "posteriorMode": "highest-fault-probability",
+                "riskScore": 0.99,
+                "suggestedIssueTitle": f"Bayesilisk context-observed: {title}",
+                "suggestedIssueBody": body,
+            }
+        )
+    return findings
 
 
 def suggested_title(

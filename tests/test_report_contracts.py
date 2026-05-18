@@ -155,6 +155,183 @@ def test_current_issue_payloads_match_schema() -> None:
         validate_schema(payload, registry["issue-payload.schema.json"], registry=registry)
 
 
+def test_external_connector_context_mismatch_becomes_verified_finding(monkeypatch: Any) -> None:
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
+    from bayesilisk import reporting
+
+    registry = schema_registry()
+    context = {
+        "source": "external-app-connector",
+        "repositoryFacts": [
+            {
+                "actorRole": "operator",
+                "artifactPaths": ["/tmp/external-proof.png"],
+                "expectedStatus": 403,
+                "failureDetail": "Unknown target identifier was ignored and the protected action was visible.",
+                "invariantId": "external.unknown_target_id_rejected",
+                "observedStatus": 200,
+                "passed": False,
+                "route": "/resource/{resourceId}/action?targetId={unknownTargetId}",
+                "source": "connector-observation",
+                "targetUrl": "http://localhost:3000/resource/123/action?targetId=missing",
+                "title": "Unknown target identifier must not open protected action",
+            }
+        ],
+    }
+
+    report = reporting.build_contextual_report(150, context=context)
+    finding = next(
+        item
+        for item in report["findings"]
+        if item["invariantId"] == "external.unknown_target_id_rejected"
+    )
+
+    validate_schema(report, registry["report.schema.json"], registry=registry)
+    assert finding["classification"] == "breakage.context-observed"
+    assert finding["issueReadiness"] == "ready-for-issue"
+    assert finding["observedResult"] == "fail"
+    assert finding["attentionReasons"] == ["connector-evidence", "external-context-failure"]
+    assert any(
+        payload["fingerprint"] == finding["fingerprint"]
+        and payload["issuePayloadSource"] == "verifiedByBayesilisk"
+        for payload in report["issuePayloads"]
+    )
+
+
+def test_source_context_generates_connector_probe_proposals(monkeypatch: Any) -> None:
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
+    from bayesilisk.probe_proposals import generate_probe_proposals
+    from bayesilisk import reporting
+
+    context = {
+        "source": "connector-source-context",
+        "agentNotes": ["source scan found route params that can be mutated"],
+        "priorAdjustments": {},
+        "repositoryFacts": [
+            {
+                "availableActions": ["open-resource-action"],
+                "expectedBehavior": {"description": "Connector-owned rule must hold.", "status": 418},
+                "invariantId": "external.connector_owned_rule",
+                "nearbyTests": ["valid target opens the action"],
+                "params": [
+                    {"kind": "id", "location": "path", "name": "resourceId", "required": True},
+                    {"kind": "id", "location": "query", "name": "targetId", "required": True},
+                ],
+                "path": "app/routes/resource.ts",
+                "proposalRules": {
+                    "targetId": [
+                        {"id": "connector-rule-a", "value": "connector-value-a"},
+                        {"id": "connector-rule-b", "value": "connector-value-b"},
+                    ]
+                },
+                "routePattern": "/resource/{resourceId}/action?targetId={targetId}",
+                "source": "repository-scan",
+                "sourceText": "TODO: force 404 when targetId is not found.",
+                "title": "Resource action validates target identifier",
+            }
+        ],
+        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
+    }
+
+    proposals = generate_probe_proposals(context)
+    report = reporting.build_contextual_report(150, context=context)
+
+    assert proposals
+    assert proposals == report["generatedProbeProposals"]
+    assert proposals[0]["connectorAction"] == "open-resource-action"
+    assert proposals[0]["invariantId"] == "external.connector_owned_rule"
+    assert proposals[0]["routePattern"] == "/resource/{resourceId}/action?targetId={targetId}"
+    assert proposals[0]["expectedStatus"] == 418
+    assert {proposal["sourceParam"] for proposal in proposals} == {"targetId"}
+    assert {proposal["mutationId"] for proposal in proposals} == {"connector-rule-a", "connector-rule-b"}
+    assert {proposal["mutatedParams"]["targetId"] for proposal in proposals} == {
+        "connector-value-a",
+        "connector-value-b",
+    }
+
+
+def test_context_level_proposal_gates_reduce_repeated_fact_rules(monkeypatch: Any) -> None:
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
+    from bayesilisk.probe_proposals import generate_probe_proposals
+
+    context = {
+        "source": "connector-source-context",
+        "proposalGates": [
+            {
+                "gateId": "shared-connector-gate",
+                "invariantIds": [
+                    "external.first_context_rule",
+                    "external.second_context_rule",
+                ],
+                "rules": [
+                    {
+                        "param": "contextHandle",
+                        "mutations": [
+                            {"id": "shared-rule-a", "value": "shared-value-a"},
+                            {"id": "shared-rule-b", "value": "shared-value-b"},
+                        ],
+                    },
+                ],
+            }
+        ],
+        "repositoryFacts": [
+            {
+                "availableActions": ["execute-first-action"],
+                "expectedBehavior": {"status": 404},
+                "invariantId": "external.first_context_rule",
+                "params": [
+                    {"kind": "opaque", "location": "query", "name": "contextHandle", "required": False},
+                    {"kind": "opaque", "location": "query", "name": "controlHandle", "required": False},
+                ],
+                "routePattern": "/first?contextHandle={contextHandle}",
+                "source": "repository-scan",
+                "title": "First connector rule context",
+            },
+            {
+                "availableActions": ["execute-second-action"],
+                "expectedBehavior": {"status": 404},
+                "invariantId": "external.second_context_rule",
+                "params": [{"kind": "opaque", "location": "query", "name": "contextHandle", "required": False}],
+                "routePattern": "/second?contextHandle={contextHandle}",
+                "source": "repository-scan",
+                "title": "Second connector rule context",
+            },
+        ],
+    }
+
+    proposals = generate_probe_proposals(context)
+
+    assert len(proposals) == 4
+    assert {proposal["proposalGate"] for proposal in proposals} == {"context-proposal-gate"}
+    assert {proposal["sourceParam"] for proposal in proposals} == {"contextHandle"}
+    assert {proposal["mutationId"] for proposal in proposals} == {"shared-rule-a", "shared-rule-b"}
+
+
+def test_source_context_without_supplied_rules_emits_no_probe_proposals(monkeypatch: Any) -> None:
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
+    from bayesilisk.probe_proposals import generate_probe_proposals
+
+    context = {
+        "repositoryFacts": [
+            {
+                "availableActions": ["open-resource-action"],
+                "expectedBehavior": {"status": 404},
+                "invariantId": "external.no_rules_supplied",
+                "params": [{"kind": "id", "location": "query", "name": "targetId", "required": True}],
+                "routePattern": "/resource?targetId={targetId}",
+                "source": "repository-scan",
+                "title": "No supplied proposal rules",
+            }
+        ]
+    }
+
+    assert generate_probe_proposals(context) == []
+
+
 def test_model_proposal_schema_covers_raw_proposal_payloads() -> None:
     registry = schema_registry()
     proposal_payload = {

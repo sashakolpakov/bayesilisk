@@ -60,6 +60,7 @@
       }
     },
     "findings": {"type": "array", "items": {"$ref": "finding.schema.json"}},
+    "generatedProbeProposals": {"type": "array"},
     "generatedScenarioCount": {"type": "integer", "minimum": 0},
     "grassmannAttention": {
       "type": "object",

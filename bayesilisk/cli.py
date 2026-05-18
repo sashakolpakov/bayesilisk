@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .context import load_context, load_observations
+from .probe_proposals import generate_probe_proposals
 from .reporting import (
     build_contextual_report,
     build_report,
@@ -24,6 +25,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--generated-count", type=int, default=8, help="Number of seeded generated composite scenarios.")
     parser.add_argument("--observations", type=Path, default=None, help="Optional JSON observation history.")
     parser.add_argument("--context", type=Path, default=None, help="Optional JSON context from agents, trackers, or repo scans.")
+    parser.add_argument(
+        "--probe-proposals-output",
+        type=Path,
+        default=None,
+        help="Write generic connector probe proposals from --context and exit.",
+    )
     embedding_group = parser.add_mutually_exclusive_group()
     embedding_group.add_argument(
         "--enable-embeddings",
@@ -96,6 +103,10 @@ def main() -> int:
     observations = load_observations(args.observations)
     context = load_context(args.context)
     runtime_config = runtime_config_from_args(args)
+    if args.probe_proposals_output is not None:
+        content = json.dumps(generate_probe_proposals(context), indent=2, sort_keys=True) + "\n"
+        write_output(content, args.probe_proposals_output)
+        return 0
     if context:
         report = build_contextual_report(
             args.seed,

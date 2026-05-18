@@ -57,14 +57,19 @@
     "attentionScore": {"type": "number", "minimum": 0, "maximum": 1},
     "classification": {
       "type": "string",
-      "enum": ["breakage.easy", "breakage.hard-to-find", "control-confirmed", "finding.candidate-breakage"]
+      "enum": [
+        "breakage.context-observed",
+        "breakage.easy",
+        "breakage.hard-to-find",
+        "control-confirmed",
+        "finding.candidate-breakage"
+      ]
     },
     "dedupeKey": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}:"},
     "expectedInvariant": {"type": "string"},
     "fingerprint": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}$"},
     "fragments": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -120,7 +125,6 @@
     "scenarioTone": {"type": "string"},
     "subScenarios": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,

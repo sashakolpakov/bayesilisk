@@ -37,6 +37,7 @@ quickstart
 architecture
 reports
 integrations
+connectors
 development
 bayesilisk
 ```

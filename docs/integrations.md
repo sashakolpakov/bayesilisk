@@ -2,6 +2,10 @@
 
 Bayesilisk integrations are optional. The deterministic CLI remains usable with standard-library Python only.
 
+For app-specific adapters, see {doc}`connectors`. Connector code belongs in the
+target app or test repo. Test teams should not patch Bayesilisk core to support
+one application.
+
 ## Microsoft Playwright
 
 The Playwright bridge turns browser observations into Bayesilisk context JSON.
