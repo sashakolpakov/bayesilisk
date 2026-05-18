@@ -9,6 +9,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
     from bayesilisk.constants import VERSION  # type: ignore[no-redef]
+    from bayesilisk.probe_proposals import generate_probe_proposals  # type: ignore[no-redef]
     from bayesilisk.reporting import (  # type: ignore[no-redef]
         build_contextual_report,
         issue_payloads,
@@ -17,6 +18,7 @@ if __package__ in {None, ""}:
 else:
     from .config import effective_runtime_config
     from .constants import VERSION
+    from .probe_proposals import generate_probe_proposals
     from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
 PROTOCOL_VERSION = "2024-11-05"
@@ -80,6 +82,17 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "observations": {"type": "object"},
                 "includeExisting": {"type": "boolean", "default": False},
                 **RUNTIME_CONFIG_SCHEMA,
+            },
+        },
+    },
+    {
+        "name": "bayesilisk.propose_probes",
+        "description": "Expand context-supplied connector proposal rules into app-agnostic probe proposals.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "context": {"type": "object"},
+                "limit": {"type": ["integer", "null"], "default": 24},
             },
         },
     },
@@ -163,10 +176,11 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(arguments, dict):
         return _error_response(request_id, -32602, "arguments must be an object")
     try:
-        report = _report_from_arguments(arguments)
         if name == "bayesilisk.run":
+            report = _report_from_arguments(arguments)
             payload = report
         elif name == "bayesilisk.rank_context":
+            report = _report_from_arguments(arguments)
             payload = {
                 "contextSummary": report["contextSummary"],
                 "effectiveConfiguration": report["effectiveConfiguration"],
@@ -175,6 +189,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 "tool": report["tool"],
             }
         elif name == "bayesilisk.issue_payloads":
+            report = _report_from_arguments(arguments)
             payload = {
                 "contextSummary": report["contextSummary"],
                 "effectiveConfiguration": report["effectiveConfiguration"],
@@ -185,6 +200,19 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                     include_existing=bool(arguments.get("includeExisting", False)),
                 ),
                 "tool": report["tool"],
+            }
+        elif name == "bayesilisk.propose_probes":
+            context = arguments.get("context", {})
+            if not isinstance(context, dict):
+                raise ValueError("context must be an object")
+            limit = arguments.get("limit", 24)
+            if limit is not None:
+                limit = int(limit)
+            proposals = generate_probe_proposals(context, limit=limit or 24)
+            payload = {
+                "proposalCount": len(proposals),
+                "proposals": proposals,
+                "tool": f"bayesilisk.v{VERSION}",
             }
         else:
             return _error_response(request_id, -32602, f"unknown tool: {name}")

@@ -374,7 +374,8 @@ It exposes:
 
 - `bayesilisk.run`;
 - `bayesilisk.rank_context`;
-- `bayesilisk.issue_payloads`.
+- `bayesilisk.issue_payloads`;
+- `bayesilisk.propose_probes`.
 
 The MCP tools accept the same control names as JSON arguments, including
 `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
@@ -385,6 +386,19 @@ Agents should pass current issue lists, open PRs, branch facts, local verifier
 notes, Playwright observations, and known Bayesilisk fingerprints as context.
 The MCP server still runs locally and does not mutate GitHub or production
 systems.
+
+For coding agents, the intended loop is:
+
+```text
+agent gathers repo/test context -> bayesilisk.propose_probes
+connector executes returned proposals -> bayesilisk.run / issue_payloads
+agent opens issues or edits code according to the verified payloads
+```
+
+`bayesilisk.run` can also call the local scenario proposer model/API when
+`enableScenarioProposer=true`. The model proposes; Bayesilisk validates and
+verifies. The agent remains responsible for app-specific connector execution,
+issue creation, and code changes.
 
 ## Documentation
 

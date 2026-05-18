@@ -1046,6 +1046,7 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     assert initialize["result"]["serverInfo"]["version"] == "bayesilisk.v1.2"
     assert {tool["name"] for tool in tools["result"]["tools"]} == {
         "bayesilisk.issue_payloads",
+        "bayesilisk.propose_probes",
         "bayesilisk.rank_context",
         "bayesilisk.run",
     }
@@ -1063,6 +1064,46 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     server.write_message(raw, {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}})
     raw.seek(0)
     assert server.read_message(raw) == {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}}
+
+
+def test_bayesilisk_mcp_server_expands_connector_probe_proposals() -> None:
+    server = importlib.import_module("bayesilisk.mcp_server")
+
+    response = server.handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "bayesilisk.propose_probes",
+                "arguments": {
+                    "context": {
+                        "repositoryFacts": [
+                            {
+                                "availableActions": ["execute-connector-action"],
+                                "expectedBehavior": {"status": 409},
+                                "invariantId": "external.connector_rule",
+                                "params": [{"name": "handle", "kind": "opaque", "location": "query"}],
+                                "proposalRules": {
+                                    "handle": [{"id": "connector-supplied-rule", "value": "connector-supplied-value"}]
+                                },
+                                "routePattern": "/connector?handle={handle}",
+                                "source": "repository-scan",
+                                "title": "Connector supplied rule",
+                            }
+                        ]
+                    },
+                    "limit": 5,
+                },
+            },
+        }
+    )
+    payload = json.loads(response["result"]["content"][0]["text"])
+
+    assert payload["proposalCount"] == 1
+    assert payload["proposals"][0]["connectorAction"] == "execute-connector-action"
+    assert payload["proposals"][0]["mutationId"] == "connector-supplied-rule"
+    assert payload["proposals"][0]["mutatedParams"] == {"handle": "connector-supplied-value"}
 
 
 def test_bayesilisk_documentation_pins_no_production_access_and_report_contract() -> None:

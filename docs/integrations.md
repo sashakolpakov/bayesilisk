@@ -126,7 +126,8 @@ Tools:
 
 - `bayesilisk.run`: run a contextual report;
 - `bayesilisk.rank_context`: return ranked failed probes from supplied context;
-- `bayesilisk.issue_payloads`: return deduped issue payloads for ready failed findings.
+- `bayesilisk.issue_payloads`: return deduped issue payloads for ready failed findings;
+- `bayesilisk.propose_probes`: expand context-supplied connector rules into probe proposals.
 
 The MCP tools accept the same control names as JSON arguments:
 `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
@@ -135,6 +136,21 @@ The MCP tools accept the same control names as JSON arguments:
 `attentionSelectionLimit`, and `ollamaBaseUrl`.
 
 The MCP server runs locally and does not mutate issue trackers or production systems.
+
+## Coding Agent Loop
+
+A Codex-style agent can use Bayesilisk MCP as the cheap local drill layer:
+
+1. Gather repository/test context and connector rules.
+2. Call `bayesilisk.propose_probes`.
+3. Run the app-specific connector against local fixtures with the returned proposals.
+4. Call `bayesilisk.run` or `bayesilisk.issue_payloads` with observed evidence.
+5. Create issues or patch code only from verified Bayesilisk output.
+
+If a local model/API is configured, pass `enableScenarioProposer=true` plus
+`scenarioProvider`, `scenarioModel`, and base URL/API-key settings to
+`bayesilisk.run`. Model proposals stay untrusted; Bayesilisk validates them
+before deterministic verification.
 
 ## GitHub Issues
 
