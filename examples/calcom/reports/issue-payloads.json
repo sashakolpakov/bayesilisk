@@ -1,0 +1,194 @@
+[
+  {
+    "attentionReasons": [
+      "connector-evidence",
+      "external-context-failure"
+    ],
+    "attentionScore": 1,
+    "body": "Scenario `calcom.unknown_reschedule_uid_must_not_open_booking_flow`: TODO says missing rescheduleUid should force 404: unknown id for rescheduleUid.\n\nFingerprint: `bayesilisk:b2a77c2dbcd3721a`\n\nClassification: `breakage.context-observed`\n\nIssue readiness: `ready-for-issue`\n\nExpected: semantic status `404`\n\nObserved: semantic status `200`\n\nRoute: `/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null`\n\nTarget URL: `http://localhost:3000/user-0-1779068495757/30-min?rescheduleUid=missing-rescheduleUid&bookingUid=null`\n\nActor role: `attendee`\n\nSource context:\n- apps/web/playwright/booking-seats.e2e.ts | TODO says missing rescheduleUid should force 404 | Cal.com source signal: booking-seats.e2e.ts contains `@TODO: force 404 when rescheduleUid is not found`; nearby tests exercise direct seated-event reschedule with `rescheduleUid` and `bookingUid=null`.\n\nEvidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.\n\nArtifacts:\n",
+    "classification": "breakage.context-observed",
+    "dedupeKey": "bayesilisk:b2a77c2dbcd3721a:calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:b2a77c2dbcd3721a",
+    "invariantId": "calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": {
+      "expectedStatus": 404,
+      "observedStatus": 200,
+      "route": "/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/user-0-1779068495757/30-min?rescheduleUid=missing-rescheduleUid&bookingUid=null"
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.99,
+    "scenarioId": "external.4",
+    "title": "Bayesilisk context-observed: TODO says missing rescheduleUid should force 404: unknown id for rescheduleUid"
+  },
+  {
+    "attentionReasons": [
+      "connector-evidence",
+      "external-context-failure"
+    ],
+    "attentionScore": 1,
+    "body": "Scenario `calcom.unknown_reschedule_uid_must_not_open_booking_flow`: TODO says missing rescheduleUid should force 404: stale id for rescheduleUid.\n\nFingerprint: `bayesilisk:b291afcc129f6e28`\n\nClassification: `breakage.context-observed`\n\nIssue readiness: `ready-for-issue`\n\nExpected: semantic status `404`\n\nObserved: semantic status `200`\n\nRoute: `/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null`\n\nTarget URL: `http://localhost:3000/user-0-1779068497200/30-min?rescheduleUid=stale-rescheduleUid&bookingUid=null`\n\nActor role: `attendee`\n\nSource context:\n- apps/web/playwright/booking-seats.e2e.ts | TODO says missing rescheduleUid should force 404 | Cal.com source signal: booking-seats.e2e.ts contains `@TODO: force 404 when rescheduleUid is not found`; nearby tests exercise direct seated-event reschedule with `rescheduleUid` and `bookingUid=null`.\n\nEvidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.\n\nArtifacts:\n",
+    "classification": "breakage.context-observed",
+    "dedupeKey": "bayesilisk:b291afcc129f6e28:calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:b291afcc129f6e28",
+    "invariantId": "calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": {
+      "expectedStatus": 404,
+      "observedStatus": 200,
+      "route": "/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/user-0-1779068497200/30-min?rescheduleUid=stale-rescheduleUid&bookingUid=null"
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.99,
+    "scenarioId": "external.5",
+    "title": "Bayesilisk context-observed: TODO says missing rescheduleUid should force 404: stale id for rescheduleUid"
+  },
+  {
+    "attentionReasons": [
+      "connector-evidence",
+      "external-context-failure"
+    ],
+    "attentionScore": 1,
+    "body": "Scenario `calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow`: Private booking link resolves rescheduleUid into booking context: unknown id for rescheduleUid.\n\nFingerprint: `bayesilisk:024e5a53e41a7cf8`\n\nClassification: `breakage.context-observed`\n\nIssue readiness: `ready-for-issue`\n\nExpected: semantic status `404`\n\nObserved: semantic status `200`\n\nRoute: `/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}`\n\nTarget URL: `http://localhost:3000/d/rqwVd9TL8ANJKg43917cA7/30-min?rescheduleUid=missing-rescheduleUid`\n\nActor role: `attendee`\n\nSource context:\n- apps/web/lib/d/[link]/[slug]/getServerSideProps.tsx | Private booking link resolves rescheduleUid into booking context | Cal.com source signal: private booking link SSR validates the hashed link, then calls getBookingForReschedule when rescheduleUid is present before rendering booking props.\n\nEvidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.\n\nArtifacts:\n",
+    "classification": "breakage.context-observed",
+    "dedupeKey": "bayesilisk:024e5a53e41a7cf8:calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:024e5a53e41a7cf8",
+    "invariantId": "calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": {
+      "expectedStatus": 404,
+      "observedStatus": 200,
+      "route": "/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/d/rqwVd9TL8ANJKg43917cA7/30-min?rescheduleUid=missing-rescheduleUid"
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.99,
+    "scenarioId": "external.6",
+    "title": "Bayesilisk context-observed: Private booking link resolves rescheduleUid into booking context: unknown id for rescheduleUid"
+  },
+  {
+    "attentionReasons": [
+      "connector-evidence",
+      "external-context-failure"
+    ],
+    "attentionScore": 1,
+    "body": "Scenario `calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow`: Private booking link resolves rescheduleUid into booking context: stale id for rescheduleUid.\n\nFingerprint: `bayesilisk:bfe8eaef0fc1701c`\n\nClassification: `breakage.context-observed`\n\nIssue readiness: `ready-for-issue`\n\nExpected: semantic status `404`\n\nObserved: semantic status `200`\n\nRoute: `/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}`\n\nTarget URL: `http://localhost:3000/d/5FtfktPEM3xLr7NAkk4sbY/30-min?rescheduleUid=stale-rescheduleUid`\n\nActor role: `attendee`\n\nSource context:\n- apps/web/lib/d/[link]/[slug]/getServerSideProps.tsx | Private booking link resolves rescheduleUid into booking context | Cal.com source signal: private booking link SSR validates the hashed link, then calls getBookingForReschedule when rescheduleUid is present before rendering booking props.\n\nEvidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.\n\nArtifacts:\n",
+    "classification": "breakage.context-observed",
+    "dedupeKey": "bayesilisk:bfe8eaef0fc1701c:calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:bfe8eaef0fc1701c",
+    "invariantId": "calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": {
+      "expectedStatus": 404,
+      "observedStatus": 200,
+      "route": "/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/d/5FtfktPEM3xLr7NAkk4sbY/30-min?rescheduleUid=stale-rescheduleUid"
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.99,
+    "scenarioId": "external.7",
+    "title": "Bayesilisk context-observed: Private booking link resolves rescheduleUid into booking context: stale id for rescheduleUid"
+  },
+  {
+    "attentionReasons": [
+      "connector-evidence",
+      "external-context-failure"
+    ],
+    "attentionScore": 1,
+    "body": "Scenario `calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow`: Dynamic booking page has a passing valid reschedule flow: unknown id for rescheduleUid.\n\nFingerprint: `bayesilisk:97a5026d569853f2`\n\nClassification: `breakage.context-observed`\n\nIssue readiness: `ready-for-issue`\n\nExpected: semantic status `404`\n\nObserved: semantic status `200`\n\nRoute: `/{username}+{username}?rescheduleUid={rescheduleUid}`\n\nTarget URL: `http://localhost:3000/user-0-1779068498525+bayesilisk-dynamic-nwd4Ce-0-1779068498766?rescheduleUid=missing-rescheduleUid`\n\nActor role: `attendee`\n\nSource context:\n- apps/web/playwright/dynamic-booking-pages.e2e.ts | Dynamic booking page has a passing valid reschedule flow | Cal.com source signal: dynamic booking tests use rescheduleUid for a valid group booking reschedule; stale or unknown reschedule context should not silently become a new group booking.\n\nEvidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.\n\nArtifacts:\n",
+    "classification": "breakage.context-observed",
+    "dedupeKey": "bayesilisk:97a5026d569853f2:calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:97a5026d569853f2",
+    "invariantId": "calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": {
+      "expectedStatus": 404,
+      "observedStatus": 200,
+      "route": "/{username}+{username}?rescheduleUid={rescheduleUid}",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/user-0-1779068498525+bayesilisk-dynamic-nwd4Ce-0-1779068498766?rescheduleUid=missing-rescheduleUid"
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.99,
+    "scenarioId": "external.8",
+    "title": "Bayesilisk context-observed: Dynamic booking page has a passing valid reschedule flow: unknown id for rescheduleUid"
+  },
+  {
+    "attentionReasons": [
+      "connector-evidence",
+      "external-context-failure"
+    ],
+    "attentionScore": 1,
+    "body": "Scenario `calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow`: Dynamic booking page has a passing valid reschedule flow: stale id for rescheduleUid.\n\nFingerprint: `bayesilisk:0f97077a61e6fdea`\n\nClassification: `breakage.context-observed`\n\nIssue readiness: `ready-for-issue`\n\nExpected: semantic status `404`\n\nObserved: semantic status `200`\n\nRoute: `/{username}+{username}?rescheduleUid={rescheduleUid}`\n\nTarget URL: `http://localhost:3000/user-0-1779068499115+bayesilisk-dynamic-yE8Y06-0-1779068499351?rescheduleUid=stale-rescheduleUid`\n\nActor role: `attendee`\n\nSource context:\n- apps/web/playwright/dynamic-booking-pages.e2e.ts | Dynamic booking page has a passing valid reschedule flow | Cal.com source signal: dynamic booking tests use rescheduleUid for a valid group booking reschedule; stale or unknown reschedule context should not silently become a new group booking.\n\nEvidence source: app-provided connector observation; Bayesilisk only compares deterministic observed facts.\n\nArtifacts:\n",
+    "classification": "breakage.context-observed",
+    "dedupeKey": "bayesilisk:0f97077a61e6fdea:calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+    "dedupeState": "new",
+    "fingerprint": "bayesilisk:0f97077a61e6fdea",
+    "invariantId": "calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+    "issuePayloadSource": "verifiedByBayesilisk",
+    "issueReadiness": "ready-for-issue",
+    "labels": [
+      "bayesilisk",
+      "usa"
+    ],
+    "minimizedReproducer": null,
+    "modelProvenance": null,
+    "originalScenario": {
+      "expectedStatus": 404,
+      "observedStatus": 200,
+      "route": "/{username}+{username}?rescheduleUid={rescheduleUid}",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/user-0-1779068499115+bayesilisk-dynamic-yE8Y06-0-1779068499351?rescheduleUid=stale-rescheduleUid"
+    },
+    "posteriorMode": "highest-fault-probability",
+    "riskScore": 0.99,
+    "scenarioId": "external.9",
+    "title": "Bayesilisk context-observed: Dynamic booking page has a passing valid reschedule flow: stale id for rescheduleUid"
+  }
+]

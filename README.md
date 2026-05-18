@@ -130,6 +130,14 @@ Example artifacts:
 
 - [example JSON report](docs/examples/example-report.json)
 - [example GitHub issue payloads](docs/examples/example-issue-payloads.json)
+- [Cal.com connector evidence](examples/calcom/)
+
+The Cal.com example uses the general Bayesilisk core with an app-specific
+connector that follows the connector docs. It records the Cal.com repository
+URL, exact tested commit, connector source context, generated proposals,
+observed local execution context, and reports. In that run Bayesilisk generated
+6 proposals from explicit connector rules and verified 6 local observations
+where expected `404` was observed as `200`.
 
 ### Why This Is Not a Black Box
 

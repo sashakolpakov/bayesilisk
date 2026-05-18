@@ -1,0 +1,116 @@
+[
+  {
+    "actorRole": "unknown",
+    "connectorAction": "open-public-booking-page",
+    "expectedStatus": 404,
+    "invariantId": "calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+    "mutatedParams": {
+      "rescheduleUid": "missing-rescheduleUid"
+    },
+    "mutationId": "unknown-id",
+    "nearbyTests": [],
+    "path": "apps/web/playwright/booking-seats.e2e.ts",
+    "proposalGate": "fact-proposal-rules",
+    "proposalId": "probe.01.calcom_unknown_reschedule_uid_must_not_open_book.bb42360563",
+    "rationale": "Bayesilisk expanded app-provided proposal rules; connector must execute real app behavior.",
+    "routePattern": "/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null",
+    "sourceParam": "rescheduleUid",
+    "sourceText": "Cal.com source signal: booking-seats.e2e.ts contains `@TODO: force 404 when rescheduleUid is not found`; nearby tests exercise direct seated-event reschedule with `rescheduleUid` and `bookingUid=null`.",
+    "title": "TODO says missing rescheduleUid should force 404: unknown id for rescheduleUid"
+  },
+  {
+    "actorRole": "unknown",
+    "connectorAction": "open-public-booking-page",
+    "expectedStatus": 404,
+    "invariantId": "calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+    "mutatedParams": {
+      "rescheduleUid": "stale-rescheduleUid"
+    },
+    "mutationId": "stale-id",
+    "nearbyTests": [],
+    "path": "apps/web/playwright/booking-seats.e2e.ts",
+    "proposalGate": "fact-proposal-rules",
+    "proposalId": "probe.02.calcom_unknown_reschedule_uid_must_not_open_book.7cd6b46569",
+    "rationale": "Bayesilisk expanded app-provided proposal rules; connector must execute real app behavior.",
+    "routePattern": "/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null",
+    "sourceParam": "rescheduleUid",
+    "sourceText": "Cal.com source signal: booking-seats.e2e.ts contains `@TODO: force 404 when rescheduleUid is not found`; nearby tests exercise direct seated-event reschedule with `rescheduleUid` and `bookingUid=null`.",
+    "title": "TODO says missing rescheduleUid should force 404: stale id for rescheduleUid"
+  },
+  {
+    "actorRole": "unknown",
+    "connectorAction": "open-private-booking-link",
+    "expectedStatus": 404,
+    "invariantId": "calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+    "mutatedParams": {
+      "rescheduleUid": "missing-rescheduleUid"
+    },
+    "mutationId": "unknown-id",
+    "nearbyTests": [],
+    "path": "apps/web/lib/d/[link]/[slug]/getServerSideProps.tsx",
+    "proposalGate": "fact-proposal-rules",
+    "proposalId": "probe.03.calcom_private_link_unknown_reschedule_uid_must_.e69f9d6947",
+    "rationale": "Bayesilisk expanded app-provided proposal rules; connector must execute real app behavior.",
+    "routePattern": "/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}",
+    "sourceParam": "rescheduleUid",
+    "sourceText": "Cal.com source signal: private booking link SSR validates the hashed link, then calls getBookingForReschedule when rescheduleUid is present before rendering booking props.",
+    "title": "Private booking link resolves rescheduleUid into booking context: unknown id for rescheduleUid"
+  },
+  {
+    "actorRole": "unknown",
+    "connectorAction": "open-private-booking-link",
+    "expectedStatus": 404,
+    "invariantId": "calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+    "mutatedParams": {
+      "rescheduleUid": "stale-rescheduleUid"
+    },
+    "mutationId": "stale-id",
+    "nearbyTests": [],
+    "path": "apps/web/lib/d/[link]/[slug]/getServerSideProps.tsx",
+    "proposalGate": "fact-proposal-rules",
+    "proposalId": "probe.04.calcom_private_link_unknown_reschedule_uid_must_.3a1c32aed9",
+    "rationale": "Bayesilisk expanded app-provided proposal rules; connector must execute real app behavior.",
+    "routePattern": "/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}",
+    "sourceParam": "rescheduleUid",
+    "sourceText": "Cal.com source signal: private booking link SSR validates the hashed link, then calls getBookingForReschedule when rescheduleUid is present before rendering booking props.",
+    "title": "Private booking link resolves rescheduleUid into booking context: stale id for rescheduleUid"
+  },
+  {
+    "actorRole": "unknown",
+    "connectorAction": "open-dynamic-booking-page",
+    "expectedStatus": 404,
+    "invariantId": "calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+    "mutatedParams": {
+      "rescheduleUid": "missing-rescheduleUid"
+    },
+    "mutationId": "unknown-id",
+    "nearbyTests": [],
+    "path": "apps/web/playwright/dynamic-booking-pages.e2e.ts",
+    "proposalGate": "fact-proposal-rules",
+    "proposalId": "probe.05.calcom_dynamic_booking_unknown_reschedule_uid_mu.b8107fe0a6",
+    "rationale": "Bayesilisk expanded app-provided proposal rules; connector must execute real app behavior.",
+    "routePattern": "/{username}+{username}?rescheduleUid={rescheduleUid}",
+    "sourceParam": "rescheduleUid",
+    "sourceText": "Cal.com source signal: dynamic booking tests use rescheduleUid for a valid group booking reschedule; stale or unknown reschedule context should not silently become a new group booking.",
+    "title": "Dynamic booking page has a passing valid reschedule flow: unknown id for rescheduleUid"
+  },
+  {
+    "actorRole": "unknown",
+    "connectorAction": "open-dynamic-booking-page",
+    "expectedStatus": 404,
+    "invariantId": "calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+    "mutatedParams": {
+      "rescheduleUid": "stale-rescheduleUid"
+    },
+    "mutationId": "stale-id",
+    "nearbyTests": [],
+    "path": "apps/web/playwright/dynamic-booking-pages.e2e.ts",
+    "proposalGate": "fact-proposal-rules",
+    "proposalId": "probe.06.calcom_dynamic_booking_unknown_reschedule_uid_mu.3215dff9a4",
+    "rationale": "Bayesilisk expanded app-provided proposal rules; connector must execute real app behavior.",
+    "routePattern": "/{username}+{username}?rescheduleUid={rescheduleUid}",
+    "sourceParam": "rescheduleUid",
+    "sourceText": "Cal.com source signal: dynamic booking tests use rescheduleUid for a valid group booking reschedule; stale or unknown reschedule context should not silently become a new group booking.",
+    "title": "Dynamic booking page has a passing valid reschedule flow: stale id for rescheduleUid"
+  }
+]

@@ -125,6 +125,11 @@ Use existing tests, TODOs, route handlers, permission matrices, schemas, and
 product rules. The expectation must be concrete enough to write an
 `expectedStatus`.
 
+Explanatory prose in fields such as `text`, `sourceText`, and `nearbyTests` can
+help Grassmann attention route and rank the investigation. It is not a rule by
+itself: Bayesilisk proposal expansion still requires `proposalRules` or
+`proposalGates`, and Bayesilisk verdicts still require observed evidence.
+
 2. Ask Bayesilisk for context-derived probe proposals.
 
 ```sh
@@ -274,3 +279,11 @@ bayesilisk/invariants_for_one_customer.py
 ```
 
 The app owns app behavior. Bayesilisk consumes evidence and verifies the report.
+
+## Worked Example
+
+See [examples/calcom](https://github.com/sashakolpakov/bayesilisk/tree/main/examples/calcom)
+for a real-app connector example.
+It records the Cal.com repository URL, exact commit hash, connector source
+context, Bayesilisk-generated proposals, observed local execution context, and
+reports.

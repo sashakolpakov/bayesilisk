@@ -1,0 +1,310 @@
+{
+  "source": "calcom-playwright-probe",
+  "agentNotes": [
+    "Cal.com probe `Unknown reschedule UID must not silently open the booking flow`: expected semantic status 404, observed 200; invariant `calcom.unknown_reschedule_uid_must_not_open_booking_flow`; route `/{username}/{eventType}?rescheduleUid={unknownUid}&bookingUid=null`.",
+    "Cal.com probe `Dynamic booking page must not ignore an unknown reschedule UID`: expected semantic status 404, observed 200; invariant `calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow`; route `/{username}+{username}?rescheduleUid={unknownUid}`.",
+    "Cal.com probe `Private booking link must not ignore an unknown reschedule UID`: expected semantic status 404, observed 200; invariant `calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow`; route `/d/{hashedLink}/{eventType}?rescheduleUid={unknownUid}`."
+  ],
+  "priorAdjustments": {},
+  "probeProposals": [],
+  "repositoryFacts": [
+    {
+      "availableActions": [
+        "open-public-booking-page"
+      ],
+      "expectedBehavior": {
+        "description": "Unknown rescheduleUid must not silently degrade into a normal booking flow.",
+        "status": 404
+      },
+      "invariantId": "calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+      "params": [
+        {
+          "name": "rescheduleUid",
+          "kind": "id",
+          "location": "query",
+          "required": false
+        },
+        {
+          "name": "bookingUid",
+          "kind": "id",
+          "location": "query",
+          "required": false
+        }
+      ],
+      "path": "apps/web/playwright/booking-seats.e2e.ts",
+      "proposalRules": {
+        "rescheduleUid": [
+          {
+            "id": "unknown-id",
+            "value": "missing-rescheduleUid"
+          },
+          {
+            "id": "stale-id",
+            "value": "stale-rescheduleUid"
+          }
+        ]
+      },
+      "routePattern": "/{username}/{eventType}?rescheduleUid={rescheduleUid}&bookingUid=null",
+      "source": "repository-scan",
+      "title": "TODO says missing rescheduleUid should force 404",
+      "text": "Cal.com source signal: booking-seats.e2e.ts contains `@TODO: force 404 when rescheduleUid is not found`; nearby tests exercise direct seated-event reschedule with `rescheduleUid` and `bookingUid=null`."
+    },
+    {
+      "availableActions": [
+        "open-private-booking-link"
+      ],
+      "expectedBehavior": {
+        "description": "Unknown rescheduleUid on a private booking link must not silently open a new booking flow.",
+        "status": 404
+      },
+      "invariantId": "calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+      "params": [
+        {
+          "name": "rescheduleUid",
+          "kind": "id",
+          "location": "query",
+          "required": false
+        }
+      ],
+      "path": "apps/web/lib/d/[link]/[slug]/getServerSideProps.tsx",
+      "proposalRules": {
+        "rescheduleUid": [
+          {
+            "id": "unknown-id",
+            "value": "missing-rescheduleUid"
+          },
+          {
+            "id": "stale-id",
+            "value": "stale-rescheduleUid"
+          }
+        ]
+      },
+      "routePattern": "/d/{hashedLink}/{eventType}?rescheduleUid={rescheduleUid}",
+      "source": "repository-scan",
+      "title": "Private booking link resolves rescheduleUid into booking context",
+      "text": "Cal.com source signal: private booking link SSR validates the hashed link, then calls getBookingForReschedule when rescheduleUid is present before rendering booking props."
+    },
+    {
+      "availableActions": [
+        "open-dynamic-booking-page"
+      ],
+      "expectedBehavior": {
+        "description": "Unknown rescheduleUid on a dynamic booking page must not silently open a new group booking flow.",
+        "status": 404
+      },
+      "invariantId": "calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+      "params": [
+        {
+          "name": "rescheduleUid",
+          "kind": "id",
+          "location": "query",
+          "required": false
+        }
+      ],
+      "path": "apps/web/playwright/dynamic-booking-pages.e2e.ts",
+      "proposalRules": {
+        "rescheduleUid": [
+          {
+            "id": "unknown-id",
+            "value": "missing-rescheduleUid"
+          },
+          {
+            "id": "stale-id",
+            "value": "stale-rescheduleUid"
+          }
+        ]
+      },
+      "routePattern": "/{username}+{username}?rescheduleUid={rescheduleUid}",
+      "source": "repository-scan",
+      "title": "Dynamic booking page has a passing valid reschedule flow",
+      "text": "Cal.com source signal: dynamic booking tests use rescheduleUid for a valid group booking reschedule; stale or unknown reschedule context should not silently become a new group booking."
+    },
+    {
+      "actorRole": "organizer",
+      "expectedStatus": 409,
+      "invariantId": "calcom.cancelled_booking_cannot_be_rescheduled",
+      "route": "/reschedule/{cancelledBookingUid}",
+      "title": "Cancelled booking direct reschedule route is rejected",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [],
+      "observedStatus": 409,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "/reschedule/{cancelledBookingUid}",
+      "timestamp": "2026-05-18T01:39:17.016Z"
+    },
+    {
+      "actorRole": "organizer",
+      "expectedStatus": 409,
+      "invariantId": "calcom.reschedule_uid_must_match_event_type",
+      "route": "/{username}/{wrongEventType}?rescheduleUid={bookingUid}",
+      "title": "Reschedule UID for another event type redirects to original event type",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [],
+      "observedStatus": 409,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "/{username}/{wrongEventType}?rescheduleUid={bookingUid}",
+      "timestamp": "2026-05-18T01:39:18.120Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 409,
+      "invariantId": "calcom.disabled_event_type_blocks_cancellation",
+      "route": "/api/cancel",
+      "title": "Disabled cancellation event type rejects cancellation API",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [],
+      "observedStatus": 409,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "/api/cancel",
+      "timestamp": "2026-05-18T01:39:20.359Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 404,
+      "invariantId": "calcom.unknown_reschedule_uid_must_not_open_booking_flow",
+      "route": "/{username}/{eventType}?rescheduleUid={unknownUid}&bookingUid=null",
+      "title": "Unknown reschedule UID must not silently open the booking flow",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [
+        {
+          "status": 200,
+          "url": "http://localhost:3000/user-0-1779068360360/30-min?rescheduleUid=missing-Rq99ZFe209rp&bookingUid=null"
+        }
+      ],
+      "observedStatus": 200,
+      "passed": false,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/user-0-1779068360360/30-min?rescheduleUid=missing-Rq99ZFe209rp&bookingUid=null",
+      "timestamp": "2026-05-18T01:39:20.756Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 404,
+      "invariantId": "calcom.dynamic_booking_unknown_reschedule_uid_must_not_open_booking_flow",
+      "route": "/{username}+{username}?rescheduleUid={unknownUid}",
+      "title": "Dynamic booking page must not ignore an unknown reschedule UID",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [
+        {
+          "status": 200,
+          "url": "http://localhost:3000/user-0-1779068360757+bayesilisk-free-0qB5H4-0-1779068361002?rescheduleUid=missing-e4Y8FuGbHvAL"
+        }
+      ],
+      "observedStatus": 200,
+      "passed": false,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/user-0-1779068360757+bayesilisk-free-0qB5H4-0-1779068361002?rescheduleUid=missing-e4Y8FuGbHvAL",
+      "timestamp": "2026-05-18T01:39:21.350Z"
+    },
+    {
+      "actorRole": "user",
+      "expectedStatus": 410,
+      "invariantId": "calcom.password_reset_old_token_invalidated",
+      "route": "/auth/forgot-password/{oldResetRequestId}",
+      "title": "Superseded password reset token must remain invalid",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [],
+      "observedStatus": 410,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/auth/forgot-password/cmpajd9nl0000jore1a0rvsmn",
+      "timestamp": "2026-05-18T01:39:22.504Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 404,
+      "invariantId": "calcom.private_link_unknown_reschedule_uid_must_not_open_booking_flow",
+      "route": "/d/{hashedLink}/{eventType}?rescheduleUid={unknownUid}",
+      "title": "Private booking link must not ignore an unknown reschedule UID",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [
+        {
+          "status": 200,
+          "url": "http://localhost:3000/d/i9iYWDuMxN6r7mLYnjYoKA/30-min?rescheduleUid=missing-NzitiOvhhc2X"
+        }
+      ],
+      "observedStatus": 200,
+      "passed": false,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/d/i9iYWDuMxN6r7mLYnjYoKA/30-min?rescheduleUid=missing-NzitiOvhhc2X",
+      "timestamp": "2026-05-18T01:39:22.946Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 404,
+      "invariantId": "calcom.unknown_direct_reschedule_route_must_404",
+      "route": "/reschedule/{unknownUid}",
+      "title": "Unknown direct reschedule route must return not found",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [
+        {
+          "status": 404,
+          "url": "http://localhost:3000/reschedule/missing-38kHil1dgz3i"
+        }
+      ],
+      "observedStatus": 404,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "http://localhost:3000/reschedule/missing-38kHil1dgz3i",
+      "timestamp": "2026-05-18T01:39:22.995Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 403,
+      "invariantId": "calcom.seated_booking_random_seat_reference_cannot_cancel",
+      "route": "/booking/{bookingUid}?cancel=true&seatReferenceUid={unknownSeatReferenceUid}",
+      "title": "Random seat reference must not expose seated booking cancellation",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [],
+      "observedStatus": 403,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "/booking/{bookingUid}?cancel=true&seatReferenceUid={unknownSeatReferenceUid}",
+      "timestamp": "2026-05-18T01:39:23.344Z"
+    },
+    {
+      "actorRole": "attendee",
+      "expectedStatus": 403,
+      "invariantId": "calcom.seated_booking_requires_seat_reference_for_attendee_cancellation",
+      "route": "/booking/{bookingUid}?cancel=true",
+      "title": "Seated booking cancellation requires a concrete seat reference",
+      "artifactPaths": [],
+      "failureDetail": "",
+      "networkResponses": [],
+      "observedStatus": 403,
+      "passed": true,
+      "selector": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "source": "microsoft-playwright",
+      "targetUrl": "/booking/{bookingUid}?cancel=true",
+      "timestamp": "2026-05-18T01:39:23.696Z"
+    }
+  ],
+  "playwrightProbe": {
+    "artifactCount": 0,
+    "failedCount": 3,
+    "passedCount": 7,
+    "resultCount": 10,
+    "target": "cal.com local Playwright fixtures"
+  }
+}

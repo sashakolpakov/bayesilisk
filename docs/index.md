@@ -38,6 +38,7 @@ architecture
 reports
 integrations
 connectors
+examples
 development
 bayesilisk
 ```
