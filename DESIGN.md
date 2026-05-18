@@ -259,6 +259,38 @@ The scenario proposer model is the proposer.
 Bayesilisk is the judge.
 ```
 
+## Important Task: Generic Sequence Proposals
+
+Bayesilisk is not yet generally capable of synthesizing arbitrary longer
+browser runs while keeping the connector as a dumb executor. Today it can
+generate parameterized probes from connector-supplied proposal rules, but the
+connector still owns the concrete action implementation.
+
+The right architecture is:
+
+```text
+connector exposes action vocabulary + state facts
+  -> Bayesilisk generates bounded action sequences
+  -> connector executes declared actions exactly
+  -> connector reports observations
+  -> Bayesilisk verifies deterministic invariants
+```
+
+Example target sequence:
+
+```text
+create booking -> cancel booking -> replay uid via public route
+```
+
+The connector must not become the scenario generator. It should expose a small
+set of typed actions, actor/session fixtures, state-producing outputs, and
+route/action parameter bindings. Bayesilisk should own the generic sequence
+proposal layer that composes those actions into bounded runs.
+
+Current Cal.com status: the cancelled-booking replay run is evidence and a
+prototype fixture, not proof that the generic engine already owns long-run
+synthesis. Treat generic sequence proposal as the next core capability.
+
 ## Implementation Requirements
 
 Implementations must preserve:

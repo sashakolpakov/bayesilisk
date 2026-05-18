@@ -51,6 +51,18 @@ Observed locally:
 
 These are local fixture observations. They are not production observations.
 
+Additional baseline evidence in [baselines](baselines/) includes:
+
+- Nearby upstream E2E tests: `13` passed, `1` skipped, `0` unexpected failures.
+- Playwright-only connector baseline: `11` observations, `7` passing controls,
+  `4` failures.
+- Longer workflow failure: create booking, cancel booking, replay cancelled
+  booking UID as public `rescheduleUid`, observed normal booking route `200`
+  instead of blocked semantic status `409`.
+- LLM-agent browser baseline with `qwen2.5-coder:3b`: in `10` stochastic runs,
+  the agent selected the malformed URL `6` times, produced invalid selections
+  `3` times, and mismatched the deterministic oracle `3` times.
+
 Strict connector-contract check for these artifacts:
 
 ```json

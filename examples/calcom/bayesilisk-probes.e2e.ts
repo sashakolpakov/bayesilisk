@@ -302,6 +302,41 @@ test("Bayesilisk Cal.com workflow probes", async ({ page, users, bookings }) => 
   await recordProbe(
     results,
     {
+      actorRole: "attendee",
+      expectedStatus: 409,
+      invariantId: "calcom.cancelled_booking_uid_cannot_be_replayed_as_public_reschedule",
+      route: "/{username}/{eventType}?rescheduleUid={cancelledBookingUid}&bookingUid=null",
+      title: "Cancelled booking UID replay through public booking route is rejected",
+    },
+    async () => {
+      const user = await users.create({ name: "Bayesilisk cancelled booking replay" });
+      const [eventType] = user.eventTypes;
+      const booking = await bookings.create(user.id, user.username, eventType.id);
+      await prisma.booking.update({ where: { id: booking.id }, data: { status: BookingStatus.CANCELLED } });
+
+      const targetUrl = `/${user.username}/${eventType.slug}?rescheduleUid=${booking.uid}&bookingUid=null`;
+      const response = await page.goto(targetUrl);
+      const bookingFormVisible = await page.locator('[name="email"]').isVisible();
+      const blockedStateVisible =
+        (await page.locator('[data-testid="cancelled-headline"]').count()) > 0 ||
+        (await page.locator("[data-testid=success-page]").count()) > 0 ||
+        (await page.locator("text=This booking has been cancelled").count()) > 0;
+
+      return {
+        failureDetail: bookingFormVisible
+          ? "A cancelled booking UID was accepted as a public rescheduleUid and the normal booking form was visible."
+          : "",
+        networkResponses: [{ status: response?.status() ?? 0, url: response?.url() ?? page.url() }],
+        observedStatus: blockedStateVisible && !bookingFormVisible ? 409 : response?.status() ?? 200,
+        passed: blockedStateVisible && !bookingFormVisible,
+        targetUrl: page.url(),
+      };
+    }
+  );
+
+  await recordProbe(
+    results,
+    {
       actorRole: "organizer",
       expectedStatus: 409,
       invariantId: "calcom.reschedule_uid_must_match_event_type",

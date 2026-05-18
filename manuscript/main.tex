@@ -1,0 +1,190 @@
+\documentclass[10pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{xspace}
+
+\newcommand{\tool}{Bayesilisk\xspace}
+
+\title{Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle}
+\author{Draft manuscript}
+\date{May 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Large language models can help testers explore application states that are not
+covered by ordinary end-to-end scripts, but they are unsafe as test oracles.
+They can suggest plausible scenarios, misread application semantics, and
+overstate weak evidence. \tool separates these roles. App-specific connectors
+publish observable context, available actions, and deterministic rules.
+\tool expands the supplied scenario space, ranks probes, and verifies only
+observed evidence returned by the connector. This draft reports an initial
+Cal.com case study at commit
+\texttt{180ede28f0bddf2738933a6e60a8e80f6116d7da}: three connector-supplied
+source facts produced six Bayesilisk probe proposals, and all six local
+Playwright executions reproduced a mismatch where unknown or stale
+\texttt{rescheduleUid} values opened booking flows with semantic status
+\texttt{200} although the supplied invariant expected \texttt{404}. Nearby
+upstream E2E tests passed, a Playwright-only connector baseline found three
+unknown-\texttt{rescheduleUid} failures, and a weak local model produced three
+invalid proposals that the verifier rejected. A browser-driving LLM-agent
+baseline was repeated ten times: the agent selected the malformed URL in six
+runs, produced invalid selections in three runs, and mismatched the deterministic
+oracle in three runs. A longer connector baseline also reproduced a
+cancelled-booking replay sequence. The remaining limitation is architectural:
+\tool does not yet generically synthesize bounded multi-action sequences while
+keeping the connector as a pure executor.
+\end{abstract}
+
+\section{Problem}
+
+E2E suites are precise but narrow. LLM-driven agents are broad but unreliable:
+they can drive a browser, invent scenarios, and then incorrectly decide whether
+the behavior is acceptable. The core research claim behind \tool is that these
+jobs should be separated. An LLM or coding agent may help propose scenario
+spaces, but deterministic verifier rules must decide pass or fail.
+
+The intended workflow is:
+
+\begin{enumerate}
+  \item A connector extracts app-specific context: routes, actors, identifiers,
+        available actions, nearby tests, and expected behavior.
+  \item \tool expands only the supplied rule space and produces probe proposals.
+  \item The connector executes those proposals through the real app or its test
+        harness.
+  \item \tool verifies returned evidence against deterministic invariants and
+        emits issue-ready findings.
+\end{enumerate}
+
+The connector is app-specific. The Bayesilisk core is not. This boundary is the
+main architectural point: app teams write connectors; \tool provides the
+generic expansion, ranking, and verification loop.
+
+\section{Cal.com Case Study}
+
+We evaluated the current connector architecture on a local Cal.com checkout.
+The tested repository and revision were:
+
+\begin{itemize}
+  \item Repository: \url{https://github.com/calcom/cal.com}
+  \item Commit: \texttt{180ede28f0bddf2738933a6e60a8e80f6116d7da}
+  \item Commit date: \texttt{2026-05-14 19:30:21 +0000}
+  \item Commit subject: font-stack fallback fix for non-Latin script support
+        (\texttt{\#29346})
+  \item Bayesilisk seed: \texttt{150}
+\end{itemize}
+
+The checked-in Bayesilisk artifacts are in \texttt{examples/calcom/}. They
+include the connector, source context, generated proposals, execution context,
+JSON report, Markdown report, and issue payloads.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Artifact & Path \\
+\midrule
+Connector code & \texttt{examples/calcom/bayesilisk-probes.e2e.ts} \\
+Source context & \texttt{examples/calcom/source-context.json} \\
+Generated proposals & \texttt{examples/calcom/generated-proposals.json} \\
+Execution evidence & \texttt{examples/calcom/execution-context.json} \\
+Bayesilisk report & \texttt{examples/calcom/reports/report.json} \\
+Issue payloads & \texttt{examples/calcom/reports/issue-payloads.json} \\
+\bottomrule
+\end{tabular}
+\caption{Checked-in Cal.com artifacts.}
+\end{table}
+
+The connector supplied three source facts. These facts described Cal.com routes
+and explicit proposal rules around \texttt{rescheduleUid}. \tool generated six
+probe proposals: unknown and stale \texttt{rescheduleUid} values for public,
+private, and dynamic booking routes. The connector then executed those six
+proposals with Playwright against local fixtures.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llll}
+\toprule
+Area & Mutation & Expected & Observed \\
+\midrule
+Public booking page & unknown id & 404 & 200 \\
+Public booking page & stale id & 404 & 200 \\
+Private booking link & unknown id & 404 & 200 \\
+Private booking link & stale id & 404 & 200 \\
+Dynamic booking page & unknown id & 404 & 200 \\
+Dynamic booking page & stale id & 404 & 200 \\
+\bottomrule
+\end{tabular}
+\caption{Verified Cal.com connector observations.}
+\end{table}
+
+The result is useful because the pass/fail verdict did not come from a model.
+The connector returned concrete observed facts. \tool compared
+\texttt{expectedStatus} and \texttt{observedStatus}, classified the six
+observations as \texttt{breakage.context-observed}, and produced issue payloads.
+An upstream issue was opened from this evidence~\cite{calcomIssue}.
+
+\section{Evidence Still Needed}
+
+The Cal.com result demonstrates the connector split, a real route/state
+mutation finding, and three baseline comparisons.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llll}
+\toprule
+Workflow & Observed scope & Failures & Notes \\
+\midrule
+Nearby E2E & 14 specs & 0 unexpected & 13 passed, 1 skipped \\
+Playwright-only connector & 11 observations & 4 & Includes cancelled UID replay \\
+Bayesilisk proposal run & 6 proposals & 6 & Unknown and stale variants \\
+Weak local model & 3 raw proposals & 0 accepted & 3 verifier rejections \\
+LLM-agent browser & 10 runs & 3 mismatched & Stochastic oracle failures \\
+\bottomrule
+\end{tabular}
+\caption{Cal.com baseline comparison.}
+\end{table}
+
+It does not yet demonstrate the full paper claim. The remaining evidence needs
+are generic Bayesilisk synthesis of bounded multi-action runs from
+connector-declared capabilities, plus broader LLM-agent baseline coverage across
+more models and prompts.
+
+These baselines matter because the argument is not merely that browser
+automation can find a failing route. The intended claim is stronger: generic
+context-to-probe expansion plus deterministic verification can recover useful
+failures while avoiding the oracle mistakes of plain LLM agents.
+
+\section{Discussion}
+
+The current evidence supports a narrow claim: given connector-supplied source
+facts and rules, \tool can expand a small scenario space, execute it through an
+app-specific connector, and verify evidence without letting the LLM decide the
+outcome. This is already different from a plain Playwright script because the
+connector does not enumerate every final generated probe by hand; it exposes
+the local state and rule space, and \tool produces the concrete mutations.
+
+The remaining work is empirical. The paper needs more app artifacts and
+architecture work before it can claim generality for longer workflows. The
+right next layer is a generic sequence proposer: connectors declare actions and
+state facts, while \tool generates bounded action sequences and verifies the
+returned evidence. The immediate target should be a concise artifact-backed
+paper rather than a broad methodology claim.
+
+\section{Conclusion}
+
+\tool treats LLMs as scenario proposers, not as test oracles. The Cal.com case
+study shows the architecture working on a real app checkout with reproducible
+connector evidence, baseline logs, weak-model rejection evidence, and
+issue-ready findings. The next version of this manuscript should add a full
+generic sequence-proposal layer and an LLM-agent-only browser run that actually
+compares additional models and prompting strategies.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
