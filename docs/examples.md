@@ -45,9 +45,10 @@ The checked-in artifacts show:
 - upstream issue and fix-PR references in `examples/calcom/upstream-outcomes.md`.
 
 The upstream outcome references matter: an open fix PR linked to a Bayesilisk
-finding is stronger validation than a closed issue by itself, because it shows
-a human contributor found the report concrete enough to implement a targeted
-change.
+finding and then approved by a human reviewer is stronger validation than a
+closed issue by itself, because it shows one human contributor found the report
+concrete enough to implement a targeted change and another human reviewer found
+the fix correct enough to approve.
 
 Explanatory prose in connector context may help Grassmann attention route and
 rank the investigation, but proposal expansion comes from explicit rules and

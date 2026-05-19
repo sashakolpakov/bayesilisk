@@ -41,7 +41,7 @@ workflow sequence that created a booking, cancelled it, and replayed the
 cancelled booking UID through a public booking route. All seven returned
 deterministic expected-vs-observed violations. One upstream report has a
 targeted fix pull request that identifies the root cause and adds a regression
-Playwright test.
+Playwright test; a separate human reviewer approved that fix.
 
 The result is not a claim that LLMs can judge application
 correctness; it is evidence that LLM-style proposal can be useful when the
@@ -99,7 +99,8 @@ This paper makes four contributions:
         evidence verification;
   \item a Cal.com artifact showing seven generated probes, seven observed
         expected-vs-observed violations, reproducible issue payloads, and an
-        upstream targeted fix pull request for one reported issue; and
+        upstream targeted fix pull request with human approval review for one
+        reported issue; and
   \item an explicit account of scope and generalization: connectors are
         app-specific by design, action-sequence breadth is governed by the
         connector-declared graph, and the Cal.com comparison runs validate the
@@ -130,8 +131,10 @@ connector is the oracle.
 issue-ready findings. One public issue, \#29399~\cite{calcomIssue}, has an
 upstream contributor fix pull request, \#29400~\cite{calcomFixPr}, that
 identifies a missing null guard in \texttt{processReschedule} and adds a
-regression Playwright test. A separate workflow issue thread,
-\#29407~\cite{calcomCancelledIssue}, remains open at capture time.
+regression Playwright test. The fix PR has a human approval review that calls
+the null guard correct and the test coverage solid~\cite{calcomFixReview}. A
+separate workflow issue thread, \#29407~\cite{calcomCancelledIssue}, remains
+open at capture time.
 
 \section{Formal Model}
 
@@ -528,6 +531,8 @@ opened a normal booking flow instead of returning 404. An upstream contributor
 opened PR \#29400~\cite{calcomFixPr}. The PR identifies the root cause as a
 missing null guard in \texttt{processReschedule}, changes the server-side
 behavior to return \texttt{notFound}, and adds a Playwright regression test. The
+PR was then approved by another human reviewer, who characterized the null
+guard as correct and the regression coverage as solid~\cite{calcomFixReview}. The
 private-link variant was added to the same issue thread to avoid duplicate
 reporting. A separate issue, \#29407~\cite{calcomCancelledIssue}, reports the
 cancelled booking UID replay sequence and remains open at capture time.
@@ -540,7 +545,7 @@ cancelled booking UID replay sequence and remains open at capture time.
 \toprule
 Finding group & Upstream response \\
 \midrule
-Public unknown/stale \texttt{rescheduleUid} & Issue \#29399 with targeted fix PR \#29400: null guard and regression test \\
+Public unknown/stale \texttt{rescheduleUid} & Issue \#29399 with targeted fix PR \#29400: null guard, regression test, and human approval review \\
 Private-link \texttt{rescheduleUid} & Added to issue \#29399 as a related comment to avoid duplicate issue noise \\
 Cancelled booking UID replay & Separate state-transition report in issue \#29407; open at capture time \\
 \bottomrule
@@ -550,7 +555,8 @@ Cancelled booking UID replay & Separate state-transition report in issue \#29407
 
 This validation is practical rather than statistical. A fix PR does not prove
 the entire methodology, but it does show that at least one generated finding was
-actionable enough for an upstream contributor to diagnose and patch.
+actionable enough for an upstream contributor to diagnose and patch, and for
+another human reviewer to approve the fix.
 
 \section{Scope and Generalization}
 
@@ -645,7 +651,8 @@ probabilistic or heuristic, but validation and verification are deterministic
 functions over a connector-declared contract and connector-returned evidence.
 The Cal.com case study demonstrates that this separation can produce useful
 real-app findings: seven generated probes, seven observed invariant violations,
-issue-ready payloads, and a targeted upstream fix PR for one reported issue. The
+issue-ready payloads, and a review-approved upstream fix PR for one reported
+issue. The
 adoption path is incremental: write the connector around existing app fixtures,
 let \tool expand the scenario space, and keep the oracle deterministic. The next
 research step is to repeat this artifact discipline across additional

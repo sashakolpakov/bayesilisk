@@ -456,4 +456,5 @@ It records the Cal.com repository URL, exact commit hash, connector source
 contexts, Bayesilisk-generated route and workflow proposals, observed local
 execution context, app-only reports, issue payloads, and upstream outcome
 references. Those outcome references distinguish issue existence from stronger
-human validation such as an upstream fix PR linked to the Bayesilisk finding.
+human validation such as an upstream fix PR, human review approval, and
+regression test linked to the Bayesilisk finding.

@@ -139,8 +139,9 @@ observed local execution context, reports, and upstream outcome references. In
 the clean current run Bayesilisk generated 7 proposals: 6 route mutations from
 explicit connector rules plus 1 bounded workflow sequence from a
 connector-declared action graph. All 7 local observations were verified as app
-findings. One reported finding already has an upstream human-authored fix PR,
-which is stronger validation than an issue being closed without fix context.
+findings. One reported finding already has an upstream human-authored fix PR
+with a human approval review, which is stronger validation than an issue being
+closed without fix context.
 
 For coding agents and LLM teams building connectors, use the ingestible contract
 at [examples/connector-agent-contract.json](examples/connector-agent-contract.json).
