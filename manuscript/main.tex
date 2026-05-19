@@ -3,19 +3,21 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{xspace}
 
-\newcommand{\tool}{Bayesilisk\xspace}
+\newcommand{\tool}{\texttt{Bayesilisk}\xspace}
 \newcommand{\Pass}{\mathsf{pass}}
 \newcommand{\Fail}{\mathsf{fail}}
 \newcommand{\Invalid}{\mathsf{invalid}}
 
-\title{Beyond E2E Scripts: Using LLM-Proposed Scenarios \\
+\title{\vspace{-2em}\includegraphics[width=0.25\textwidth]{assets/bayesilisk_logo_bw.png}\\[0.8em]
+Beyond E2E Scripts: Using LLM-Proposed Scenarios \\
 Without Letting the LLM Be the Oracle}
-\author{Draft manuscript}
-\date{May 2026}
+\author{Alexander Kolpakov}
+\date{\today}
 
 \begin{document}
 \maketitle
@@ -29,8 +31,9 @@ search surface consisting of routes, actions, identifiers, state facts,
 invariants, and executable probe hooks. The \tool core expands that surface into
 candidate scenarios, rejects malformed candidates by deterministic contract
 validation, prioritizes valid probes with Grassmann-style attention and a
-Bayesian score, and verifies only evidence returned by connector execution. This
-paper gives a compact formal model for that loop and reports a Cal.com case
+Bayesian score, and verifies only evidence returned by connector execution.
+
+This paper gives a compact formal model for that loop and reports a Cal.com case
 study at a fixed May 2026 revision. From
 connector-declared route facts and an action graph, \tool generated seven
 probes: six unknown/stale \texttt{rescheduleUid} route mutations and one bounded
@@ -38,7 +41,9 @@ workflow sequence that created a booking, cancelled it, and replayed the
 cancelled booking UID through a public booking route. All seven returned
 deterministic expected-vs-observed violations. One upstream report has a
 targeted fix pull request that identifies the root cause and adds a regression
-Playwright test. The result is not a claim that LLMs can judge application
+Playwright test.
+
+The result is not a claim that LLMs can judge application
 correctness; it is evidence that LLM-style proposal can be useful when the
 oracle remains deterministic and evidence-bound.
 \end{abstract}
@@ -48,17 +53,27 @@ oracle remains deterministic and evidence-bound.
 End-to-end suites (E2E) are reliable when they fail because their assertions are
 explicit, executable, and repeatable. However, their weakness is coverage. A suite usually contains the workflows a team remembered to encode under the time and productivity constraints, not the combinatorial neighborhood around stale identifiers, role changes, cancelled state, direct routes, private links, feature flags, or replayed workflow tokens.
 
-On the other hand, LLM-driven browser agents have the opposite shape. They can suggest unusual states and longer sequences, but they are unreliable when asked to decide whether the observed behavior is correct. Neither they can guarantee reliable generation of valid scenarios.
+On the other hand, LLM-driven browser agents have the opposite shape. Prior work
+shows that language models can interleave reasoning and external actions, but
+realistic web-agent benchmarks still show large reliability gaps, and
+hallucination remains a known failure mode in generated text and
+reasoning~\cite{react,webarena,ji2023hallucination}. Such agents can suggest
+unusual states and longer sequences, but they are unreliable when asked to decide
+whether the observed behavior is correct. They also cannot guarantee reliable
+generation of valid scenarios.
+Recent agentic E2E work still asks the inherently stochastic model to infer
+pre/postcondition oracles~\cite{webtestpilot}; \tool instead keeps the oracle
+within deterministic connector-supplied bounds.
 
-\tool is built around a narrow separation: models propose where to
-look, but deterministic rules decide what counts as a valid scenario, and what constitutes a failure. The connector for an application exposes context and executable hooks; it does not own the scenario search strategy. The \tool core generates candidate scenarios from the declared surface, validates candidates against the connector contract, ranks valid probes, asks the connector to execute them, and verifies returned evidence
-against explicit invariants.
+\tool~\cite{bayesilisk} is built around a narrow separation: models propose where to
+look, but deterministic rules decide what counts as a valid scenario, and what constitutes a failure. The connector for an application exposes context and executable hooks; it does not own the scenario search strategy. The \tool core generates candidate scenarios from the declared surface, validates candidates against the connector contract, ranks valid probes, asks the connector to execute them, and verifies returned evidence against explicit invariants.
 
 This is close in spirit to property-based testing, where generators produce
 inputs and properties act as oracles~\cite{quickcheck}. The difference is the
 target: \tool treats a modern UI/API application as the system under test and
-uses browser/API probes as evidence sensors. It also treats LLM proposals as
-untrusted generator hints, not as properties and not as verdicts.
+uses browser/API probes, implemented in the artifact with Playwright, as
+evidence sensors~\cite{playwright}. It also treats LLM proposals as untrusted
+generator hints, not as properties and not as verdicts.
 
 The practical value is that teams do not have to choose between narrow E2E
 scripts and unconstrained LLM agents. If a team can describe the app surface it
@@ -106,10 +121,11 @@ deterministic invariants to evidence returned by the connector. Neither the LLM 
 connector is the oracle.
 
 \textbf{What external validation exists?} The Cal.com artifact produced
-issue-ready findings. One public issue, \#29399, has an upstream contributor fix
-pull request, \#29400, that identifies a missing null guard in
-\texttt{processReschedule} and adds a regression Playwright test. A separate
-workflow issue thread, \#29407, remains open at capture time.
+issue-ready findings. One public issue, \#29399~\cite{calcomIssue}, has an
+upstream contributor fix pull request, \#29400~\cite{calcomFixPr}, that
+identifies a missing null guard in \texttt{processReschedule} and adds a
+regression Playwright test. A separate workflow issue thread,
+\#29407~\cite{calcomCancelledIssue}, remains open at capture time.
 
 \section{Formal Model}
 
@@ -171,7 +187,7 @@ proposals, non-string fields, malformed JSON, impossible counts, and unsupported
 actions are rejected as proposer telemetry rather than reported as product
 failures.
 
-\subsection{Grassmann-Style Attention}
+\subsection{Grassmann Attention}
 
 The attention layer is a prioritizer, not an oracle. Conceptually, invariant
 descriptions and observations define local subspaces in a feature space. For an
@@ -183,8 +199,13 @@ can be written as
 where \(\Pi_{P_i}\) projects \(q\) onto the invariant plane. This follows the
 standard geometric view of subspaces on Grassmann manifolds~\cite{edelman1998geometry}.
 
-The current implementation uses a bounded anchor-plane proxy, with optional
-local embedding similarity. For each invariant \(i\), \tool computes
+However, \(\gamma_i(q)\) is only an ideal geometric score. The current
+implementation does not compute this projection directly. Instead, it uses an
+interpretable bounded anchor-plane proxy, \(\alpha_i\), whose novelty term can
+include embedding similarity to the same invariant-plane anchors. Thus
+\(\alpha_i\) is the operational attention score used for ranking planes in the
+current artifact, while \(\gamma_i\) describes the intended Grassmannian
+interpretation. For each invariant~\(i\), \tool computes
 \[
   \alpha_i =
   \operatorname{clip}_{[0,1]}
@@ -192,18 +213,139 @@ local embedding similarity. For each invariant \(i\), \tool computes
       w_f f_i + w_u u_i + w_s \sigma_i + w_p p_i + w_n n_i - d_i
   \right),
 \]
-where \(f_i\) is observed failure density, \(u_i\) is untestedness, \(\sigma_i\)
-is invariant sensitivity, \(p_i\) is Playwright evidence density, \(n_i\) is
-keyword or embedding novelty, and \(d_i\) is fixed/muted decay. The largest
+with current weights
+\[
+  (w_f,w_u,w_s,w_p,w_n)=(0.45,0.25,0.15,0.10,0.05).
+\]
+The variables are computed directly from context facts. The notation is:
+\(P_i\) is the invariant plane; \(q\) is the context vector; \(\Pi_{P_i}\) is
+projection onto \(P_i\); \(\gamma_i(q)\) is ideal Grassmann proximity;
+\(\alpha_i\) is the operational attention score; \(T_i\) is the number of facts
+whose \texttt{invariantId} is \(i\); \(F_i\) is the number of those facts that
+fail; \(N_i^{PW}\) is the number of those facts whose source is
+Playwright; \(K_i\) is the keyword-hit count; \(E_i\) is
+embedding similarity; \(\sigma_i\) is configured invariant sensitivity; and
+\(d_i\) is fixed/muted decay. The normalized feature names are: \(f_i\) for
+failure density, \(u_i\) for untestedness, \(p_i\) for Playwright evidence, and
+\(n_i\) for novelty.
+
+The current artifact uses three saturation thresholds:
+\[
+  \tau_T=4,\qquad \tau_P=3,\qquad \tau_K=6.
+\]
+They are calibration constants, not oracle rules. \(\tau_T\) means that after
+four observations a plane is no longer treated as materially untested;
+\(\tau_P\) means that three Playwright observations saturate the browser-evidence
+term; and \(\tau_K\) means that six keyword hits saturate lexical novelty.
+These values are current implementation defaults chosen to make attention
+saturate quickly on small connector artifacts; they should be treated as tunable
+ranking parameters and ablated in larger evaluations. Changing these thresholds
+changes prioritization pressure only; it does not change candidate validity or
+pass/fail verification. Then
+\[
+  f_i =
+  \begin{cases}
+    F_i/T_i & T_i>0,\\
+    0 & T_i=0,
+  \end{cases}
+  \qquad
+  u_i =
+  \begin{cases}
+    1 & T_i=0,\\
+    \max(0,1-\min(T_i,\tau_T)/\tau_T) & T_i>0,
+  \end{cases}
+  \qquad
+  p_i=\min(1,N_i^{PW}/\tau_P).
+\]
+In the current artifact, the sensitivity \(\sigma_i\) is read from the
+\texttt{INVARIANT\_SENSITIVITY} table maintained by the \tool authors in the
+core configuration. It encodes how sensitive an invariant plane is considered
+for search prioritization. If an invariant id is absent from that table, as may
+be the case for connector-supplied external invariants, the implementation uses
+the neutral default \(0.5\). The novelty term is
+\[
+  n_i=\max(\min(1,K_i/\tau_K),E_i),
+\]
+where \(K_i\) is the context keyword-hit count for invariant \(i\), and
+\(E_i\in[0,1]\) is optional embedding similarity to the invariant anchor plane
+(\(0\) if embeddings are disabled or unavailable). The decay \(d_i\) is \(0.12\)
+for fixed or regression-watch invariant ids, \(0.20\) for muted invariant ids,
+and \(0\) otherwise, using the larger value if both apply. The largest
 \(\alpha_i\) values select planes for exploration. They do not determine whether
 a behavior is correct.
 
 \subsection{Bayesian Ranking}
 
-After a deterministic invariant result exists, \tool computes a ranking score.
-For invariant \(i\), let \(\pi_i\) be its prior fault probability, let
-\(\Delta_i\) be a bounded context adjustment, and let \(\ell_i\) be the
-likelihood associated with the observed pass/fail result. The adjusted prior is
+Bayesian ranking runs only after a deterministic invariant result exists. It is
+used to order findings in the report, assign posterior-mode labels, and decide
+which issue candidates or probes appear first. It is not used to create a
+failure.
+
+For catalog and generated verifier scenarios, the ranking inputs come from two
+places: invariant metadata and connector/context observations. In the current
+implementation the invariant metadata is the \texttt{Invariant} object:
+\[
+  I_i =
+  (\texttt{id},\texttt{expected},\pi_i,L_i^{fail},L_i^{pass},
+   \texttt{difficulty},\phi_i).
+\]
+The \tool-authored catalog stores these objects in
+\texttt{bayesilisk/invariants.py}; report output serializes the same likelihood
+metadata as \texttt{failLikelihood} and \texttt{passLikelihood}. Thus
+\(\pi_i\), \(L_i^{fail}\), and \(L_i^{pass}\) are not inferred during a run.
+They are prior/ranking constants supplied by the invariant author with the
+invariant definition; they are not generated by the LLM and are not derived from
+connector execution. For connector-defined invariants, the same role is played
+by the connector's declared invariant metadata.
+
+The run-time context adjustment is computed from observation tags and explicit
+context fields. For finding fingerprint \(x\), invariant \(i\), and scenario
+\(s\), the implementation computes
+\[
+  \Delta_i =
+  -0.28\,\mathbf{1}_{x\in Fixed}
+  +0.18\,\mathbf{1}_{x\in Confirmed}
+  -0.45\,\mathbf{1}_{x\in Muted}
+  +A_i+B_s,
+\]
+where \(x\) is the finding fingerprint, \(A_i\) is an explicit context
+adjustment for invariant \(i\), and \(B_s\) is an explicit context adjustment
+for scenario \(s\); missing explicit adjustments are zero. The sets
+\(Fixed\), \(Confirmed\), and \(Muted\) are populated from
+\texttt{fixedFingerprints}, \texttt{confirmedFingerprints}, and
+\texttt{mutedFingerprints} in the context/observation file, plus fingerprints
+extracted from that context. \(A_i\) is read from the context field
+\texttt{priorAdjustments}; \(B_s\) is read from \texttt{scenarioAdjustments}.
+If these fields are absent or malformed, their contribution is zero.
+
+The likelihood used in the posterior is selected after deterministic
+verification. For a concrete scenario \(s\), \tool merges its fragments into
+facts \(F_s\) and calls the invariant evaluator:
+\[
+  \phi_i(F_s) \rightarrow (b_i,o_i),
+\]
+where \(b_i\) is the Boolean evaluator result and \(o_i\) is the evaluator's
+observation text. The reported deterministic result is
+\[
+  r_i =
+  \begin{cases}
+    \Pass & \text{if } b_i=\texttt{true},\\
+    \Fail & \text{if } b_i=\texttt{false}.
+  \end{cases}
+\]
+Only then does \tool choose the scalar likelihood used for ranking:
+\[
+  \ell_i =
+  \begin{cases}
+    L_i^{pass} & \text{if } r_i=\Pass,\\
+    L_i^{fail} & \text{if } r_i=\Fail.
+  \end{cases}
+\]
+So ``computed'' here means deterministic branch selection from invariant
+metadata after the evaluator has already returned pass/fail. There is no learned
+likelihood estimator in the current artifact, and the likelihood does not
+decide whether the scenario failed. It only changes the ordering of already
+evaluated findings. The adjusted prior is
 \[
   \tilde{\pi}_i = \operatorname{clip}_{[0.05,0.95]}(\pi_i + \Delta_i).
 \]
@@ -213,8 +355,16 @@ The posterior risk score is
   \frac{\tilde{\pi}_i \ell_i}
        {\tilde{\pi}_i \ell_i + (1-\tilde{\pi}_i)(1-\ell_i)}.
 \]
-This is a ranking score in the Bayesian sense~\cite{bishop2006pattern}. It is
-not the pass/fail rule. Pass/fail is produced only by the invariant evaluator.
+This is a ranking score in the Bayesian sense~\cite{bishop2006pattern}. Pass/fail
+is produced only by the invariant evaluator.
+
+Direct connector-observed findings use the same general report pipeline but a
+different scoring path. If connector evidence already contains a deterministic
+mismatch between expected and observed status, the finding is evidence-bearing
+before Bayesian ranking. \tool records it as a context-observed breakage,
+assigns a high report-ordering score, and marks it issue-ready. This path is
+connector-generic; Cal.com is the current case study using it, not a special
+rule in the core.
 
 \subsection{Evidence Verification}
 
@@ -252,7 +402,8 @@ application. App-specific code is isolated to connector execution.
 
 \section{Cal.com Case Study}
 
-We evaluated the current connector architecture on a local Cal.com checkout.
+We evaluated the current connector architecture on a local Cal.com
+checkout~\cite{calcom}.
 The tested repository and revision were:
 
 \begin{itemize}
@@ -317,7 +468,7 @@ Cancelled booking replay & cancelled uid & 409 & 200 \\
 \end{table}
 
 All seven probes executed against local Playwright fixtures without unexpected
-Playwright test failures. All seven returned evidence that violated the
+Playwright test failures~\cite{playwright}. All seven returned evidence that violated the
 connector-declared invariant. The route mutations expected semantic status
 \texttt{404} and observed \texttt{200}. The cancelled-booking replay expected
 semantic status \texttt{409} and observed \texttt{200}. \tool classified the
@@ -427,6 +578,51 @@ Playwright probes were narrower, weak local model output was rejected by
 validation, and browser-driving LLM trials showed oracle instability. A larger
 multi-app study would quantify effect size across projects and models; it is
 not required to establish the core separation demonstrated here.
+
+\section{Future Work}
+
+Two next steps would make the ranking layer more mathematically grounded while
+preserving the same trust boundary: attention and probability may guide search,
+but they must not become the oracle.
+
+\textbf{Actual Grassmann attention.} The current implementation uses
+\(\alpha_i\), a bounded anchor-plane proxy for the ideal Grassmannian score
+\(\gamma_i(q)\). A fuller version should construct an explicit feature vector
+\(q\) for each connector context and an orthonormal basis \(U_i\) for each
+invariant subspace \(P_i\). The operational attention score could then be the
+projection energy
+\[
+  \gamma_i(q)=\|U_i^\top q\|_2^2,
+\]
+or a related Grassmann distance based on principal angles between the context
+subspace and invariant subspace. The basis vectors can be built from invariant
+text, connector-declared routes/actions, nearby tests, execution evidence, and
+validated historical findings. This would replace the current hand-weighted
+proxy as the main exploration router, while leaving deterministic verification
+unchanged~\cite{edelman1998geometry}.
+
+\textbf{Calibrated likelihoods.} The current artifact uses invariant-level
+ranking constants \(L_i^{fail}\) and \(L_i^{pass}\). A stronger version should
+estimate likelihoods from validation data. Let \(Z_i\) mean that invariant
+\(i\) is genuinely violated, and let \(r_i\in\{\Pass,\Fail\}\) be the
+deterministic verifier result. For a failing result, the calibrated posterior
+should use
+\[
+  P(Z_i\mid r_i=\Fail)=
+  \frac{P(Z_i)P(r_i=\Fail\mid Z_i)}
+       {P(Z_i)P(r_i=\Fail\mid Z_i)+
+        P(\neg Z_i)P(r_i=\Fail\mid \neg Z_i)}.
+\]
+The terms \(P(r_i=\Fail\mid Z_i)\) and
+\(P(r_i=\Fail\mid \neg Z_i)\) are the true-positive and false-positive behavior
+of that verifier/probe family. They can be estimated from historical
+Bayesilisk findings, seeded faults, negative controls, connector evidence
+quality, invariant class, and human validation signals such as upstream issue
+acceptance, fix pull requests, and regression tests. Passing controls should be
+calibrated analogously with \(P(r_i=\Pass\mid Z_i)\) and
+\(P(r_i=\Pass\mid \neg Z_i)\). This would turn the current hand-calibrated
+ranking constants into empirical reliability estimates without changing the
+rule that pass/fail is decided only by deterministic invariants~\cite{bishop2006pattern,guo2017calibration}.
 
 \section{Conclusion}
 

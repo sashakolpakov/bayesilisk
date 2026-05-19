@@ -293,6 +293,80 @@ Cal.com connector executes that generated proposal directly. This is evidence
 for the declared-action sequence architecture, not proof that Bayesilisk can
 synthesize arbitrary free-form browser runs.
 
+## Important Task: True Grassmann Attention
+
+The current `attentionScore` is an interpretable bounded proxy for Grassmann
+attention. It uses failure density, untestedness, invariant sensitivity,
+Playwright evidence, novelty, and fixed/muted decay. That proxy is useful for
+small artifacts, but it is not the full Grassmann operation.
+
+The target architecture is:
+
+```text
+connector context + invariant definitions + nearby tests + observed evidence
+  -> feature vectors or local subspace bases
+  -> invariant planes
+  -> projection or Grassmann-distance score
+  -> bounded probe prioritization
+  -> deterministic verifier remains authoritative
+```
+
+For invariant plane `P_i` with orthonormal basis `U_i` and context vector `q`,
+the direct projection score is:
+
+```text
+gamma_i(q) = || U_i^T q ||_2^2
+```
+
+Equivalent future implementations may use principal angles or another explicit
+Grassmann distance between a context subspace and an invariant subspace. The
+important requirement is that the Grassmann layer remains only a router. It can
+choose where Bayesilisk spends verifier budget; it cannot decide pass/fail.
+
+## Important Task: Calibrated Likelihoods
+
+The current Bayesian ranking path uses invariant-level constants:
+
+```text
+prior
+fail_likelihood
+pass_likelihood
+```
+
+Those constants are supplied by the invariant author and selected after the
+deterministic evaluator returns pass or fail. This is an initial ranking proxy,
+not an empirical calibration.
+
+The target architecture is to estimate likelihood terms from validation data.
+For invariant `i`, let `Z_i` mean that the app genuinely violates the invariant,
+and let `r_i` be the deterministic verifier result. For a failing result, the
+ranking model should estimate:
+
+```text
+P(r_i = fail | Z_i)      # true-positive behavior
+P(r_i = fail | not Z_i)  # false-positive behavior
+```
+
+For a passing result, it should estimate:
+
+```text
+P(r_i = pass | Z_i)
+P(r_i = pass | not Z_i)
+```
+
+Useful calibration sources include:
+
+- historical Bayesilisk findings and their outcomes;
+- seeded faults in fixture or demo apps;
+- negative controls against known-good states;
+- connector evidence quality, such as direct status mismatch versus weaker UI text;
+- invariant/probe family, such as stale id, permission boundary, workflow order, or feature flag;
+- human validation signals, including accepted upstream issues, fix PRs, and added regression tests.
+
+The calibrated likelihood model still must not decide pass/fail. It only ranks
+findings after deterministic verification and helps prioritize future probe
+budget.
+
 ## Implementation Requirements
 
 Implementations must preserve:
