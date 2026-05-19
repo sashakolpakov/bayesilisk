@@ -45,21 +45,13 @@ oracle remains deterministic and evidence-bound.
 
 \section{Introduction}
 
-End-to-end suites are reliable when they fail because their assertions are
-explicit, executable, and repeatable. Their weakness is coverage. A suite usually
-contains the workflows a team remembered to encode, not the combinatorial
-neighborhood around stale identifiers, role changes, cancelled state, direct
-routes, private links, feature flags, or replayed workflow tokens. LLM-driven
-browser agents have the opposite shape. They can suggest unusual states and
-longer sequences, but they are unreliable when asked to decide whether the
-observed behavior is correct.
+End-to-end suites (E2E) are reliable when they fail because their assertions are
+explicit, executable, and repeatable. However, their weakness is coverage. A suite usually contains the workflows a team remembered to encode under the time and productivity constraints, not the combinatorial neighborhood around stale identifiers, role changes, cancelled state, direct routes, private links, feature flags, or replayed workflow tokens.
 
-\tool is built around a narrow separation: models may help propose where to
-look, but deterministic rules decide what counts as a failure. The connector for
-an application exposes context and executable hooks; it does not own the
-scenario search strategy. The \tool core generates candidate scenarios from the
-declared surface, validates candidates against the connector contract, ranks
-valid probes, asks the connector to execute them, and verifies returned evidence
+On the other hand, LLM-driven browser agents have the opposite shape. They can suggest unusual states and longer sequences, but they are unreliable when asked to decide whether the observed behavior is correct. Neither they can guarantee reliable generation of valid scenarios.
+
+\tool is built around a narrow separation: models propose where to
+look, but deterministic rules decide what counts as a valid scenario, and what constitutes a failure. The connector for an application exposes context and executable hooks; it does not own the scenario search strategy. The \tool core generates candidate scenarios from the declared surface, validates candidates against the connector contract, ranks valid probes, asks the connector to execute them, and verifies returned evidence
 against explicit invariants.
 
 This is close in spirit to property-based testing, where generators produce
@@ -72,9 +64,9 @@ The practical value is that teams do not have to choose between narrow E2E
 scripts and unconstrained LLM agents. If a team can describe the app surface it
 already understands---actors, routes, actions, fixtures, identifiers, and
 rules---\tool can sweep the adjacent scenario space, prioritize suspicious
-combinations, and emit deterministic issue payloads. The claim is deliberately
+combinations, and emit deterministic issue payloads. Our claim is deliberately
 bounded but useful: \tool does not replace domain knowledge; it turns that
-domain knowledge into a larger, repeatable search procedure.
+domain knowledge into a larger, more variable, and repeatable search procedure.
 
 This paper makes four contributions:
 
@@ -96,7 +88,7 @@ This paper makes four contributions:
 
 \section{Claim Audit}
 
-A skeptical reader should ask four questions.
+There are four important questions to be answered about \tool, including its architecture and use cases.
 
 \textbf{Who generates scenarios?} The connector declares the app-specific search
 surface: routes, actions, identifiers, state facts, invariants, and valid
@@ -116,8 +108,8 @@ connector is the oracle.
 \textbf{What external validation exists?} The Cal.com artifact produced
 issue-ready findings. One public issue, \#29399, has an upstream contributor fix
 pull request, \#29400, that identifies a missing null guard in
-\texttt{processReschedule} and adds a regression Playwright test. A second
-workflow issue, \#29407, remains open at capture time.
+\texttt{processReschedule} and adds a regression Playwright test. A separate
+workflow issue thread, \#29407, remains open at capture time.
 
 \section{Formal Model}
 
@@ -133,15 +125,18 @@ generic function over \(C\).
 
 \subsection{Scenario Generation and Validation}
 
-A route-mutation candidate has the form
+From connector-declared route facts and mutation schemas, \tool constructs a
+route-mutation candidate of the form
 \[
   s = (r, a, i, p, m),
 \]
-where \(r \in R\), \(a \in A\), \(i \in I\), \(p\) is a route parameter, and
-\(m \in M(p)\) is an allowed mutation such as unknown, stale, foreign, missing,
-or duplicate. \tool generates candidates by taking the cross product of
-connector-declared facts and mutation schemas, then deduplicating by action,
-invariant, route pattern, parameter, and mutation id.
+where \(r \in R\) is a declared route pattern, \(a \in A\) is a declared
+connector action, \(i \in I\) is a declared invariant, \(p\) is a declared route
+parameter, and \(m \in M(p)\) is an allowed mutation for that parameter, such as
+unknown, stale, foreign, missing, or duplicate. The connector does not enumerate
+this final candidate. It declares the searchable surface and the allowed
+mutation schema; \tool performs the expansion, deduplication, validation, and
+ranking.
 
 An action-sequence candidate is generated from an action graph
 \[
@@ -363,14 +358,14 @@ browser run illustrates why the model should not be the oracle.
 
 \section{Upstream Validation}
 
-Two upstream issues were opened from the Cal.com evidence. The first,
+Two upstream issue threads were opened from the Cal.com evidence. The first,
 \#29399~\cite{calcomIssue}, reported that an unknown \texttt{rescheduleUid}
 opened a normal booking flow instead of returning 404. An upstream contributor
 opened PR \#29400~\cite{calcomFixPr}. The PR identifies the root cause as a
 missing null guard in \texttt{processReschedule}, changes the server-side
 behavior to return \texttt{notFound}, and adds a Playwright regression test. The
 private-link variant was added to the same issue thread to avoid duplicate
-reporting. The second issue, \#29407~\cite{calcomCancelledIssue}, reports the
+reporting. A separate issue, \#29407~\cite{calcomCancelledIssue}, reports the
 cancelled booking UID replay sequence and remains open at capture time.
 
 \begin{table}[h]
