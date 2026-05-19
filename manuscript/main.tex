@@ -66,7 +66,13 @@ pre/postcondition oracles~\cite{webtestpilot}; \tool instead keeps the oracle
 within deterministic connector-supplied bounds.
 
 \tool~\cite{bayesilisk} is built around a narrow separation: models propose where to
-look, but deterministic rules decide what counts as a valid scenario, and what constitutes a failure. The connector for an application exposes context and executable hooks; it does not own the scenario search strategy. The \tool core generates candidate scenarios from the declared surface, validates candidates against the connector contract, ranks valid probes, asks the connector to execute them, and verifies returned evidence against explicit invariants.
+look, but deterministic rules decide what counts as a valid scenario, and what
+constitutes a failure. Ranking is a later triage step, not an oracle. The
+connector for an application exposes context and executable hooks; it does not
+own the scenario search strategy. The \tool core generates candidate scenarios
+from the declared surface, validates candidates against the connector contract,
+ranks valid probes, asks the connector to execute them, and verifies returned
+evidence against explicit invariants.
 
 This is close in spirit to property-based testing, where generators produce
 inputs and properties act as oracles~\cite{quickcheck}. The difference is the
@@ -279,7 +285,12 @@ a behavior is correct.
 Bayesian ranking runs only after a deterministic invariant result exists. It is
 used to order findings in the report, assign posterior-mode labels, and decide
 which issue candidates or probes appear first. It is not used to create a
-failure.
+failure. Operationally, the pipeline is: \tool generates or accepts a candidate
+scenario; contract validation rejects malformed or non-applicable candidates;
+the connector executes valid probes or returns observed evidence; a deterministic
+invariant produces \(\Pass\) or \(\Fail\); and only then does \tool compute
+\(\rho_i\). Thus Bayesian ranking answers which verified finding a tester should
+inspect first. It does not answer whether the behavior is a bug.
 
 For catalog and generated verifier scenarios, the ranking inputs come from two
 places: invariant metadata and connector/context observations. In the current
@@ -355,16 +366,18 @@ The posterior risk score is
   \frac{\tilde{\pi}_i \ell_i}
        {\tilde{\pi}_i \ell_i + (1-\tilde{\pi}_i)(1-\ell_i)}.
 \]
-This is a ranking score in the Bayesian sense~\cite{bishop2006pattern}. Pass/fail
-is produced only by the invariant evaluator.
+This is a ranking score in the Bayesian sense~\cite{bishop2006pattern}. The
+report sorts by decreasing \(\rho_i\), then by posterior mode and finding id,
+so \(\rho_i\) controls report order, follow-up probe order, and triage labels.
+Pass/fail is produced only by the invariant evaluator.
 
 Direct connector-observed findings use the same general report pipeline but a
 different scoring path. If connector evidence already contains a deterministic
 mismatch between expected and observed status, the finding is evidence-bearing
-before Bayesian ranking. \tool records it as a context-observed breakage,
-assigns a high report-ordering score, and marks it issue-ready. This path is
-connector-generic; Cal.com is the current case study using it, not a special
-rule in the core.
+before Bayesian ranking. \tool records it as a context-observed breakage, marks
+it issue-ready, and gives it high report priority. This is evidence-first
+ranking, not learned Bayesian inference. The path is connector-generic; Cal.com
+is the current case study using it, not a special rule in the core.
 
 \subsection{Evidence Verification}
 

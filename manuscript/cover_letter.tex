@@ -1,0 +1,52 @@
+\documentclass[11pt]{letter}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{url}
+
+\signature{Alexander Kolpakov}
+\address{}
+\date{\today}
+
+\begin{document}
+
+\begin{letter}{Automated Software Engineering}
+
+\opening{Dear Editors,}
+
+I am pleased to submit the manuscript ``Beyond E2E Scripts: Using
+LLM-Proposed Scenarios Without Letting the LLM Be the Oracle'' for
+consideration.
+
+The paper presents Bayesilisk, a testing architecture that separates scenario
+proposal from correctness judgment. App-specific connectors expose bounded
+application context, executable probe hooks, and deterministic invariants.
+Bayesilisk then expands the declared scenario space, validates candidate probes,
+prioritizes valid probes, and verifies only connector-returned evidence against
+the deterministic rules. The central claim is deliberately narrow: language
+models and model-like proposal mechanisms can help explore missed application
+states, but they should not act as test oracles.
+
+The manuscript combines a compact formal model with a Cal.com case study. At a
+fixed May 2026 revision, Bayesilisk generated seven deterministic violations
+from connector-declared route facts and a bounded action graph, including
+unknown and stale \texttt{rescheduleUid} route mutations and a create-cancel-
+replay workflow sequence. One upstream report led to a human-authored fix pull
+request with a regression Playwright test, providing external validation that
+the evidence was actionable rather than merely synthetic.
+
+We believe the work is relevant to readers interested in software testing,
+LLM-assisted development, end-to-end testing, and practical verification of web
+applications. Its contribution is not another autonomous browser agent, but an
+evidence-bound architecture for using model-generated scenario exploration
+without delegating the oracle to a stochastic model.
+
+The manuscript is original, has not been published elsewhere, and is not under
+simultaneous consideration by another venue. Any code and artifact references
+included in the manuscript are provided to support reproducibility.
+
+\closing{Sincerely,}
+
+\end{letter}
+
+\end{document}
