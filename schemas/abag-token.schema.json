@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bayesilisk.local/schemas/abag-token.schema.json",
   "title": "Bayesilisk ABAG token",
-  "description": "A transitional ABAG token may be a legacy string token or a typed universal token with an app-specific refinement.",
-  "type": ["string", "object"],
+  "description": "A typed universal ABAG token with optional app-specific connector refinement.",
+  "type": "object",
   "additionalProperties": false,
   "required": ["token"],
   "properties": {

@@ -18,6 +18,12 @@ in [docs/connectors.md](../../docs/connectors.md): source facts declare
 `availableActions`; observed facts declare `expectedStatus`, `observedStatus`,
 and `passed` from local Playwright/API execution.
 
+For longer workflows, the source context uses typed ABAG tokens. Bayesilisk
+matches `token` plus optional `resourceType`; connector-only names such as
+`booking.uid`, `booking.id`, `eventType.slug`, and `user.username` live in
+`refines` and are emitted only so the Cal.com Playwright connector can execute
+the generated sequence.
+
 Explanatory prose is still useful. The `text`, `sourceText`, and `nearbyTests`
 fields can help Grassmann attention route and rank the investigation. They do
 not authorize proposal expansion by themselves, and they do not decide pass or
@@ -102,6 +108,11 @@ Then run the Cal.com connector in a local Cal.com checkout with the generated
 proposal file. The example connector expects Cal.com's Playwright test
 environment and local database fixtures.
 
+The connector fails fast if the local app server is not reachable. In the
+checkout used for these artifacts, `.env` had empty local secrets, so the run
+provided non-empty `NEXTAUTH_SECRET` and `CALENDSO_ENCRYPTION_KEY` in the shell
+environment before starting or reusing the local Playwright web server.
+
 ```sh
 BAYESILISK_PROPOSALS_INPUT=/tmp/calcom-bayesilisk-proposals.json \
 BAYESILISK_CONTEXT_OUTPUT=/tmp/calcom-bayesilisk-execution-context.json \
@@ -150,7 +161,8 @@ files and context. Bayesilisk core only expands supplied proposal rules and
 verifies observed evidence.
 
 For longer workflows, the connector can expose an action graph rather than a
-single action. In this example Bayesilisk composes:
+single action. In this example Bayesilisk composes over typed ABAG tokens and
+then emits connector-facing refinements for execution:
 
 ```text
 create-booking -> cancel-booking -> open-public-booking-route(rescheduleUid=booking.uid)

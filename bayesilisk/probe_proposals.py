@@ -220,16 +220,12 @@ def _typed_token_match_keys(value: dict[str, Any]) -> list[str]:
 
 
 def _token_match_keys(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return [_string(value)] if _string(value) else []
     if not isinstance(value, dict):
         return []
     return _unique_strings(_typed_token_match_keys(value))
 
 
 def _token_display_id(value: Any) -> str:
-    if isinstance(value, str):
-        return _string(value)
     if not isinstance(value, dict):
         return ""
     concrete = _string(value.get("refines") or value.get("appToken") or value.get("id"))

@@ -158,47 +158,9 @@ to real app actions.
 
 For longer deterministic workflows, a connector can also declare an action
 graph. The connector still owns execution, but Bayesilisk can compose bounded
-sequences from declared action inputs and outputs.
-
-```json
-{
-  "connectorActionGraph": {
-    "actions": [
-      {
-        "actionId": "create-booking",
-        "produces": ["booking.uid", "eventType.slug", "user.username"]
-      },
-      {
-        "actionId": "cancel-booking",
-        "requires": ["booking.uid"],
-        "produces": ["booking.status.cancelled"]
-      },
-      {
-        "actionId": "open-public-booking-route",
-        "requires": ["user.username", "eventType.slug"]
-      }
-    ],
-    "sequenceRules": [
-      {
-        "ruleId": "cancelled-booking-replay",
-        "invariantId": "calcom.cancelled_booking_replay_rejected",
-        "expectedBehavior": {"status": 409},
-        "requiresState": ["booking.status.cancelled"],
-        "goal": {
-          "action": "open-public-booking-route",
-          "paramBindings": {"rescheduleUid": "booking.uid"}
-        },
-        "maxDepth": 4,
-        "title": "Cancelled booking UID replay is rejected"
-      }
-    ]
-  }
-}
-```
-
-The string-token form above is accepted as the v1 input form. New connectors
-should prefer ABAG typed tokens when the graph may become reusable across apps.
-Typed tokens separate the universal meaning from the app-specific handle:
+sequences from declared action inputs and outputs. Action-graph dependencies
+must be ABAG typed tokens. Typed tokens separate the universal meaning from the
+app-specific handle:
 
 ```json
 {
@@ -216,10 +178,7 @@ the concrete refinement.
 
 Boundary rule: Bayesilisk matches typed-token dependencies using `token` plus
 optional `resourceType`. It does not use `refines` to satisfy dependencies.
-`refines` is only for connector execution and readable proposal output. Legacy
-string tokens are still accepted, but a legacy string such as `booking.uid` will
-not satisfy a typed requirement such as `resource.public_id` with
-`resourceType: "booking"`. If a connector wants reusable ABAG behavior, declare
+`refines` is only for connector execution and readable proposal output. Declare
 typed tokens on the producing actions, consuming actions, required states, and
 parameter bindings.
 
@@ -233,14 +192,15 @@ The same Cal.com-shaped sequence can therefore be written as:
         "actionId": "create-booking",
         "produces": [
           {"token": "resource.public_id", "resourceType": "booking", "refines": "booking.uid"},
-          "eventType.slug",
-          "user.username"
+          {"token": "resource.id", "resourceType": "booking", "refines": "booking.id"},
+          {"token": "resource.public_id", "resourceType": "event_type", "refines": "eventType.slug"},
+          {"token": "principal.actor", "resourceType": "calcom_user", "refines": "user.username"}
         ]
       },
       {
         "actionId": "cancel-booking",
         "requires": [
-          {"token": "resource.public_id", "resourceType": "booking"}
+          {"token": "resource.id", "resourceType": "booking", "refines": "booking.id"}
         ],
         "produces": [
           {"token": "state.cancelled", "resourceType": "booking", "refines": "booking.status.cancelled"}
@@ -248,7 +208,10 @@ The same Cal.com-shaped sequence can therefore be written as:
       },
       {
         "actionId": "open-public-booking-route",
-        "requires": ["user.username", "eventType.slug"]
+        "requires": [
+          {"token": "principal.actor", "resourceType": "calcom_user", "refines": "user.username"},
+          {"token": "resource.public_id", "resourceType": "event_type", "refines": "eventType.slug"}
+        ]
       }
     ],
     "sequenceRules": [

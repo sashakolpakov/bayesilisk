@@ -294,36 +294,26 @@ Cal.com connector executes that generated proposal directly. This is evidence
 for the declared-action sequence architecture, not proof that Bayesilisk can
 synthesize arbitrary free-form browser runs.
 
-## Design Sprint: Abstract Action Graphs
+## Abstract Action Graphs
 
-The current `connectorActionGraph` is useful but too literal. It composes string
-tokens such as:
+`connectorActionGraph` uses Abstract Bayesilisk Action Graph (ABAG) tokens:
+connector-declared graph nodes and edges carry universal typed tokens plus
+optional app-specific refinements. The connector still owns execution.
+Bayesilisk composes over the abstract graph.
 
-```text
-create-booking produces booking.uid
-cancel-booking requires booking.uid, produces booking.status.cancelled
-open-public-booking-route binds rescheduleUid <- booking.uid
-```
-
-This finds the Cal.com sequence, but Bayesilisk does not yet know that the same
-flow shape appears in other apps:
+The same abstract flow shape appears in many apps:
 
 ```text
-create-invoice -> void-invoice -> replay invoice public link
-create-reset-token -> expire-token -> replay token
-create-invite -> revoke-invite -> accept invite
+create booking -> cancel booking -> replay booking uid through public route
+create invoice -> void invoice -> replay invoice public link
+create reset token -> expire token -> replay token
+create invite -> revoke invite -> accept invite
 ```
 
-Today the core sees only string dependency flow. The design target is an
-Abstract Bayesilisk Action Graph (ABAG): a connector-declared graph whose nodes
-and edges carry universal typed tokens plus optional app-specific refinements.
-The connector still owns execution. Bayesilisk operates on the abstract graph.
-For typed ABAG inputs, Bayesilisk must match dependencies by `token` plus
-optional `resourceType`. The `refines` field is connector-facing: it names the
-concrete app token that execution code understands and may be emitted in
-proposal parameters, but it must not satisfy abstract graph dependencies.
-Legacy string tokens remain accepted as string-token graphs, but they do not
-stand in for typed ABAG tokens.
+Bayesilisk matches ABAG dependencies by `token` plus optional `resourceType`.
+The `refines` field is connector-facing: it names the concrete app token that
+execution code understands and may be emitted in proposal parameters, but it
+must not satisfy abstract graph dependencies.
 
 ### ABAG Token Vocabulary
 
@@ -405,19 +395,18 @@ kernels, learned graph embeddings, or quasi-isometry-inspired clustering for
 graphs that preserve large-scale token flow despite local naming differences.
 Those methods remain prioritizers. They do not become oracles.
 
-### Sprint Deliverables
+### Implementation Requirements
 
-- define a JSON schema for ABAG tokens instead of arbitrary string-only
-  `requires` and `produces` entries;
-- document token naming rules and the distinction between universal tokens and
-  app refinements;
-- add connector examples that map concrete app actions into ABAG nodes;
-- add motif examples for stale id replay, revoked token replay, tenant swap,
-  role downgrade, and duplicate submission;
-- update `docs/connectors.md` and `examples/connector-agent-contract.json` so
-  test teams can write ABAG-capable connectors without touching Bayesilisk core;
-- keep the current string-token graph accepted during the design sprint, but
-  treat it as a transitional input form, not the long-term abstraction.
+- action-graph `requires`, `produces`, `requiresState`, and `paramBindings`
+  must use ABAG token objects;
+- app-specific names belong in `resourceType` and `refines`, not in `token`;
+- `refines` may appear in proposal output for connector execution, but it must
+  not drive core graph matching;
+- connector examples must map concrete app actions into ABAG nodes;
+- reusable motif examples should cover stale id replay, revoked token replay,
+  tenant swap, role downgrade, and duplicate submission;
+- test teams write connectors and ABAG mappings without touching Bayesilisk
+  core.
 
 ## Important Task: True Grassmann Attention
 

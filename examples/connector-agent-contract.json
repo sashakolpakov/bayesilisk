@@ -103,7 +103,7 @@
     "Keep app-specific nouns in resourceType and refines, not in token.",
     "Use refines for the concrete connector token that app-specific execution code understands.",
     "Bayesilisk matches typed dependencies by token plus optional resourceType, never by refines.",
-    "Legacy string tokens are accepted as transitional input, but typed tokens are preferred for reusable action graphs."
+    "Action-graph requires, produces, requiresState, and paramBindings must use typed ABAG token objects."
   ],
   "abagTokenVocabulary": [
     "principal.actor",

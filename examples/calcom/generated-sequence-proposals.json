@@ -13,8 +13,31 @@
         "params": {},
         "produces": [
           "booking.uid",
+          "booking.id",
           "eventType.slug",
           "user.username"
+        ],
+        "producesTokens": [
+          {
+            "refines": "booking.uid",
+            "resourceType": "booking",
+            "token": "resource.public_id"
+          },
+          {
+            "refines": "booking.id",
+            "resourceType": "booking",
+            "token": "resource.id"
+          },
+          {
+            "refines": "eventType.slug",
+            "resourceType": "event_type",
+            "token": "resource.public_id"
+          },
+          {
+            "refines": "user.username",
+            "resourceType": "calcom_user",
+            "token": "principal.actor"
+          }
         ],
         "requires": [],
         "stepId": "step.01.create_booking"
@@ -25,13 +48,34 @@
         "produces": [
           "booking.status.cancelled"
         ],
+        "producesTokens": [
+          {
+            "refines": "booking.status.cancelled",
+            "resourceType": "booking",
+            "token": "state.cancelled"
+          }
+        ],
         "requires": [
-          "booking.uid"
+          "booking.id"
+        ],
+        "requiresTokens": [
+          {
+            "refines": "booking.id",
+            "resourceType": "booking",
+            "token": "resource.id"
+          }
         ],
         "stepId": "step.02.cancel_booking"
       },
       {
         "connectorAction": "open-public-booking-route",
+        "paramBindingTokens": {
+          "rescheduleUid": {
+            "refines": "booking.uid",
+            "resourceType": "booking",
+            "token": "resource.public_id"
+          }
+        },
         "params": {
           "rescheduleUid": "booking.uid"
         },
@@ -39,6 +83,18 @@
         "requires": [
           "eventType.slug",
           "user.username"
+        ],
+        "requiresTokens": [
+          {
+            "refines": "eventType.slug",
+            "resourceType": "event_type",
+            "token": "resource.public_id"
+          },
+          {
+            "refines": "user.username",
+            "resourceType": "calcom_user",
+            "token": "principal.actor"
+          }
         ],
         "stepId": "step.03.open_public_booking_route"
       }

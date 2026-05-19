@@ -202,6 +202,9 @@ async function recordProbe(
     }
   } catch (error) {
     failureDetail = error instanceof Error ? error.message : String(error);
+    if (failureDetail.includes("ERR_CONNECTION_REFUSED") || failureDetail.includes("ECONNREFUSED")) {
+      throw error;
+    }
   }
   results.push({
     ...probe,
@@ -215,6 +218,25 @@ async function recordProbe(
     targetUrl,
     timestamp: new Date().toISOString(),
   });
+}
+
+async function assertAppAvailable(page: any) {
+  await expect
+    .poll(
+      async () => {
+        try {
+          const response = await page.request.get("/", { timeout: 5000 });
+          return response.status();
+        } catch {
+          return 999;
+        }
+      },
+      {
+        message: "Cal.com web server must be reachable before Bayesilisk probes collect evidence",
+        timeout: 30000,
+      }
+    )
+    .toBeLessThan(500);
 }
 
 async function executeWorkflowSequenceProposal(
@@ -304,6 +326,7 @@ test.afterEach(async ({ users }) => {
 test("Bayesilisk Cal.com workflow probes", async ({ page, users, bookings }) => {
   const results: ProbeResult[] = [];
   const proposals = loadProbeProposals();
+  await assertAppAvailable(page);
 
   if (proposals.length) {
     for (const proposal of proposals) {

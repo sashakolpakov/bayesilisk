@@ -7,25 +7,58 @@
       {
         "actionId": "create-booking",
         "produces": [
-          "booking.uid",
-          "eventType.slug",
-          "user.username"
+          {
+            "token": "resource.public_id",
+            "resourceType": "booking",
+            "refines": "booking.uid"
+          },
+          {
+            "token": "resource.id",
+            "resourceType": "booking",
+            "refines": "booking.id"
+          },
+          {
+            "token": "resource.public_id",
+            "resourceType": "event_type",
+            "refines": "eventType.slug"
+          },
+          {
+            "token": "principal.actor",
+            "resourceType": "calcom_user",
+            "refines": "user.username"
+          }
         ]
       },
       {
         "actionId": "cancel-booking",
         "produces": [
-          "booking.status.cancelled"
+          {
+            "token": "state.cancelled",
+            "resourceType": "booking",
+            "refines": "booking.status.cancelled"
+          }
         ],
         "requires": [
-          "booking.uid"
+          {
+            "token": "resource.id",
+            "resourceType": "booking",
+            "refines": "booking.id"
+          }
         ]
       },
       {
         "actionId": "open-public-booking-route",
         "requires": [
-          "eventType.slug",
-          "user.username"
+          {
+            "token": "resource.public_id",
+            "resourceType": "event_type",
+            "refines": "eventType.slug"
+          },
+          {
+            "token": "principal.actor",
+            "resourceType": "calcom_user",
+            "refines": "user.username"
+          }
         ]
       }
     ],
@@ -38,13 +71,20 @@
         "goal": {
           "action": "open-public-booking-route",
           "paramBindings": {
-            "rescheduleUid": "booking.uid"
+            "rescheduleUid": {
+              "token": "resource.public_id",
+              "resourceType": "booking",
+              "refines": "booking.uid"
+            }
           }
         },
         "invariantId": "calcom.cancelled_booking_uid_cannot_be_replayed_as_public_reschedule",
         "maxDepth": 4,
         "requiresState": [
-          "booking.status.cancelled"
+          {
+            "token": "state.cancelled",
+            "resourceType": "booking"
+          }
         ],
         "ruleId": "cancelled-booking-public-replay",
         "title": "Cancelled booking UID replay through public booking route is rejected"

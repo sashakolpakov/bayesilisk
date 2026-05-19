@@ -11,6 +11,16 @@ Tested app revision:
 
 ## Current Runs
 
+The current package was rebuilt from scratch on May 19, 2026:
+
+1. Bayesilisk generated 6 route-mutation proposals from `source-context.json`.
+2. Bayesilisk generated 1 typed-ABAG workflow sequence from
+   `sequence-source-context.json`.
+3. The Cal.com Playwright connector executed those proposals against the local
+   checkout.
+4. `../execution-context.json` was consolidated only from the fresh connector
+   observations.
+
 Artifacts:
 
 - `generated-proposals-run.json`: Playwright run for the 6 generated

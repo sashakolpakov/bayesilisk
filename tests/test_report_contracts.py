@@ -65,6 +65,9 @@ def validate_schema(instance: Any, schema: dict[str, Any], *, registry: dict[str
             extra = sorted(set(instance) - set(properties))
             if extra:
                 raise SchemaError(f"{path}: unexpected keys {extra!r}")
+        elif isinstance(additional, dict):
+            for key in sorted(set(instance) - set(properties)):
+                validate_schema(instance[key], additional, registry=registry, path=f"{path}.{key}")
         for key, subschema in properties.items():
             if key in instance:
                 validate_schema(instance[key], subschema, registry=registry, path=f"{path}.{key}")
@@ -111,6 +114,67 @@ def type_matches(instance: Any, schema_type: str | list[str]) -> bool:
     if schema_type == "string":
         return isinstance(instance, str)
     raise SchemaError(f"unsupported schema type {schema_type!r}")
+
+
+def calcom_typed_action_graph_context() -> dict[str, Any]:
+    return {
+        "source": "connector-source-context",
+        "agentNotes": ["connector exposes ABAG typed tokens"],
+        "priorAdjustments": {},
+        "repositoryFacts": [],
+        "connectorActionGraph": {
+            "actions": [
+                {
+                    "actionId": "create-booking",
+                    "produces": [
+                        {"token": "resource.public_id", "resourceType": "booking", "refines": "booking.uid"},
+                        {"token": "resource.id", "resourceType": "booking", "refines": "booking.id"},
+                        {"token": "resource.public_id", "resourceType": "event_type", "refines": "eventType.slug"},
+                        {"token": "principal.actor", "resourceType": "calcom_user", "refines": "user.username"},
+                    ],
+                },
+                {
+                    "actionId": "cancel-booking",
+                    "requires": [
+                        {"token": "resource.id", "resourceType": "booking", "refines": "booking.id"},
+                    ],
+                    "produces": [
+                        {"token": "state.cancelled", "resourceType": "booking", "refines": "booking.status.cancelled"},
+                    ],
+                },
+                {
+                    "actionId": "open-public-booking-route",
+                    "requires": [
+                        {"token": "principal.actor", "resourceType": "calcom_user", "refines": "user.username"},
+                        {"token": "resource.public_id", "resourceType": "event_type", "refines": "eventType.slug"},
+                    ],
+                },
+            ],
+            "sequenceRules": [
+                {
+                    "ruleId": "cancelled-booking-replay",
+                    "expectedBehavior": {"status": 409},
+                    "goal": {
+                        "action": "open-public-booking-route",
+                        "paramBindings": {
+                            "rescheduleUid": {
+                                "token": "resource.public_id",
+                                "resourceType": "booking",
+                                "refines": "booking.uid",
+                            }
+                        },
+                    },
+                    "invariantId": "external.cancelled_booking_replay_rejected",
+                    "maxDepth": 4,
+                    "requiresState": [
+                        {"token": "state.cancelled", "resourceType": "booking"},
+                    ],
+                    "title": "Cancelled booking UID replay is rejected",
+                }
+            ],
+        },
+        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
+    }
 
 
 def test_golden_baseline_report_matches_report_schema(monkeypatch: Any) -> None:
@@ -278,44 +342,7 @@ def test_connector_action_graph_generates_bounded_sequence_proposals(monkeypatch
     from bayesilisk.probe_proposals import generate_probe_proposals, generate_sequence_proposals
     from bayesilisk import reporting
 
-    context = {
-        "source": "connector-source-context",
-        "agentNotes": ["connector exposes actions and state facts"],
-        "priorAdjustments": {},
-        "repositoryFacts": [],
-        "connectorActionGraph": {
-            "actions": [
-                {
-                    "actionId": "create-booking",
-                    "produces": ["booking.uid", "eventType.slug", "user.username"],
-                },
-                {
-                    "actionId": "cancel-booking",
-                    "requires": ["booking.uid"],
-                    "produces": ["booking.status.cancelled"],
-                },
-                {
-                    "actionId": "open-public-booking-route",
-                    "requires": ["user.username", "eventType.slug"],
-                },
-            ],
-            "sequenceRules": [
-                {
-                    "ruleId": "cancelled-booking-replay",
-                    "expectedBehavior": {"status": 409},
-                    "goal": {
-                        "action": "open-public-booking-route",
-                        "paramBindings": {"rescheduleUid": "booking.uid"},
-                    },
-                    "invariantId": "external.cancelled_booking_replay_rejected",
-                    "maxDepth": 4,
-                    "requiresState": ["booking.status.cancelled"],
-                    "title": "Cancelled booking UID replay is rejected",
-                }
-            ],
-        },
-        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
-    }
+    context = calcom_typed_action_graph_context()
 
     sequence_proposals = generate_sequence_proposals(context)
     proposals = generate_probe_proposals(context)
@@ -339,74 +366,7 @@ def test_connector_action_graph_supports_abag_typed_tokens(monkeypatch: Any) -> 
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
     from bayesilisk.probe_proposals import generate_sequence_proposals
 
-    context = {
-        "source": "connector-source-context",
-        "agentNotes": ["connector exposes ABAG typed tokens"],
-        "priorAdjustments": {},
-        "repositoryFacts": [],
-        "connectorActionGraph": {
-            "actions": [
-                {
-                    "actionId": "create-booking",
-                    "produces": [
-                        {
-                            "token": "resource.public_id",
-                            "resourceType": "booking",
-                            "refines": "booking.uid",
-                        },
-                        "eventType.slug",
-                        "user.username",
-                    ],
-                },
-                {
-                    "actionId": "cancel-booking",
-                    "requires": [
-                        {
-                            "token": "resource.public_id",
-                            "resourceType": "booking",
-                        }
-                    ],
-                    "produces": [
-                        {
-                            "token": "state.cancelled",
-                            "resourceType": "booking",
-                            "refines": "booking.status.cancelled",
-                        }
-                    ],
-                },
-                {
-                    "actionId": "open-public-booking-route",
-                    "requires": ["user.username", "eventType.slug"],
-                },
-            ],
-            "sequenceRules": [
-                {
-                    "ruleId": "cancelled-booking-replay",
-                    "expectedBehavior": {"status": 409},
-                    "goal": {
-                        "action": "open-public-booking-route",
-                        "paramBindings": {
-                            "rescheduleUid": {
-                                "token": "resource.public_id",
-                                "resourceType": "booking",
-                                "refines": "booking.uid",
-                            }
-                        },
-                    },
-                    "invariantId": "external.cancelled_booking_replay_rejected",
-                    "maxDepth": 4,
-                    "requiresState": [
-                        {
-                            "token": "state.cancelled",
-                            "resourceType": "booking",
-                        }
-                    ],
-                    "title": "Cancelled booking UID replay is rejected",
-                }
-            ],
-        },
-        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
-    }
+    context = calcom_typed_action_graph_context()
 
     registry = schema_registry()
     validate_schema(context, registry["playwright-context.schema.json"], registry=registry)
@@ -420,7 +380,7 @@ def test_connector_action_graph_supports_abag_typed_tokens(monkeypatch: Any) -> 
         "cancel-booking",
         "open-public-booking-route",
     ]
-    assert proposal["sequenceSteps"][0]["produces"] == ["booking.uid", "eventType.slug", "user.username"]
+    assert proposal["sequenceSteps"][0]["produces"] == ["booking.uid", "booking.id", "eventType.slug", "user.username"]
     assert proposal["sequenceSteps"][0]["producesTokens"][0] == {
         "token": "resource.public_id",
         "resourceType": "booking",
@@ -479,7 +439,7 @@ def test_connector_action_graph_rejects_unsupported_sequences() -> None:
     context = {
         "connectorActionGraph": {
             "actions": [
-                {"actionId": "open-public-booking-route", "requires": ["user.username", "eventType.slug"]},
+                {"actionId": "open-public-booking-route", "requires": []},
             ],
             "sequenceRules": [
                 {
@@ -487,10 +447,18 @@ def test_connector_action_graph_rejects_unsupported_sequences() -> None:
                     "expectedBehavior": {"status": 409},
                     "goal": {
                         "action": "open-public-booking-route",
-                        "paramBindings": {"rescheduleUid": "booking.uid"},
+                        "paramBindings": {
+                            "rescheduleUid": {
+                                "token": "resource.public_id",
+                                "resourceType": "booking",
+                                "refines": "booking.uid",
+                            }
+                        },
                     },
                     "invariantId": "external.missing_producer",
-                    "requiresState": ["booking.status.cancelled"],
+                    "requiresState": [
+                        {"token": "state.cancelled", "resourceType": "booking"},
+                    ],
                     "title": "Cannot build without producer actions",
                 }
             ],

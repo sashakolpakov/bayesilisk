@@ -1120,11 +1120,32 @@ def test_bayesilisk_mcp_server_expands_connector_sequence_proposals() -> None:
                     "context": {
                         "connectorActionGraph": {
                             "actions": [
-                                {"actionId": "create-object", "produces": ["object.id"]},
+                                {
+                                    "actionId": "create-object",
+                                    "produces": [
+                                        {
+                                            "token": "resource.public_id",
+                                            "resourceType": "generic_object",
+                                            "refines": "object.id",
+                                        }
+                                    ],
+                                },
                                 {
                                     "actionId": "retire-object",
-                                    "requires": ["object.id"],
-                                    "produces": ["object.state.retired"],
+                                    "requires": [
+                                        {
+                                            "token": "resource.public_id",
+                                            "resourceType": "generic_object",
+                                            "refines": "object.id",
+                                        }
+                                    ],
+                                    "produces": [
+                                        {
+                                            "token": "state.revoked",
+                                            "resourceType": "generic_object",
+                                            "refines": "object.state.retired",
+                                        }
+                                    ],
                                 },
                                 {"actionId": "open-object-route", "requires": []},
                             ],
@@ -1134,10 +1155,21 @@ def test_bayesilisk_mcp_server_expands_connector_sequence_proposals() -> None:
                                     "expectedBehavior": {"status": 410},
                                     "goal": {
                                         "action": "open-object-route",
-                                        "paramBindings": {"objectId": "object.id"},
+                                        "paramBindings": {
+                                            "objectId": {
+                                                "token": "resource.public_id",
+                                                "resourceType": "generic_object",
+                                                "refines": "object.id",
+                                            }
+                                        },
                                     },
                                     "invariantId": "external.retired_object_replay",
-                                    "requiresState": ["object.state.retired"],
+                                    "requiresState": [
+                                        {
+                                            "token": "state.revoked",
+                                            "resourceType": "generic_object",
+                                        }
+                                    ],
                                     "title": "Retired object replay is rejected",
                                 }
                             ],

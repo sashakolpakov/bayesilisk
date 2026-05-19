@@ -45,7 +45,17 @@
             "required": ["ruleId", "invariantId", "goal", "expectedBehavior"],
             "properties": {
               "expectedBehavior": {"type": "object"},
-              "goal": {"type": "object"},
+              "goal": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "action": {"type": "string"},
+                  "paramBindings": {
+                    "type": "object",
+                    "additionalProperties": {"$ref": "abag-token.schema.json"}
+                  }
+                }
+              },
               "invariantId": {"type": "string"},
               "maxDepth": {"type": "integer", "minimum": 1},
               "requiresState": {"type": "array", "items": {"$ref": "abag-token.schema.json"}},
