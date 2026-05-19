@@ -35,7 +35,8 @@ Bayesian score, and verifies only evidence returned by connector execution.
 
 This paper gives a compact formal model for that loop and reports a Cal.com case
 study at a fixed May 2026 revision. From
-connector-declared route facts and an action graph, \tool generated seven
+connector-declared route facts and a typed Abstract Bayesilisk Action Graph
+(ABAG), \tool generated seven
 probes: six unknown/stale \texttt{rescheduleUid} route mutations and one bounded
 workflow sequence that created a booking, cancelled it, and replayed the
 cancelled booking UID through a public booking route. All seven returned
@@ -74,6 +75,12 @@ from the declared surface, validates candidates against the connector contract,
 ranks valid probes, asks the connector to execute them, and verifies returned
 evidence against explicit invariants.
 
+The workflow form of this boundary is an Abstract Bayesilisk Action Graph
+(ABAG). In an ABAG, \tool sees typed abstract tokens such as
+\texttt{resource.public\_id}/\texttt{booking}; the connector/adaptor supplies
+refinements such as \texttt{booking.uid} so the abstract proposal can be
+executed in the concrete application.
+
 This is close in spirit to property-based testing, where generators produce
 inputs and properties act as oracles~\cite{quickcheck}. The difference is the
 target: \tool treats a modern UI/API application as the system under test and
@@ -96,7 +103,7 @@ This paper makes four contributions:
         LLM as the oracle;
   \item a mathematical formulation of connector contracts, scenario validation,
         Grassmann-style attention, Bayesian ranking, and deterministic
-        evidence verification;
+        evidence verification, including typed ABAG workflow composition;
   \item a Cal.com artifact showing seven generated probes, seven observed
         expected-vs-observed violations, reproducible issue payloads, and an
         upstream targeted fix pull request with human approval review for one
@@ -114,9 +121,11 @@ There are four important questions to be answered about \tool, including its arc
 
 \textbf{Who generates scenarios?} The connector declares the app-specific search
 surface: routes, actions, identifiers, state facts, invariants, and valid
-mutation or action schemas. \tool generates concrete candidate scenarios from
-that declared surface, optionally using LLM proposals as additional candidate
-ideas. The connector does not enumerate final tests.
+mutation or action schemas. For workflow probes, it declares a typed ABAG:
+actions, abstract token preconditions, abstract token products, state
+requirements, and connector refinements. \tool generates concrete candidate
+scenarios from that declared surface, optionally using LLM proposals as
+additional candidate ideas. The connector does not enumerate final tests.
 
 \textbf{Who executes scenarios?} The connector executes validated probe requests
 through the real application, local fixtures, Playwright, API calls, or a test
@@ -145,8 +154,10 @@ Let an application connector publish a contract
 where \(R\) is a set of route patterns, \(A\) is a set of connector actions,
 \(F\) is a set of observable state facts and identifiers, \(I\) is a set of
 deterministic invariants, \(M\) is a set of parameter mutation schemas, and
-\(G\) is an action graph. The connector is app-specific; the \tool core is a
-generic function over \(C\).
+\(G\) is an Abstract Bayesilisk Action Graph. The connector is app-specific; the
+\tool core is a generic function over \(C\). In this sense the connector is an
+application adaptor: it translates between concrete app fixtures and the
+abstract contract consumed by \tool.
 
 \subsection{Scenario Generation and Validation}
 
@@ -163,38 +174,88 @@ this final candidate. It declares the searchable surface and the allowed
 mutation schema; \tool performs the expansion, deduplication, validation, and
 ranking.
 
-An action-sequence candidate is generated from an action graph
+\subsection{Abstract Bayesilisk Action Graphs}
+
+For longer workflows, \tool uses a typed Abstract Bayesilisk Action Graph
+(ABAG)
 \[
-  G = (A, \operatorname{req}, \operatorname{prod}),
+  G = (A,T,\operatorname{req},\operatorname{prod},\operatorname{bind}),
 \]
-where each action has required tokens and produced tokens. A sequence
+where \(A\) is the connector action set and \(T\) is a set of typed tokens. A
+token \(\tau \in T\) has three relevant fields:
+\[
+  \tau = (u,c,\rho).
+\]
+The components deliberately separate the portable abstraction from the
+app-specific adaptor vocabulary:
+\begin{itemize}
+  \item \(u\) is the universal token, for example
+        \texttt{resource.public\_id} or \texttt{state.cancelled};
+  \item \(c\) is an optional class that narrows the token, for example
+        \texttt{booking}, \texttt{event\_type}, or \texttt{calcom\_user};
+  \item \(\rho\) is an optional concrete connector refinement, for example
+        \texttt{booking.uid} or \texttt{user.username}.
+\end{itemize}
+The abstract key used by the \tool core is
+\[
+  \kappa(\tau) = (u,c).
+\]
+The refinement \(\rho\) is not used to satisfy graph dependencies. It is
+connector-facing metadata that lets the adaptor execute a generated abstract
+probe against concrete fixtures.
+
+Each action \(a\in A\) has required and produced token sets,
+\(\operatorname{req}(a)\subseteq T\) and
+\(\operatorname{prod}(a)\subseteq T\). A sequence
 \[
   \sigma = (a_1,\ldots,a_k)
 \]
 is valid for a terminal goal action \(a_k\) only if
 \[
   \forall t \in \{1,\ldots,k\}:
-  \operatorname{req}(a_t) \subseteq \bigcup_{j<t}\operatorname{prod}(a_j),
+  \{\kappa(\tau):\tau\in\operatorname{req}(a_t)\}
+  \subseteq
+  \bigcup_{j<t}\{\kappa(\tau):\tau\in\operatorname{prod}(a_j)\},
   \qquad k \le d_{\max}.
 \]
-Thus a connector can expose actions such as create booking, cancel booking, and
-open booking route, while \tool composes the bounded workflow. The connector
-still owns concrete execution.
+Goal parameter bindings are also typed. If a terminal action has a parameter
+\(p\), then \(\operatorname{bind}(a_k,p)=\tau\) means that \tool may bind
+\(p\) to a previously produced token with the same abstract key \(\kappa(\tau)\).
+If \(\rho\) is present, \tool emits it in the generated proposal so the
+connector can look up the concrete value. Thus \tool may reason over
+\texttt{resource.public\_id}/\texttt{booking}, while the Cal.com connector
+executes with \texttt{booking.uid}. This is the central refinement boundary:
+Bayesilisk composes and validates over abstract tokens; the connector/adaptor
+executes concrete app operations through refinements.
+
+This makes the reusable unit a graph motif rather than an app noun. The same
+abstract sequence
+\[
+  \texttt{resource.create}
+  \rightarrow
+  \texttt{state.transition(revoked)}
+  \rightarrow
+  \texttt{identifier.replay(boundary)}
+\]
+can describe cancelled booking replay, voided invoice link replay, expired
+password-reset token replay, or revoked invitation acceptance. Each app needs
+its own connector refinements and execution hooks, but the \tool core sees the
+same class of verifier-search problem.
 
 Validation is deterministic:
 \[
   V_C(s) =
   \begin{cases}
-    1 & \text{if every referenced route, action, parameter, fact, and invariant
-         is declared in } C,\\
+    1 & \text{if every referenced route, action, parameter, fact, token, and
+         invariant is declared in } C,\\
     0 & \text{otherwise.}
   \end{cases}
 \]
 Only candidates with \(V_C(s)=1\) can become executable probes. LLM output enters
 the same validation gate. Unknown target planes, unknown ids, duplicate
 proposals, non-string fields, malformed JSON, impossible counts, and unsupported
-actions are rejected as proposer telemetry rather than reported as product
-failures.
+actions or ill-typed ABAG tokens are rejected as proposer telemetry rather than
+reported as product failures.
 
 \subsection{Grassmann Attention}
 
@@ -432,7 +493,7 @@ The tested repository and revision were:
 \end{itemize}
 
 The connector supplied three route facts for booking pages with
-\texttt{rescheduleUid} behavior and one action graph for a longer booking
+\texttt{rescheduleUid} behavior and one typed ABAG for a longer booking
 workflow. \tool generated six route-mutation probes and one workflow-sequence
 probe. The sequence was:
 \[
@@ -440,6 +501,28 @@ probe. The sequence was:
   \texttt{cancel-booking} \rightarrow
   \texttt{open-public-booking-route}.
 \]
+
+The ABAG was not Cal.com logic embedded in the \tool core. The checked-in
+connector acted as an adaptor. Its \texttt{create-booking} action produced four
+abstract-to-concrete refinements:
+\begin{itemize}
+  \item \texttt{resource.public\_id}/\texttt{booking}
+        \(\mapsto\) \texttt{booking.uid};
+  \item \texttt{resource.id}/\texttt{booking}
+        \(\mapsto\) \texttt{booking.id};
+  \item \texttt{resource.public\_id}/\texttt{event\_type}
+        \(\mapsto\) \texttt{eventType.slug};
+  \item \texttt{principal.actor}/\texttt{calcom\_user}
+        \(\mapsto\) \texttt{user.username}.
+\end{itemize}
+The \texttt{cancel-booking} action required
+\texttt{resource.id}/\texttt{booking} and produced
+\texttt{state.cancelled}/\texttt{booking}. The
+\texttt{open-public-booking-route} action bound \texttt{rescheduleUid} to
+\texttt{resource.public\_id}/\texttt{booking}.
+\tool matched only the abstract keys and generated the sequence. The Cal.com
+Playwright connector used the \texttt{refines} names to execute real fixture
+operations and return observed status evidence.
 
 \begin{table}[h]
 \centering
@@ -579,6 +662,14 @@ specification can declare actors, routes, action hooks, identifiers, and
 invariants without modifying the \tool core. Connector quality still matters:
 the broader and more accurate the declared surface, the broader the generated
 probe space.
+
+\textbf{ABAG refinement boundary.} Typed ABAG tokens are the portability layer.
+The \tool core matches \texttt{token} and optional \texttt{resourceType}. It does
+not treat \texttt{refines} as evidence that a dependency is satisfied.
+\texttt{refines} is deliberately adaptor-local: it carries concrete names that
+the connector needs to execute a probe, such as fixture fields, URL parameters,
+database ids, or session handles. This keeps Cal.com names out of the verifier
+while still letting the generated proposal be executable.
 
 \textbf{Bounded workflow generation.} Sequence generation is intentionally
 bounded by the connector-declared action graph and depth. That bound can still
