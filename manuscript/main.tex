@@ -24,20 +24,17 @@ publish observable context, available actions, and deterministic rules.
 \tool expands the supplied scenario space, ranks probes, and verifies only
 observed evidence returned by the connector. This draft reports an initial
 Cal.com case study at commit
-\texttt{180ede28f0bddf2738933a6e60a8e80f6116d7da}: three connector-supplied
-source facts produced six Bayesilisk probe proposals, and all six local
-Playwright executions reproduced a mismatch where unknown or stale
+\texttt{180ede28f0bddf2738933a6e60a8e80f6116d7da}: connector-supplied
+route facts and an action graph produced seven Bayesilisk probe proposals. Six
+local Playwright executions reproduced a mismatch where unknown or stale
 \texttt{rescheduleUid} values opened booking flows with semantic status
-\texttt{200} although the supplied invariant expected \texttt{404}. Nearby
-upstream E2E tests passed, a Playwright-only connector baseline found three
-unknown-\texttt{rescheduleUid} failures, and a weak local model produced three
-invalid proposals that the verifier rejected. A browser-driving LLM-agent
-baseline was repeated ten times: the agent selected the malformed URL in six
-runs, produced invalid selections in three runs, and mismatched the deterministic
-oracle in three runs. A longer connector baseline also reproduced a
-cancelled-booking replay sequence. The remaining limitation is architectural:
-\tool does not yet generically synthesize bounded multi-action sequences while
-keeping the connector as a pure executor.
+\texttt{200} although the supplied invariant expected \texttt{404}; a seventh
+bounded workflow proposal created a booking, cancelled it, and replayed the
+cancelled booking UID through the public booking route, again observing
+\texttt{200} where the supplied invariant expected \texttt{409}. One reported
+finding already has an upstream human-authored fix pull request. The current
+artifact set keeps only this clean seven-finding rerun; baseline comparisons
+should be recreated as fresh runs when needed.
 \end{abstract}
 
 \section{Problem}
@@ -79,8 +76,9 @@ The tested repository and revision were:
 \end{itemize}
 
 The checked-in Bayesilisk artifacts are in \texttt{examples/calcom/}. They
-include the connector, source context, generated proposals, execution context,
-JSON report, Markdown report, and issue payloads.
+include the connector, source contexts, generated proposals, consolidated
+execution context, app-only JSON report, app-only Markdown report, issue
+payloads, and the two Playwright run logs for the clean rerun.
 
 \begin{table}[h]
 \centering
@@ -91,19 +89,24 @@ Artifact & Path \\
 Connector code & \texttt{examples/calcom/bayesilisk-probes.e2e.ts} \\
 Source context & \texttt{examples/calcom/source-context.json} \\
 Generated proposals & \texttt{examples/calcom/generated-proposals.json} \\
+Sequence context & \texttt{examples/calcom/sequence-source-context.json} \\
+Generated sequence & \texttt{examples/calcom/generated-sequence-proposals.json} \\
 Execution evidence & \texttt{examples/calcom/execution-context.json} \\
 Bayesilisk report & \texttt{examples/calcom/reports/report.json} \\
 Issue payloads & \texttt{examples/calcom/reports/issue-payloads.json} \\
+Upstream outcomes & \texttt{examples/calcom/upstream-outcomes.md} \\
 \bottomrule
 \end{tabular}
 \caption{Checked-in Cal.com artifacts.}
 \end{table}
 
-The connector supplied three source facts. These facts described Cal.com routes
-and explicit proposal rules around \texttt{rescheduleUid}. \tool generated six
-probe proposals: unknown and stale \texttt{rescheduleUid} values for public,
-private, and dynamic booking routes. The connector then executed those six
-proposals with Playwright against local fixtures.
+The connector supplied source facts for Cal.com routes and an action graph for
+one workflow. \tool generated six route probes and one workflow-sequence probe.
+The route probes mutate unknown and stale \texttt{rescheduleUid} values for
+public, private, and dynamic booking routes. The workflow probe creates a
+booking, cancels it, and replays the cancelled booking UID through the public
+booking route. The connector executed all seven proposals with Playwright
+against local fixtures.
 
 \begin{table}[h]
 \centering
@@ -117,6 +120,7 @@ Private booking link & unknown id & 404 & 200 \\
 Private booking link & stale id & 404 & 200 \\
 Dynamic booking page & unknown id & 404 & 200 \\
 Dynamic booking page & stale id & 404 & 200 \\
+Cancelled booking replay & cancelled uid & 409 & 200 \\
 \bottomrule
 \end{tabular}
 \caption{Verified Cal.com connector observations.}
@@ -124,14 +128,47 @@ Dynamic booking page & stale id & 404 & 200 \\
 
 The result is useful because the pass/fail verdict did not come from a model.
 The connector returned concrete observed facts. \tool compared
-\texttt{expectedStatus} and \texttt{observedStatus}, classified the six
+\texttt{expectedStatus} and \texttt{observedStatus}, classified the seven
 observations as \texttt{breakage.context-observed}, and produced issue payloads.
-An upstream issue was opened from this evidence~\cite{calcomIssue}.
+Two upstream issues were opened from this evidence: one for public
+\texttt{rescheduleUid} replay~\cite{calcomIssue} and one for cancelled booking
+UID replay~\cite{calcomCancelledIssue}. The first issue already has a
+human-authored fix pull request~\cite{calcomFixPr}. This is stronger validation
+than issue closure alone: an issue can be closed as erroneous, but a targeted
+fix PR indicates that a human contributor found the report actionable.
+
+\section{Upstream Response}
+
+The upstream response is important because the claim is not only that
+\tool can emit plausible reports. The reports need to be useful to humans
+working on the target system.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llll}
+\toprule
+Finding group & Issue & Human response & Status at capture \\
+\midrule
+Public unknown/stale \texttt{rescheduleUid} & \#29399 & Fix PR \#29400 & Open \\
+Private-link \texttt{rescheduleUid} & \#29399 comment & Folded into thread & Open \\
+Cancelled booking UID replay & \#29407 & Newly reported & Open \\
+\bottomrule
+\end{tabular}
+\caption{Upstream response to Bayesilisk-generated Cal.com findings.}
+\end{table}
+
+The private-link finding is tracked as a related comment rather than a separate
+issue to avoid duplicating the existing \texttt{rescheduleUid} thread. The
+cancelled-booking workflow finding is separate because it comes from a different
+state transition: a real booking is created, cancelled, and then replayed as
+public reschedule context.
 
 \section{Evidence Still Needed}
 
-The Cal.com result demonstrates the connector split, a real route/state
-mutation finding, and three baseline comparisons.
+The Cal.com result demonstrates the connector split and a real route/state
+mutation finding. It does not yet demonstrate the full paper claim. The
+remaining evidence needs are fresh baseline comparisons and additional app
+artifacts beyond Cal.com.
 
 \begin{table}[h]
 \centering
@@ -139,22 +176,14 @@ mutation finding, and three baseline comparisons.
 \toprule
 Workflow & Observed scope & Failures & Notes \\
 \midrule
-Nearby E2E & 14 specs & 0 unexpected & 13 passed, 1 skipped \\
-Playwright-only connector & 11 observations & 4 & Includes cancelled UID replay \\
 Bayesilisk proposal run & 6 proposals & 6 & Unknown and stale variants \\
-Weak local model & 3 raw proposals & 0 accepted & 3 verifier rejections \\
-LLM-agent browser & 10 runs & 3 mismatched & Stochastic oracle failures \\
+Bayesilisk sequence run & 1 sequence & 1 & Cancelled UID replay \\
 \bottomrule
 \end{tabular}
-\caption{Cal.com baseline comparison.}
+\caption{Current clean Cal.com rerun.}
 \end{table}
 
-It does not yet demonstrate the full paper claim. The remaining evidence needs
-are generic Bayesilisk synthesis of bounded multi-action runs from
-connector-declared capabilities, plus broader LLM-agent baseline coverage across
-more models and prompts.
-
-These baselines matter because the argument is not merely that browser
+Fresh baselines matter because the argument is not merely that browser
 automation can find a failing route. The intended claim is stronger: generic
 context-to-probe expansion plus deterministic verification can recover useful
 failures while avoiding the oracle mistakes of plain LLM agents.
@@ -169,20 +198,20 @@ connector does not enumerate every final generated probe by hand; it exposes
 the local state and rule space, and \tool produces the concrete mutations.
 
 The remaining work is empirical. The paper needs more app artifacts and
-architecture work before it can claim generality for longer workflows. The
-right next layer is a generic sequence proposer: connectors declare actions and
-state facts, while \tool generates bounded action sequences and verifies the
-returned evidence. The immediate target should be a concise artifact-backed
-paper rather than a broad methodology claim.
+architecture work before it can claim generality for longer workflows. The new
+sequence proposer is intentionally bounded: connectors declare actions and
+state facts, while \tool generates short action sequences and verifies returned
+evidence. The immediate target should be a concise artifact-backed paper rather
+than a broad methodology claim.
 
 \section{Conclusion}
 
 \tool treats LLMs as scenario proposers, not as test oracles. The Cal.com case
 study shows the architecture working on a real app checkout with reproducible
-connector evidence, baseline logs, weak-model rejection evidence, and
-issue-ready findings. The next version of this manuscript should add a full
-generic sequence-proposal layer and an LLM-agent-only browser run that actually
-compares additional models and prompting strategies.
+connector evidence and issue-ready findings. The next version of this
+manuscript should add a full second app artifact and recreate baseline
+comparisons against existing E2E tests, Playwright-only probing, weak model
+proposals, and browser-driving LLM agents.
 
 \bibliographystyle{plain}
 \bibliography{references}

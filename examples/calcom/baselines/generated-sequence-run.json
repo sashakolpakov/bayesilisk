@@ -148,13 +148,13 @@
   },
   "suites": [
     {
-      "title": "apps/web/playwright/llm-agent-oracle.e2e.ts",
-      "file": "apps/web/playwright/llm-agent-oracle.e2e.ts",
+      "title": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      "file": "apps/web/playwright/bayesilisk-probes.e2e.ts",
       "column": 0,
       "line": 0,
       "specs": [
         {
-          "title": "LLM-agent-only oracle baseline for unknown rescheduleUid",
+          "title": "Bayesilisk Cal.com workflow probes",
           "ok": true,
           "tags": [
             "calcom/web"
@@ -171,12 +171,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 5466,
+                  "duration": 1805,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-05-18T03:18:55.106Z",
+                  "startTime": "2026-05-18T20:40:01.742Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -184,9 +184,9 @@
               "status": "expected"
             }
           ],
-          "id": "0006990a78938eb78642-18100e84381c745718da",
-          "file": "apps/web/playwright/llm-agent-oracle.e2e.ts",
-          "line": 52,
+          "id": "2768c947ee9aa7b40698-a4fe0f457e293a1b2f7d",
+          "file": "apps/web/playwright/bayesilisk-probes.e2e.ts",
+          "line": 304,
           "column": 5
         }
       ]
@@ -194,8 +194,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-05-18T03:18:54.568Z",
-    "duration": 6355.771,
+    "startTime": "2026-05-18T20:39:59.354Z",
+    "duration": 4499.352,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,

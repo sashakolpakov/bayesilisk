@@ -287,9 +287,11 @@ set of typed actions, actor/session fixtures, state-producing outputs, and
 route/action parameter bindings. Bayesilisk should own the generic sequence
 proposal layer that composes those actions into bounded runs.
 
-Current Cal.com status: the cancelled-booking replay run is evidence and a
-prototype fixture, not proof that the generic engine already owns long-run
-synthesis. Treat generic sequence proposal as the next core capability.
+Current Cal.com status: Bayesilisk generates the cancelled-booking replay as a
+bounded workflow sequence from a connector-declared action graph, and the
+Cal.com connector executes that generated proposal directly. This is evidence
+for the declared-action sequence architecture, not proof that Bayesilisk can
+synthesize arbitrary free-form browser runs.
 
 ## Implementation Requirements
 

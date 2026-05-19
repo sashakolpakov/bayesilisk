@@ -87,7 +87,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "bayesilisk.propose_probes",
-        "description": "Expand context-supplied connector proposal rules into app-agnostic probe proposals.",
+        "description": "Expand context-supplied connector proposal rules and action graphs into app-agnostic probe proposals.",
         "inputSchema": {
             "type": "object",
             "properties": {

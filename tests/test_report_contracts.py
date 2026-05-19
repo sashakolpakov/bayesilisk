@@ -252,6 +252,95 @@ def test_source_context_generates_connector_probe_proposals(monkeypatch: Any) ->
     }
 
 
+def test_connector_action_graph_generates_bounded_sequence_proposals(monkeypatch: Any) -> None:
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
+    from bayesilisk.probe_proposals import generate_probe_proposals, generate_sequence_proposals
+    from bayesilisk import reporting
+
+    context = {
+        "source": "connector-source-context",
+        "agentNotes": ["connector exposes actions and state facts"],
+        "priorAdjustments": {},
+        "repositoryFacts": [],
+        "connectorActionGraph": {
+            "actions": [
+                {
+                    "actionId": "create-booking",
+                    "produces": ["booking.uid", "eventType.slug", "user.username"],
+                },
+                {
+                    "actionId": "cancel-booking",
+                    "requires": ["booking.uid"],
+                    "produces": ["booking.status.cancelled"],
+                },
+                {
+                    "actionId": "open-public-booking-route",
+                    "requires": ["user.username", "eventType.slug"],
+                },
+            ],
+            "sequenceRules": [
+                {
+                    "ruleId": "cancelled-booking-replay",
+                    "expectedBehavior": {"status": 409},
+                    "goal": {
+                        "action": "open-public-booking-route",
+                        "paramBindings": {"rescheduleUid": "booking.uid"},
+                    },
+                    "invariantId": "external.cancelled_booking_replay_rejected",
+                    "maxDepth": 4,
+                    "requiresState": ["booking.status.cancelled"],
+                    "title": "Cancelled booking UID replay is rejected",
+                }
+            ],
+        },
+        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
+    }
+
+    sequence_proposals = generate_sequence_proposals(context)
+    proposals = generate_probe_proposals(context)
+    report = reporting.build_contextual_report(150, context=context)
+
+    assert sequence_proposals == proposals
+    assert proposals == report["generatedProbeProposals"]
+    proposal = proposals[0]
+    assert proposal["proposalKind"] == "workflow-sequence"
+    assert proposal["expectedStatus"] == 409
+    assert [step["connectorAction"] for step in proposal["sequenceSteps"]] == [
+        "create-booking",
+        "cancel-booking",
+        "open-public-booking-route",
+    ]
+    assert proposal["sequenceSteps"][-1]["params"] == {"rescheduleUid": "booking.uid"}
+
+
+def test_connector_action_graph_rejects_unsupported_sequences() -> None:
+    from bayesilisk.probe_proposals import generate_sequence_proposals
+
+    context = {
+        "connectorActionGraph": {
+            "actions": [
+                {"actionId": "open-public-booking-route", "requires": ["user.username", "eventType.slug"]},
+            ],
+            "sequenceRules": [
+                {
+                    "ruleId": "missing-producer",
+                    "expectedBehavior": {"status": 409},
+                    "goal": {
+                        "action": "open-public-booking-route",
+                        "paramBindings": {"rescheduleUid": "booking.uid"},
+                    },
+                    "invariantId": "external.missing_producer",
+                    "requiresState": ["booking.status.cancelled"],
+                    "title": "Cannot build without producer actions",
+                }
+            ],
+        }
+    }
+
+    assert generate_sequence_proposals(context) == []
+
+
 def test_context_level_proposal_gates_reduce_repeated_fact_rules(monkeypatch: Any) -> None:
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
     monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")

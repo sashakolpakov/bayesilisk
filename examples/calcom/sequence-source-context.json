@@ -1,0 +1,64 @@
+{
+  "agentNotes": [
+    "Cal.com connector declares action capabilities for longer workflow proposal."
+  ],
+  "connectorActionGraph": {
+    "actions": [
+      {
+        "actionId": "create-booking",
+        "produces": [
+          "booking.uid",
+          "eventType.slug",
+          "user.username"
+        ]
+      },
+      {
+        "actionId": "cancel-booking",
+        "produces": [
+          "booking.status.cancelled"
+        ],
+        "requires": [
+          "booking.uid"
+        ]
+      },
+      {
+        "actionId": "open-public-booking-route",
+        "requires": [
+          "eventType.slug",
+          "user.username"
+        ]
+      }
+    ],
+    "sequenceRules": [
+      {
+        "expectedBehavior": {
+          "description": "A cancelled booking UID must not be reusable as a public rescheduleUid.",
+          "status": 409
+        },
+        "goal": {
+          "action": "open-public-booking-route",
+          "paramBindings": {
+            "rescheduleUid": "booking.uid"
+          }
+        },
+        "invariantId": "calcom.cancelled_booking_uid_cannot_be_replayed_as_public_reschedule",
+        "maxDepth": 4,
+        "requiresState": [
+          "booking.status.cancelled"
+        ],
+        "ruleId": "cancelled-booking-public-replay",
+        "title": "Cancelled booking UID replay through public booking route is rejected"
+      }
+    ]
+  },
+  "playwrightProbe": {
+    "artifactCount": 0,
+    "failedCount": 0,
+    "passedCount": 0,
+    "resultCount": 0,
+    "target": "cal.com connector action graph"
+  },
+  "priorAdjustments": {},
+  "repositoryFacts": [],
+  "source": "calcom-connector-action-graph"
+}

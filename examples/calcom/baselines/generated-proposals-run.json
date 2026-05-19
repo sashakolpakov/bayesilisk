@@ -171,12 +171,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 7873,
+                  "duration": 4894,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-05-18T03:18:14.472Z",
+                  "startTime": "2026-05-18T20:38:35.599Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -186,7 +186,7 @@
           ],
           "id": "2768c947ee9aa7b40698-a4fe0f457e293a1b2f7d",
           "file": "apps/web/playwright/bayesilisk-probes.e2e.ts",
-          "line": 208,
+          "line": 304,
           "column": 5
         }
       ]
@@ -194,8 +194,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-05-18T03:18:13.883Z",
-    "duration": 9028.373,
+    "startTime": "2026-05-18T20:38:33.115Z",
+    "duration": 7900.361000000001,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,

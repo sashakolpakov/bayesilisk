@@ -135,9 +135,12 @@ Example artifacts:
 The Cal.com example uses the general Bayesilisk core with an app-specific
 connector that follows the connector docs. It records the Cal.com repository
 URL, exact tested commit, connector source context, generated proposals,
-observed local execution context, and reports. In that run Bayesilisk generated
-6 proposals from explicit connector rules and verified 6 local observations
-where expected `404` was observed as `200`.
+observed local execution context, reports, and upstream outcome references. In
+the clean current run Bayesilisk generated 7 proposals: 6 route mutations from
+explicit connector rules plus 1 bounded workflow sequence from a
+connector-declared action graph. All 7 local observations were verified as app
+findings. One reported finding already has an upstream human-authored fix PR,
+which is stronger validation than an issue being closed without fix context.
 
 For coding agents and LLM teams building connectors, use the ingestible contract
 at [examples/connector-agent-contract.json](examples/connector-agent-contract.json).

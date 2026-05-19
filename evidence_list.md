@@ -1,7 +1,8 @@
 # Bayesilisk Evidence List
 
-This file tracks the evidence needed for a concise Bayesilisk paper and the
-current Cal.com artifact status.
+This file tracks the current clean Cal.com artifact set and the manuscript
+evidence still needed. Historical baseline run logs are intentionally not kept
+in `examples/calcom`.
 
 ## Research Claim
 
@@ -9,60 +10,7 @@ LLMs are useful for proposing scenario spaces, but unsafe as test oracles.
 Bayesilisk separates proposal from verification using connector-provided app
 context, deterministic rules, and evidence-bearing probes.
 
-## Evidence Goals
-
-- [x] A clear baseline comparison against existing E2E tests and
-  Playwright-only probing for Cal.com.
-- [x] Quantitative evidence that a weaker local proposal model can produce
-  invalid proposals that need finite-state verifier gates.
-- [x] A full LLM-agent-only browser-driving baseline.
-- [x] A longer sequence not caught by the nearby existing E2E run.
-- [ ] Generic Bayesilisk synthesis of longer multi-action runs while keeping the
-  connector as a pure action executor.
-
-## Baselines
-
-Compare against:
-
-- [x] Existing E2E tests alone:
-  `examples/calcom/baselines/existing-e2e-nearby.json`
-- [x] Playwright-only probing:
-  `examples/calcom/baselines/playwright-only-probe.json`,
-  `examples/calcom/baselines/playwright-only-context.json`, and
-  `examples/calcom/baselines/playwright-only-report.md`
-- [x] LLM proposals without deterministic verifier, captured as raw weak-model
-  proposal output:
-  `examples/calcom/weak-model/qwen2.5-coder-3b-source-report.json`
-- [x] Bayesilisk with weaker local model proposals plus verifier:
-  `examples/calcom/weak-model/qwen2.5-coder-3b-source-report.json`
-- [x] Full LLM agent driving Playwright directly:
-  `examples/calcom/baselines/llm-agent-oracle.e2e.ts`,
-  `examples/calcom/baselines/llm-agent-oracle-run.json`, and
-  `examples/calcom/baselines/llm-agent-oracle-result.json`
-
-## Key Result To Chase
-
-Show that Bayesilisk recovers failures that:
-
-- [x] Existing tests do not cover.
-- [ ] A plain LLM agent misses or misjudges. The current browser-driving
-  10-run baseline misjudged the observed failure in `3` of `10` trials.
-- [x] A weaker model may propose noisily, but the verifier prevents false oracle
-  claims.
-
-## Artifact Story
-
-Every app needs:
-
-- [x] Repo URL and commit hash.
-- [x] Connector code.
-- [x] Context JSON.
-- [x] Generated proposals.
-- [x] Execution evidence.
-- [x] Bayesilisk report.
-- [x] Baseline run logs.
-
-## Cal.com Artifact Status
+## Current Cal.com Artifact
 
 App under test:
 
@@ -73,118 +21,76 @@ App under test:
 - Commit subject: `fix: add system-ui fallback to font stack for non-Latin script support (#29346)`
 - Bayesilisk seed: `150`
 
-Checked-in artifacts:
+Checked-in current artifacts:
 
 - Connector code: `examples/calcom/bayesilisk-probes.e2e.ts`
-- Source context: `examples/calcom/source-context.json`
-- Generated proposals: `examples/calcom/generated-proposals.json`
-- Execution evidence: `examples/calcom/execution-context.json`
-- Bayesilisk JSON report: `examples/calcom/reports/report.json`
-- Bayesilisk Markdown report: `examples/calcom/reports/report.md`
-- Issue payloads: `examples/calcom/reports/issue-payloads.json`
-- Baseline summary: `examples/calcom/baselines/README.md`
-- Existing nearby E2E baseline:
-  `examples/calcom/baselines/existing-e2e-nearby.json`
-- Playwright-only connector baseline:
-  `examples/calcom/baselines/playwright-only-probe.json`
-- Playwright-only connector context:
-  `examples/calcom/baselines/playwright-only-context.json`
-- Playwright-only Bayesilisk report:
-  `examples/calcom/baselines/playwright-only-report.md`
-- Weak local model report:
-  `examples/calcom/weak-model/qwen2.5-coder-3b-source-report.json`
-- LLM-agent browser baseline:
-  `examples/calcom/baselines/llm-agent-oracle.e2e.ts`
-- LLM-agent browser run log:
-  `examples/calcom/baselines/llm-agent-oracle-run.json`
-- LLM-agent oracle result:
-  `examples/calcom/baselines/llm-agent-oracle-result.json`
-- LLM-agent 10-run browser baseline:
-  `examples/calcom/baselines/llm-agent-oracle-10.jsonl`
-- LLM-agent 10-run browser run log:
-  `examples/calcom/baselines/llm-agent-oracle-10-run.json`
-- LLM-agent 10-run summary:
-  `examples/calcom/baselines/llm-agent-oracle-10-summary.json`
+- Rule context: `examples/calcom/source-context.json`
+- Generated route proposals: `examples/calcom/generated-proposals.json`
+- Sequence context: `examples/calcom/sequence-source-context.json`
+- Generated sequence proposal: `examples/calcom/generated-sequence-proposals.json`
+- Consolidated execution evidence: `examples/calcom/execution-context.json`
+- Route-proposal Playwright run log:
+  `examples/calcom/baselines/generated-proposals-run.json`
+- Sequence Playwright run log:
+  `examples/calcom/baselines/generated-sequence-run.json`
+- App-only JSON report: `examples/calcom/reports/report.json`
+- App-only Markdown report: `examples/calcom/reports/report.md`
+- App-only issue payloads: `examples/calcom/reports/issue-payloads.json`
+- Upstream human-response references:
+  `examples/calcom/upstream-outcomes.md`
 
-Observed Cal.com result:
+Clean rerun result:
 
-- Source facts supplied by the connector: `3`
-- Generated probe proposals: `6`
-- Executed connector observations: `6`
-- Verified `breakage.context-observed` findings: `6`
-- Failure pattern: expected semantic status `404`, observed semantic status
-  `200` for unknown or stale `rescheduleUid` variants.
+- Generated route proposals: `6`
+- Generated workflow-sequence proposals: `1`
+- Connector observations: `7`
+- Verified `breakage.context-observed` app findings: `7`
+- Unexpected Playwright test failures: `0`
 
-Baseline comparison:
+Upstream response:
 
-- Nearby upstream E2E files:
-  `apps/web/playwright/booking-seats.e2e.ts` and
-  `apps/web/playwright/dynamic-booking-pages.e2e.ts`
-- Nearby upstream E2E result: `13` expected passed tests, `1` skipped test,
-  `0` unexpected failures.
-- Playwright-only connector result: `11` observations, `7` passing controls,
-  `4` failing observations.
-- Bayesilisk generated-proposal result: `6` generated proposals and `6`
-  verified unknown/stale `rescheduleUid` findings across public, private, and
-  dynamic booking routes.
-- Weak local model result using `qwen2.5-coder:3b`: `3` raw proposals, `0`
-  accepted, `3` rejected by verifier gates.
-- LLM-agent browser baseline using `qwen2.5-coder:3b`: in `10` stochastic runs,
-  the agent selected the malformed unknown-`rescheduleUid` URL `6` times,
-  selected the plain control URL `1` time, produced invalid selections `3`
-  times, matched the deterministic oracle `7` times, and mismatched it `3`
-  times.
+- Public unknown/stale `rescheduleUid` was reported as
+  `calcom/cal.diy#29399`.
+- Private booking-link `rescheduleUid` was added as a related Bayesilisk
+  comment on `calcom/cal.diy#29399`.
+- A contributor opened fix PR `calcom/cal.diy#29400`, identifying the root
+  cause as a missing null guard in `processReschedule`.
+- Cancelled booking UID replay was reported as `calcom/cal.diy#29407` and is
+  still awaiting upstream response at capture time.
 
 Observed variants:
 
-- Public booking page with unknown `rescheduleUid`.
-- Public booking page with stale `rescheduleUid`.
-- Private booking link with unknown `rescheduleUid`.
-- Private booking link with stale `rescheduleUid`.
-- Dynamic booking page with unknown `rescheduleUid`.
-- Dynamic booking page with stale `rescheduleUid`.
+- Public booking page with unknown `rescheduleUid`: expected `404`, observed
+  `200`.
+- Public booking page with stale `rescheduleUid`: expected `404`, observed
+  `200`.
+- Private booking link with unknown `rescheduleUid`: expected `404`, observed
+  `200`.
+- Private booking link with stale `rescheduleUid`: expected `404`, observed
+  `200`.
+- Dynamic booking page with unknown `rescheduleUid`: expected `404`, observed
+  `200`.
+- Dynamic booking page with stale `rescheduleUid`: expected `404`, observed
+  `200`.
 - Cancelled booking UID replay through public booking route after creating and
-  cancelling a real booking.
+  cancelling a real booking: expected `409`, observed `200`.
 
-Known limitations for the current Cal.com artifact:
+## Manuscript Evidence Still Needed
 
-- The longer cancelled-booking replay was executed by the Cal.com connector
-  baseline. It is evidence that the failure exists, but not yet evidence that
-  Bayesilisk generically synthesizes longer multi-action runs.
-- The browser-driving LLM-agent baseline is a small sample (`10` trials) using
-  one local model. It shows stochastic oracle and action-selection fragility,
-  but should not be overgeneralized to all models or prompting strategies.
+- Recreate baseline comparisons as fresh, separately named runs when needed:
+  existing E2E, Playwright-only probing, LLM-agent-only browser driving, and
+  weak-model proposals without deterministic verification.
+- Add at least one second real-app artifact with the same clean artifact
+  discipline: repo URL, commit hash, connector, context, generated proposals,
+  execution evidence, app-only report, and issue payloads.
+- Broaden the LLM-agent baseline across additional local or hosted models if
+  the paper needs a model-robust oracle-safety claim.
 
-Architecture note for longer runs:
+## Architecture Boundary
 
-- Desired connector role: expose action vocabulary, actor/session fixtures,
-  state-producing actions, route/action parameter bindings, and observed
-  evidence.
-- Desired Bayesilisk role: generate bounded action sequences from those
-  connector-declared capabilities, rank them with attention, and verify returned
-  evidence against deterministic rules.
-- Desired connector execution contract: execute a proposed sequence exactly and
-  report observations; do not decide pass/fail and do not filter app-specific
-  scenarios beyond declaring unsupported actions.
-
-Completed Cal.com evidence runs:
-
-- Run and preserve the nearby upstream E2E tests that motivated the source
-  facts: complete.
-- Run a Playwright-only probe baseline with the same connector actions but no
-  Bayesilisk proposal expansion: complete.
-- Run a weaker local model proposal pass and record proposal count, invalid
-  proposal count, executed proposal count, and verifier-confirmed findings:
-  complete.
-- Run a full LLM-agent-only browser-driving baseline and record proposed
-  actions, pass/fail claims, and oracle mistakes: complete. The 10-run sample
-  produced `3` oracle mismatches.
-- Add at least one longer workflow probe around booking/reschedule state if the
-  Cal.com fixtures support it reliably: complete.
-
-Remaining Cal.com evidence to collect:
-
-- Add generic Bayesilisk sequence proposal so longer runs can be generated from
-  connector-declared capabilities instead of handwritten connector probe logic.
-- Repeat the LLM-agent-only baseline with additional local and hosted models if
-  the paper needs broader model coverage.
+- Bayesilisk now generates bounded action-sequence proposals from
+  connector-declared capabilities.
+- The connector remains the app-specific executor for concrete fixture
+  operations.
+- This is not arbitrary free-form browser-run synthesis; ranking with attention
+  and richer sequence search remain future extensions.
