@@ -214,6 +214,15 @@ action implementation understands. Bayesilisk can match typed tokens by the
 abstract token and resource type, while the connector can still execute through
 the concrete refinement.
 
+Boundary rule: Bayesilisk matches typed-token dependencies using `token` plus
+optional `resourceType`. It does not use `refines` to satisfy dependencies.
+`refines` is only for connector execution and readable proposal output. Legacy
+string tokens are still accepted, but a legacy string such as `booking.uid` will
+not satisfy a typed requirement such as `resource.public_id` with
+`resourceType: "booking"`. If a connector wants reusable ABAG behavior, declare
+typed tokens on the producing actions, consuming actions, required states, and
+parameter bindings.
+
 The same Cal.com-shaped sequence can therefore be written as:
 
 ```json

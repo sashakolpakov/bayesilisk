@@ -209,27 +209,37 @@ def _unique_strings(values: list[str]) -> list[str]:
     return result
 
 
-def _token_aliases(value: Any) -> list[str]:
+def _typed_token_match_keys(value: dict[str, Any]) -> list[str]:
+    token = _string(value.get("token") or value.get("kind"))
+    resource_type = _string(value.get("resourceType") or value.get("resource"))
+    if token and resource_type:
+        return [f"{token}:{resource_type}", token]
+    if token:
+        return [token]
+    return []
+
+
+def _token_match_keys(value: Any) -> list[str]:
     if isinstance(value, str):
         return [_string(value)] if _string(value) else []
     if not isinstance(value, dict):
         return []
-    aliases: list[str] = []
-    concrete = _string(value.get("refines") or value.get("appToken") or value.get("id"))
-    if concrete:
-        aliases.append(concrete)
-    token = _string(value.get("token") or value.get("kind"))
-    resource_type = _string(value.get("resourceType") or value.get("resource"))
-    if token and resource_type:
-        aliases.append(f"{token}:{resource_type}")
-    if token:
-        aliases.append(token)
-    return _unique_strings(aliases)
+    return _unique_strings(_typed_token_match_keys(value))
 
 
 def _token_display_id(value: Any) -> str:
-    aliases = _token_aliases(value)
-    return aliases[0] if aliases else ""
+    if isinstance(value, str):
+        return _string(value)
+    if not isinstance(value, dict):
+        return ""
+    concrete = _string(value.get("refines") or value.get("appToken") or value.get("id"))
+    if concrete:
+        return concrete
+    token = _string(value.get("token") or value.get("kind"))
+    resource_type = _string(value.get("resourceType") or value.get("resource"))
+    if token and resource_type:
+        return f"{token}:{resource_type}"
+    return token
 
 
 def _list_of_token_display_ids(value: Any) -> list[str]:
@@ -243,7 +253,7 @@ def _list_of_token_keys(value: Any) -> list[str]:
         return []
     keys: list[str] = []
     for item in value:
-        keys.extend(_token_aliases(item))
+        keys.extend(_token_match_keys(item))
     return _unique_strings(keys)
 
 
@@ -344,7 +354,7 @@ def _param_bindings(goal: dict[str, Any], rule: dict[str, Any]) -> dict[str, str
 def _param_binding_keys(goal: dict[str, Any], rule: dict[str, Any]) -> list[str]:
     keys: list[str] = []
     for source in _raw_param_bindings(goal, rule).values():
-        keys.extend(_token_aliases(source))
+        keys.extend(_token_match_keys(source))
     return _unique_strings(keys)
 
 

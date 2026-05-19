@@ -434,6 +434,45 @@ def test_connector_action_graph_supports_abag_typed_tokens(monkeypatch: Any) -> 
     }
 
 
+def test_abag_typed_tokens_do_not_fall_back_to_app_specific_refines() -> None:
+    from bayesilisk.probe_proposals import generate_sequence_proposals
+
+    context = {
+        "connectorActionGraph": {
+            "actions": [
+                {
+                    "actionId": "create-booking",
+                    "produces": ["booking.uid"],
+                },
+                {
+                    "actionId": "open-public-booking-route",
+                    "requires": [],
+                },
+            ],
+            "sequenceRules": [
+                {
+                    "ruleId": "typed-replay-needs-typed-producer",
+                    "expectedBehavior": {"status": 409},
+                    "goal": {
+                        "action": "open-public-booking-route",
+                        "paramBindings": {
+                            "rescheduleUid": {
+                                "token": "resource.public_id",
+                                "resourceType": "booking",
+                                "refines": "booking.uid",
+                            }
+                        },
+                    },
+                    "invariantId": "external.typed_replay_requires_typed_producer",
+                    "title": "Typed replay requires typed producer",
+                }
+            ],
+        }
+    }
+
+    assert generate_sequence_proposals(context) == []
+
+
 def test_connector_action_graph_rejects_unsupported_sequences() -> None:
     from bayesilisk.probe_proposals import generate_sequence_proposals
 

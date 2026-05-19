@@ -318,6 +318,12 @@ Today the core sees only string dependency flow. The design target is an
 Abstract Bayesilisk Action Graph (ABAG): a connector-declared graph whose nodes
 and edges carry universal typed tokens plus optional app-specific refinements.
 The connector still owns execution. Bayesilisk operates on the abstract graph.
+For typed ABAG inputs, Bayesilisk must match dependencies by `token` plus
+optional `resourceType`. The `refines` field is connector-facing: it names the
+concrete app token that execution code understands and may be emitted in
+proposal parameters, but it must not satisfy abstract graph dependencies.
+Legacy string tokens remain accepted as string-token graphs, but they do not
+stand in for typed ABAG tokens.
 
 ### ABAG Token Vocabulary
 
