@@ -1106,6 +1106,60 @@ def test_bayesilisk_mcp_server_expands_connector_probe_proposals() -> None:
     assert payload["proposals"][0]["mutatedParams"] == {"handle": "connector-supplied-value"}
 
 
+def test_bayesilisk_mcp_server_expands_connector_sequence_proposals() -> None:
+    server = importlib.import_module("bayesilisk.mcp_server")
+
+    response = server.handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "bayesilisk.propose_probes",
+                "arguments": {
+                    "context": {
+                        "connectorActionGraph": {
+                            "actions": [
+                                {"actionId": "create-object", "produces": ["object.id"]},
+                                {
+                                    "actionId": "retire-object",
+                                    "requires": ["object.id"],
+                                    "produces": ["object.state.retired"],
+                                },
+                                {"actionId": "open-object-route", "requires": []},
+                            ],
+                            "sequenceRules": [
+                                {
+                                    "ruleId": "retired-object-replay",
+                                    "expectedBehavior": {"status": 410},
+                                    "goal": {
+                                        "action": "open-object-route",
+                                        "paramBindings": {"objectId": "object.id"},
+                                    },
+                                    "invariantId": "external.retired_object_replay",
+                                    "requiresState": ["object.state.retired"],
+                                    "title": "Retired object replay is rejected",
+                                }
+                            ],
+                        }
+                    },
+                    "limit": 5,
+                },
+            },
+        }
+    )
+    payload = json.loads(response["result"]["content"][0]["text"])
+
+    assert payload["proposalCount"] == 1
+    assert payload["proposals"][0]["proposalKind"] == "workflow-sequence"
+    assert [step["connectorAction"] for step in payload["proposals"][0]["sequenceSteps"]] == [
+        "create-object",
+        "retire-object",
+        "open-object-route",
+    ]
+    assert payload["proposals"][0]["sequenceSteps"][-1]["params"] == {"objectId": "object.id"}
+
+
 def test_bayesilisk_documentation_pins_no_production_access_and_report_contract() -> None:
     document = DOC.read_text(encoding="utf-8")
 

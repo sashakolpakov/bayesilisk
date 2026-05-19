@@ -6,7 +6,7 @@
     "Do not modify Bayesilisk core for one app connector.",
     "Do not let an LLM write observedStatus.",
     "Do not let an LLM write passed.",
-    "Do not let prose-only context generate probes; proposalRules or proposalGates are required.",
+    "Do not let prose-only context generate probes; proposalRules, proposalGates, or connectorActionGraph sequenceRules are required.",
     "Do not connect to production systems or use production data.",
     "Do not open issues from connector output alone; use Bayesilisk verified issue payloads."
   ],
@@ -17,7 +17,7 @@
     "routePattern",
     "params",
     "expectedBehavior.status",
-    "proposalRules or matching proposalGates",
+    "proposalRules or matching proposalGates, unless using connectorActionGraph.sequenceRules",
     "availableActions"
   ],
   "observedFactRequiredFields": [
@@ -39,7 +39,7 @@
   "allowedAgentSteps": [
     {
       "step": "collect_context",
-      "description": "Read local tests, route handlers, schemas, TODOs, and product rules. Produce source facts with explicit proposal rules."
+      "description": "Read local tests, route handlers, schemas, TODOs, and product rules. Produce source facts with explicit proposal rules or connector action graphs."
     },
     {
       "step": "ask_bayesilisk_for_proposals",
@@ -97,5 +97,36 @@
     "networkResponses": [{"status": 200, "url": "http://localhost:3000/resource/123/action?targetId=missing"}],
     "selector": "connector:open-resource-action",
     "timestamp": "2026-05-18T00:00:00Z"
+  },
+  "connectorActionGraphTemplate": {
+    "actions": [
+      {
+        "actionId": "create-resource",
+        "produces": ["resource.id"]
+      },
+      {
+        "actionId": "retire-resource",
+        "requires": ["resource.id"],
+        "produces": ["resource.state.retired"]
+      },
+      {
+        "actionId": "open-resource-route",
+        "requires": []
+      }
+    ],
+    "sequenceRules": [
+      {
+        "ruleId": "retired-resource-replay",
+        "invariantId": "myapp.retired_resource_rejected",
+        "expectedBehavior": {"status": 410},
+        "requiresState": ["resource.state.retired"],
+        "goal": {
+          "action": "open-resource-route",
+          "paramBindings": {"resourceId": "resource.id"}
+        },
+        "maxDepth": 4,
+        "title": "Retired resource replay is rejected"
+      }
+    ]
   }
 }

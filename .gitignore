@@ -10,3 +10,8 @@ build/
 docs/_build/
 *.egg-info/
 .venv/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out

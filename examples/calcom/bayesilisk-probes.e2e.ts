@@ -36,10 +36,15 @@ type ProbeProposal = {
   expectedStatus: number;
   invariantId: string;
   mutatedParams?: Record<string, string | null>;
-  mutationId: string;
+  mutationId?: string;
   path?: string | null;
   proposalId: string;
+  proposalKind?: string;
   routePattern: string;
+  sequenceSteps?: Array<{
+    connectorAction: string;
+    params?: Record<string, string>;
+  }>;
   sourceParam?: string | null;
   sourceText?: string;
   title: string;
@@ -122,6 +127,19 @@ function buildContext(results: ProbeResult[], proposals: ProbeProposal[] = []) {
       title: "Dynamic booking page has a passing valid reschedule flow",
       text: "Cal.com source signal: dynamic booking tests use rescheduleUid for a valid group booking reschedule; stale or unknown reschedule context should not silently become a new group booking.",
     },
+    {
+      availableActions: ["create-booking", "cancel-booking", "open-public-booking-route"],
+      expectedBehavior: {
+        description: "A cancelled booking UID must not be reusable as a public rescheduleUid.",
+        status: 409,
+      },
+      invariantId: "calcom.cancelled_booking_uid_cannot_be_replayed_as_public_reschedule",
+      path: "apps/web/playwright/bayesilisk-probes.e2e.ts",
+      routePattern: "create-booking -> cancel-booking -> open-public-booking-route",
+      source: "repository-scan",
+      title: "Cancelled booking UID replay through public booking route is rejected",
+      text: "Cal.com connector action graph creates a booking, cancels it, then replays the cancelled booking UID through the public booking route as rescheduleUid.",
+    },
   ];
   return {
     source: "calcom-playwright-probe",
@@ -199,6 +217,84 @@ async function recordProbe(
   });
 }
 
+async function executeWorkflowSequenceProposal(
+  proposal: ProbeProposal,
+  fixtures: {
+    bookings: any;
+    page: any;
+    users: any;
+  }
+) {
+  const state: Record<string, string | number | null> = {};
+  let targetUrl = proposal.title;
+  let networkResponses: Array<{ status: number; url: string }> = [];
+  let bookingFormVisible = false;
+  let blockedStateVisible = false;
+  const steps = proposal.sequenceSteps ?? [];
+
+  for (const step of steps) {
+    if (step.connectorAction === "create-booking") {
+      const user = await fixtures.users.create({ name: `Bayesilisk sequence ${proposal.proposalId}` });
+      const [eventType] = user.eventTypes;
+      const booking = await fixtures.bookings.create(user.id, user.username, eventType.id);
+      state["booking.uid"] = booking.uid;
+      state["booking.id"] = booking.id;
+      state["eventType.slug"] = eventType.slug;
+      state["user.username"] = user.username;
+      continue;
+    }
+
+    if (step.connectorAction === "cancel-booking") {
+      const bookingId = state["booking.id"];
+      if (typeof bookingId !== "number") {
+        throw new Error("cancel-booking requires booking.id from a previous step");
+      }
+      await prisma.booking.update({ where: { id: bookingId }, data: { status: BookingStatus.CANCELLED } });
+      state["booking.status.cancelled"] = "true";
+      continue;
+    }
+
+    if (step.connectorAction === "open-public-booking-route") {
+      const username = state["user.username"];
+      const eventTypeSlug = state["eventType.slug"];
+      if (typeof username !== "string" || typeof eventTypeSlug !== "string") {
+        throw new Error("open-public-booking-route requires user.username and eventType.slug");
+      }
+      const params = new URLSearchParams();
+      for (const [paramName, stateKey] of Object.entries(step.params ?? {})) {
+        const value = state[stateKey];
+        if (typeof value === "string") {
+          params.set(paramName, value);
+        }
+      }
+      params.set("bookingUid", "null");
+      const response = await fixtures.page.goto(`/${username}/${eventTypeSlug}?${params.toString()}`);
+      targetUrl = fixtures.page.url();
+      networkResponses = [{ status: response?.status() ?? 0, url: response?.url() ?? targetUrl }];
+      bookingFormVisible = await fixtures.page.locator('[name="email"]').isVisible();
+      blockedStateVisible =
+        (await fixtures.page.locator('[data-testid="cancelled-headline"]').count()) > 0 ||
+        (await fixtures.page.locator("[data-testid=success-page]").count()) > 0 ||
+        (await fixtures.page.locator("text=This booking has been cancelled").count()) > 0;
+      continue;
+    }
+
+    throw new Error(`Unsupported sequence connectorAction: ${step.connectorAction}`);
+  }
+
+  return {
+    failureDetail: blockedStateVisible && !bookingFormVisible
+      ? ""
+      : `Bayesilisk-generated sequence replayed a cancelled booking UID as public rescheduleUid and reached ${targetUrl} with semantic status ${
+          networkResponses[0]?.status ?? 200
+        } instead of a blocked cancelled-booking state.`,
+    networkResponses,
+    observedStatus: blockedStateVisible && !bookingFormVisible ? proposal.expectedStatus : networkResponses[0]?.status ?? 200,
+    passed: blockedStateVisible && !bookingFormVisible,
+    targetUrl,
+  };
+}
+
 test.describe.configure({ mode: "serial" });
 
 test.afterEach(async ({ users }) => {
@@ -211,6 +307,20 @@ test("Bayesilisk Cal.com workflow probes", async ({ page, users, bookings }) => 
 
   if (proposals.length) {
     for (const proposal of proposals) {
+      if (proposal.proposalKind === "workflow-sequence") {
+        await recordProbe(
+          results,
+          {
+            actorRole: "attendee",
+            expectedStatus: proposal.expectedStatus,
+            invariantId: proposal.invariantId,
+            route: (proposal.sequenceSteps ?? []).map((step) => step.connectorAction).join(" -> "),
+            title: proposal.title,
+          },
+          async () => executeWorkflowSequenceProposal(proposal, { bookings, page, users })
+        );
+        continue;
+      }
       if (
         proposal.connectorAction !== "open-public-booking-page" &&
         proposal.connectorAction !== "open-private-booking-link" &&
@@ -296,6 +406,41 @@ test("Bayesilisk Cal.com workflow probes", async ({ page, users, bookings }) => 
       await page.goto(`/reschedule/${booking.uid}`);
       await expect(page.locator('[data-testid="cancelled-headline"]')).toBeVisible();
       return !page.url().includes("rescheduleUid");
+    }
+  );
+
+  await recordProbe(
+    results,
+    {
+      actorRole: "attendee",
+      expectedStatus: 409,
+      invariantId: "calcom.cancelled_booking_uid_cannot_be_replayed_as_public_reschedule",
+      route: "/{username}/{eventType}?rescheduleUid={cancelledBookingUid}&bookingUid=null",
+      title: "Cancelled booking UID replay through public booking route is rejected",
+    },
+    async () => {
+      const user = await users.create({ name: "Bayesilisk cancelled booking replay" });
+      const [eventType] = user.eventTypes;
+      const booking = await bookings.create(user.id, user.username, eventType.id);
+      await prisma.booking.update({ where: { id: booking.id }, data: { status: BookingStatus.CANCELLED } });
+
+      const targetUrl = `/${user.username}/${eventType.slug}?rescheduleUid=${booking.uid}&bookingUid=null`;
+      const response = await page.goto(targetUrl);
+      const bookingFormVisible = await page.locator('[name="email"]').isVisible();
+      const blockedStateVisible =
+        (await page.locator('[data-testid="cancelled-headline"]').count()) > 0 ||
+        (await page.locator("[data-testid=success-page]").count()) > 0 ||
+        (await page.locator("text=This booking has been cancelled").count()) > 0;
+
+      return {
+        failureDetail: bookingFormVisible
+          ? "A cancelled booking UID was accepted as a public rescheduleUid and the normal booking form was visible."
+          : "",
+        networkResponses: [{ status: response?.status() ?? 0, url: response?.url() ?? page.url() }],
+        observedStatus: blockedStateVisible && !bookingFormVisible ? 409 : response?.status() ?? 200,
+        passed: blockedStateVisible && !bookingFormVisible,
+        targetUrl: page.url(),
+      };
     }
   );
 

@@ -1,0 +1,48 @@
+[
+  {
+    "expectedStatus": 409,
+    "invariantId": "calcom.cancelled_booking_uid_cannot_be_replayed_as_public_reschedule",
+    "proposalGate": "connector-action-graph",
+    "proposalId": "sequence.01.calcom_cancelled_booking_uid_cannot_be_replayed_.c6334ce5a1",
+    "proposalKind": "workflow-sequence",
+    "rationale": "Bayesilisk composed connector-declared actions into a bounded deterministic workflow sequence.",
+    "sequenceRuleId": "cancelled-booking-public-replay",
+    "sequenceSteps": [
+      {
+        "connectorAction": "create-booking",
+        "params": {},
+        "produces": [
+          "booking.uid",
+          "eventType.slug",
+          "user.username"
+        ],
+        "requires": [],
+        "stepId": "step.01.create_booking"
+      },
+      {
+        "connectorAction": "cancel-booking",
+        "params": {},
+        "produces": [
+          "booking.status.cancelled"
+        ],
+        "requires": [
+          "booking.uid"
+        ],
+        "stepId": "step.02.cancel_booking"
+      },
+      {
+        "connectorAction": "open-public-booking-route",
+        "params": {
+          "rescheduleUid": "booking.uid"
+        },
+        "produces": [],
+        "requires": [
+          "eventType.slug",
+          "user.username"
+        ],
+        "stepId": "step.03.open_public_booking_route"
+      }
+    ],
+    "title": "Cancelled booking UID replay through public booking route is rejected"
+  }
+]

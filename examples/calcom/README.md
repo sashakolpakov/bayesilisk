@@ -35,8 +35,9 @@ fail.
 ## Observed Result
 
 The connector supplied source-backed proposal rules around stale or unknown
-`rescheduleUid` context. Bayesilisk generated 6 probe proposals. The local
-Cal.com connector executed those 6 proposals against local fixtures.
+`rescheduleUid` context, plus an action graph for cancelled-booking replay.
+Bayesilisk generated 7 probe proposals. The local Cal.com connector executed
+those 7 proposals against local fixtures.
 
 Observed locally:
 
@@ -48,15 +49,22 @@ Observed locally:
 | Private booking link with `rescheduleUid` | stale id | 404 | 200 |
 | Dynamic booking page with `rescheduleUid` | unknown id | 404 | 200 |
 | Dynamic booking page with `rescheduleUid` | stale id | 404 | 200 |
+| Cancelled booking UID replay through public route | replay cancelled uid | 409 | 200 |
 
 These are local fixture observations. They are not production observations.
+
+Current run logs in [baselines](baselines/) include:
+
+- `generated-proposals-run.json`: the 6 unknown/stale `rescheduleUid` probes.
+- `generated-sequence-run.json`: the generated cancelled-booking workflow
+  sequence.
 
 Strict connector-contract check for these artifacts:
 
 ```json
 {
-  "sourceFactCount": 3,
-  "observedFactCount": 6,
+  "sourceFactCount": 4,
+  "observedFactCount": 7,
   "violations": []
 }
 ```
@@ -66,10 +74,15 @@ Strict connector-contract check for these artifacts:
 - [bayesilisk-probes.e2e.ts](bayesilisk-probes.e2e.ts): Cal.com Playwright connector example.
 - [source-context.json](source-context.json): connector source facts and explicit proposal rules.
 - [generated-proposals.json](generated-proposals.json): proposals emitted by Bayesilisk from the supplied rules.
-- [execution-context.json](execution-context.json): observed connector evidence after executing proposals.
-- [reports/report.json](reports/report.json): full Bayesilisk JSON report.
-- [reports/report.md](reports/report.md): full Bayesilisk Markdown report.
+- [sequence-source-context.json](sequence-source-context.json): connector-declared action graph for a longer workflow.
+- [generated-sequence-proposals.json](generated-sequence-proposals.json): bounded workflow proposal emitted from the action graph.
+- [execution-context.json](execution-context.json): consolidated observed connector evidence after executing all 7 proposals.
+- [baselines/generated-proposals-run.json](baselines/generated-proposals-run.json): Playwright run log for the 6 generated route probes.
+- [baselines/generated-sequence-run.json](baselines/generated-sequence-run.json): Playwright run log for the generated workflow sequence.
+- [reports/report.json](reports/report.json): app-only Bayesilisk JSON report for the 7 findings.
+- [reports/report.md](reports/report.md): app-only Bayesilisk Markdown report for the 7 findings.
 - [reports/issue-payloads.json](reports/issue-payloads.json): connector-only issue-ready payloads generated from verified findings.
+- [upstream-outcomes.md](upstream-outcomes.md): upstream issue/PR references showing human response to reported findings.
 
 ## Reproduce The Bayesilisk Steps
 
@@ -79,6 +92,10 @@ From the Bayesilisk repository root:
 python3 -m bayesilisk \
   --context examples/calcom/source-context.json \
   --probe-proposals-output /tmp/calcom-bayesilisk-proposals.json
+
+python3 -m bayesilisk \
+  --context examples/calcom/sequence-source-context.json \
+  --probe-proposals-output /tmp/calcom-bayesilisk-sequence-proposals.json
 ```
 
 Then run the Cal.com connector in a local Cal.com checkout with the generated
@@ -92,9 +109,18 @@ node .yarn/releases/yarn-4.12.0.cjs playwright test \
   apps/web/playwright/bayesilisk-probes.e2e.ts \
   --project=@calcom/web \
   --workers=1
+
+BAYESILISK_PROPOSALS_INPUT=/tmp/calcom-bayesilisk-sequence-proposals.json \
+BAYESILISK_CONTEXT_OUTPUT=/tmp/calcom-bayesilisk-sequence-context.json \
+node .yarn/releases/yarn-4.12.0.cjs playwright test \
+  apps/web/playwright/bayesilisk-probes.e2e.ts \
+  --project=@calcom/web \
+  --workers=1
 ```
 
-Finally, run Bayesilisk over the observed execution context:
+Finally, combine the observed route and sequence evidence into one execution
+context, then run Bayesilisk over that consolidated context. The checked-in
+`execution-context.json` and reports are the clean current rerun artifacts.
 
 ```sh
 python3 -m bayesilisk \
@@ -114,8 +140,22 @@ python3 -m bayesilisk \
   --output /tmp/calcom-bayesilisk-issue-payloads.json
 ```
 
+Only `breakage.context-observed` payloads from the app connector should be used
+for Cal.com issue creation.
+
 ## Boundary
 
 This example intentionally keeps Cal.com-specific knowledge in the connector
 files and context. Bayesilisk core only expands supplied proposal rules and
 verifies observed evidence.
+
+For longer workflows, the connector can expose an action graph rather than a
+single action. In this example Bayesilisk composes:
+
+```text
+create-booking -> cancel-booking -> open-public-booking-route(rescheduleUid=booking.uid)
+```
+
+from `sequence-source-context.json`. The connector still executes the concrete
+Cal.com fixture actions and reports observations; Bayesilisk owns the generic
+bounded sequence proposal and deterministic verification boundary.

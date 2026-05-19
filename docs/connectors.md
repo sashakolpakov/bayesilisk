@@ -156,6 +156,57 @@ Do not add app-specific logic to Bayesilisk for a connector. Add app-specific
 execution support in the connector by mapping proposal `connectorAction` values
 to real app actions.
 
+For longer deterministic workflows, a connector can also declare an action
+graph. The connector still owns execution, but Bayesilisk can compose bounded
+sequences from declared action inputs and outputs.
+
+```json
+{
+  "connectorActionGraph": {
+    "actions": [
+      {
+        "actionId": "create-booking",
+        "produces": ["booking.uid", "eventType.slug", "user.username"]
+      },
+      {
+        "actionId": "cancel-booking",
+        "requires": ["booking.uid"],
+        "produces": ["booking.status.cancelled"]
+      },
+      {
+        "actionId": "open-public-booking-route",
+        "requires": ["user.username", "eventType.slug"]
+      }
+    ],
+    "sequenceRules": [
+      {
+        "ruleId": "cancelled-booking-replay",
+        "invariantId": "calcom.cancelled_booking_replay_rejected",
+        "expectedBehavior": {"status": 409},
+        "requiresState": ["booking.status.cancelled"],
+        "goal": {
+          "action": "open-public-booking-route",
+          "paramBindings": {"rescheduleUid": "booking.uid"}
+        },
+        "maxDepth": 4,
+        "title": "Cancelled booking UID replay is rejected"
+      }
+    ]
+  }
+}
+```
+
+Bayesilisk will emit a `proposalKind: "workflow-sequence"` proposal such as:
+
+```text
+create-booking -> cancel-booking -> open-public-booking-route(rescheduleUid=booking.uid)
+```
+
+The connector receives that sequence, executes each declared action exactly,
+and reports observed evidence. The connector must not decide pass/fail; it only
+maps declared `actionId` values to real app fixture/browser/API actions and
+returns concrete observations.
+
 3. Execute real app behavior.
 
 Use the app's own fixture helpers and browser/API test tools. A connector should
@@ -309,5 +360,7 @@ The app owns app behavior. Bayesilisk consumes evidence and verifies the report.
 See [examples/calcom](https://github.com/sashakolpakov/bayesilisk/tree/main/examples/calcom)
 for a real-app connector example.
 It records the Cal.com repository URL, exact commit hash, connector source
-context, Bayesilisk-generated proposals, observed local execution context, and
-reports.
+contexts, Bayesilisk-generated route and workflow proposals, observed local
+execution context, app-only reports, issue payloads, and upstream outcome
+references. Those outcome references distinguish issue existence from stronger
+human validation such as an upstream fix PR linked to the Bayesilisk finding.
