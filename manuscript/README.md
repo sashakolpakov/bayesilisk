@@ -1,8 +1,21 @@
 # Manuscript Draft
 
-This directory contains a concise LaTeX manuscript draft for Bayesilisk.
+This directory contains the current concise LaTeX manuscript for Bayesilisk.
 
-Current target: short case-study style paper, not ACM TOSEM.
+Current target: a compact practice/research case-study article centered on the
+Cal.com artifact and the verifier architecture. The draft now includes:
+
+- a claim audit separating scenario generation, connector execution, and
+  deterministic oracle ownership;
+- a mathematical model of connector contracts, route mutations, bounded action
+  sequences, Grassmann-style attention, Bayesian ranking, and evidence
+  verification;
+- the current Cal.com artifact summary: 7 generated probes, 7 connector
+  observations, 7 verified app findings, and issue-ready payloads;
+- upstream validation: Cal.com issue `#29399` has targeted fix PR `#29400`,
+  and cancelled-booking replay issue `#29407` remains open at capture time;
+- explicit limitations: one real app artifact, bounded sequence generation, and
+  small local comparison runs rather than a full multi-app benchmark.
 
 Build locally with:
 
@@ -13,12 +26,7 @@ pdflatex main.tex
 pdflatex main.tex
 ```
 
-The draft intentionally states the current evidence limits: the Cal.com artifact
-contains a real connector run, 7 verified app findings, and one generated
-bounded workflow sequence. It does not yet include fresh baseline comparisons
-against existing E2E tests, Playwright-only probing, weak model proposals, or
-browser-driving LLM agents.
+Supporting notes:
 
-The Cal.com artifact also records upstream human response: issue `#29399` has
-an open fix PR, `#29400`. That is treated as stronger validation than a closed
-issue without fix context.
+- `socratic_passes.md` records the claim-audit passes used to rewrite the text.
+- `venue_notes.md` records likely publication venues and current positioning.

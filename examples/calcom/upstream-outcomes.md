@@ -24,6 +24,13 @@ threads.
   `fix: return 404 for unknown rescheduleUid instead of opening booking flow`
 - Fix PR state at capture: `open`
 - Fix PR created at: `2026-05-18T06:51:15Z`
+- Fix PR changed files at capture:
+  - `apps/web/server/lib/[user]/[type]/getServerSideProps.ts`
+  - `apps/web/playwright/booking-pages.e2e.ts`
+  - `apps/web/playwright/booking-seats.e2e.ts`
+- Fix PR summary at capture: separates the missing-booking null case in
+  `processReschedule`, returns `notFound`, and adds a Playwright regression
+  test for unknown `rescheduleUid`.
 
 Interpretation: this is evidence that the Bayesilisk finding was concrete
 enough for a human contributor to produce a targeted fix.

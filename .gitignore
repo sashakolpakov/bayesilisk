@@ -15,3 +15,4 @@ docs/_build/
 *.blg
 *.log
 *.out
+*.synctex.gz
