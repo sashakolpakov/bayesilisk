@@ -14,8 +14,10 @@ Cal.com artifact and the verifier architecture. The draft now includes:
   observations, 7 verified app findings, and issue-ready payloads;
 - upstream validation: Cal.com issue `#29399` has targeted fix PR `#29400`,
   and cancelled-booking replay issue `#29407` remains open at capture time;
-- explicit limitations: one real app artifact, bounded sequence generation, and
-  small local comparison runs rather than a full multi-app benchmark.
+- scope and generalization: connectors are app-specific by design, bounded
+  sequence generation scales with the connector-declared action graph, and the
+  Cal.com comparison runs validate the difference from E2E-only,
+  Playwright-only, weak-model, and LLM-agent workflows.
 
 Build locally with:
 

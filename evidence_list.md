@@ -98,21 +98,24 @@ generated-proposal and generated-sequence Playwright runs. Exploratory baseline
 logs are summarized here and in the manuscript rather than stored as historical
 garbage in the example directory.
 
-## Evidence Still Needed For A Stronger Journal Submission
+## Evidence To Broaden The Journal Submission
 
 - Add at least one second real-app artifact with the same clean artifact
   discipline: repo URL, commit hash, connector, context, generated proposals,
-  execution evidence, app-only report, and issue payloads.
+  execution evidence, app-only report, and issue payloads. This broadens the
+  empirical base; it does not require changing the Bayesilisk core.
 - Broaden the LLM-agent baseline across additional local or hosted models if
   the paper needs a model-robust oracle-safety claim.
 - Recreate all baseline comparisons as separately named, retained runs if
-  targeting a stronger empirical venue such as JSS, ASE, TOSEM, or TSE.
+  targeting a statistics-heavy empirical venue such as JSS, ASE, TOSEM, or TSE.
 
 ## Architecture Boundary
 
 - Bayesilisk now generates bounded action-sequence proposals from
-  connector-declared capabilities.
+  connector-declared capabilities. The bound is a verifier/search control; the
+  practical breadth depends on the connector-declared action graph.
 - The connector remains the app-specific executor for concrete fixture
   operations.
-- This is not arbitrary free-form browser-run synthesis; ranking with attention
-  and richer sequence search remain future extensions.
+- This is not arbitrary free-form browser-run synthesis. App teams expose
+  actions and state facts; Bayesilisk composes and verifies within that declared
+  surface.

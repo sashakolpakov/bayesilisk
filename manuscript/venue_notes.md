@@ -40,9 +40,11 @@ Source: https://www.sciencedirect.com/journal/softwarex
 ## Stronger Research-Journal Targets
 
 Journal of Systems and Software or Automated Software Engineering become more
-credible after multi-app evaluation, more baseline runs, and an ablation study
-that separates connector context, generated proposals, attention ranking,
-Bayesian ordering, weak-model noise, and deterministic verification.
+credible after multi-app evaluation and an ablation study that separates
+connector context, generated proposals, attention ranking, Bayesian ordering,
+weak-model noise, and deterministic verification. The current Cal.com baselines
+already support the architectural distinction; a broader venue will want effect
+sizes across projects and models.
 
 Sources:
 
@@ -52,8 +54,9 @@ Sources:
 ## Not Yet: TOSEM/TSE-Style Claims
 
 ACM TOSEM and IEEE TSE are premature for the current artifact. They would expect
-a stronger research contribution and broader validation than one real-app case
-study plus local baselines. A credible TOSEM/TSE submission would need at least:
+a larger empirical package than the current Cal.com-centered artifact, even
+with useful local baselines and upstream PR validation. A credible TOSEM/TSE
+submission would need at least:
 
 - multiple real applications;
 - reproducible connector branches or patches;

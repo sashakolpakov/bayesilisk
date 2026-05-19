@@ -68,12 +68,17 @@ Manuscript consequence: the upstream validation section uses one targeted fix PR
 as practical validation and does not overclaim that all findings have been
 patched.
 
-## Pass 7: What Is Not Proven Yet?
+## Pass 7: What Is The Generalization Boundary?
 
-Question: What would a reviewer still attack?
+Question: What transfers to another application, and what must be app-specific?
 
-Answer: The current empirical evidence is one real app, bounded workflow
-generation, small local comparison runs, and connector-dependent coverage.
+Answer: The Bayesilisk core transfers: scenario expansion, validation,
+attention, ranking, and deterministic verification are app-agnostic. The
+connector must be app-specific because each product has its own actors, routes,
+fixtures, identifiers, and invariants. Sequence generation is bounded by the
+declared action graph, but that boundary can be broad when the connector exposes
+enough meaningful actions.
 
-Manuscript consequence: the threats-to-validity section states those limits
-directly instead of hiding them.
+Manuscript consequence: the paper now frames this as scope and generalization:
+the Cal.com baselines validate the architectural distinction, while additional
+apps would broaden empirical evidence rather than change the core claim.

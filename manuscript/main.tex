@@ -68,6 +68,14 @@ target: \tool treats a modern UI/API application as the system under test and
 uses browser/API probes as evidence sensors. It also treats LLM proposals as
 untrusted generator hints, not as properties and not as verdicts.
 
+The practical value is that teams do not have to choose between narrow E2E
+scripts and unconstrained LLM agents. If a team can describe the app surface it
+already understands---actors, routes, actions, fixtures, identifiers, and
+rules---\tool can sweep the adjacent scenario space, prioritize suspicious
+combinations, and emit deterministic issue payloads. The claim is deliberately
+bounded but useful: \tool does not replace domain knowledge; it turns that
+domain knowledge into a larger, repeatable search procedure.
+
 This paper makes four contributions:
 
 \begin{enumerate}
@@ -79,9 +87,11 @@ This paper makes four contributions:
   \item a Cal.com artifact showing seven generated probes, seven observed
         expected-vs-observed violations, reproducible issue payloads, and an
         upstream targeted fix pull request for one reported issue; and
-  \item an explicit account of current limits: one practical real-app artifact,
-        bounded action-sequence generation, and small baseline runs rather than
-        a broad multi-application benchmark.
+  \item an explicit account of scope and generalization: connectors are
+        app-specific by design, action-sequence breadth is governed by the
+        connector-declared graph, and the Cal.com comparison runs validate the
+        architectural separation from E2E-only, Playwright-only, weak-model, and
+        LLM-agent workflows.
 \end{enumerate}
 
 \section{Claim Audit}
@@ -383,27 +393,45 @@ This validation is practical rather than statistical. A fix PR does not prove
 the entire methodology, but it does show that at least one generated finding was
 actionable enough for an upstream contributor to diagnose and patch.
 
-\section{Threats to Validity}
+\section{Scope and Generalization}
 
-\textbf{Single-app evidence.} The current practical validation is Cal.com. A
-stronger journal claim needs additional app artifacts with the same discipline:
-repository revision, connector, context, generated proposals, execution
-evidence, report, issue payloads, and upstream response where possible.
+\tool is intended to be adopted through app-specific connectors and
+app-agnostic verification. The following points describe that engineering
+boundary and the evidence needed to broaden the empirical case; they are not
+exceptions to the architecture.
 
-\textbf{Connector quality.} \tool can only explore the surface the connector
-declares. If the connector omits actors, routes, state facts, or invariants,
-\tool will not infer those semantics reliably from browser pixels alone.
+\textbf{Application scope.} The current public practical validation is Cal.com.
+The result does not depend on Cal.com-specific verifier code: the core consumes
+a connector contract and generated probes through the same app-agnostic
+interfaces used elsewhere in \tool. Additional application artifacts would
+strengthen empirical breadth, but the required adaptation is the expected one:
+each app team writes a connector that exposes its own routes, actions, state
+facts, fixtures, and invariants.
 
-\textbf{Bounded workflow generation.} The current sequence proposer composes
-short action sequences from declared requires/produces tokens. It does not
-synthesize arbitrary free-form browser sessions.
+\textbf{Connector specificity.} Connector-specific code is not a weakness of the
+architecture; it is the integration boundary. A team that knows the app
+specification can declare actors, routes, action hooks, identifiers, and
+invariants without modifying the \tool core. Connector quality still matters:
+the broader and more accurate the declared surface, the broader the generated
+probe space.
+
+\textbf{Bounded workflow generation.} Sequence generation is intentionally
+bounded by the connector-declared action graph and depth. That bound can still
+cover a large workflow space when the connector exposes a broad action
+vocabulary and meaningful state tokens. The design avoids arbitrary free-form
+browser wandering; \tool composes declared actions and the connector executes
+them.
 
 \textbf{Oracle scope.} The deterministic oracle is only as good as the supplied
 ruleset. \tool prevents the LLM from being the oracle; it does not remove the
 need for correct invariants.
 
-\textbf{Baseline size.} The comparison runs are useful controls, not a full
-empirical benchmark across models, apps, and seeds.
+\textbf{Baseline interpretation.} The Cal.com comparison runs validate the
+architectural difference: nearby E2E did not cover the generated states, manual
+Playwright probes were narrower, weak local model output was rejected by
+validation, and browser-driving LLM trials showed oracle instability. A larger
+multi-app study would quantify effect size across projects and models; it is
+not required to establish the core separation demonstrated here.
 
 \section{Conclusion}
 
@@ -414,9 +442,10 @@ functions over a connector-declared contract and connector-returned evidence.
 The Cal.com case study demonstrates that this separation can produce useful
 real-app findings: seven generated probes, seven observed invariant violations,
 issue-ready payloads, and a targeted upstream fix PR for one reported issue. The
-next research step is not to make the connector smarter; it is to repeat this
-artifact discipline across additional applications while keeping the \tool core
-app-agnostic.
+adoption path is incremental: write the connector around existing app fixtures,
+let \tool expand the scenario space, and keep the oracle deterministic. The next
+research step is to repeat this artifact discipline across additional
+applications while keeping the \tool core app-agnostic.
 
 \bibliographystyle{plain}
 \bibliography{references}
