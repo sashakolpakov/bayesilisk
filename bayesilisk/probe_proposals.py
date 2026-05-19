@@ -198,10 +198,73 @@ def generate_probe_proposals(context: dict[str, Any] | None, *, limit: int = DEF
     return proposals
 
 
-def _list_of_strings(value: Any) -> list[str]:
+def _unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        text = _string(value)
+        if text and text not in seen:
+            seen.add(text)
+            result.append(text)
+    return result
+
+
+def _token_aliases(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [_string(value)] if _string(value) else []
+    if not isinstance(value, dict):
+        return []
+    aliases: list[str] = []
+    concrete = _string(value.get("refines") or value.get("appToken") or value.get("id"))
+    if concrete:
+        aliases.append(concrete)
+    token = _string(value.get("token") or value.get("kind"))
+    resource_type = _string(value.get("resourceType") or value.get("resource"))
+    if token and resource_type:
+        aliases.append(f"{token}:{resource_type}")
+    if token:
+        aliases.append(token)
+    return _unique_strings(aliases)
+
+
+def _token_display_id(value: Any) -> str:
+    aliases = _token_aliases(value)
+    return aliases[0] if aliases else ""
+
+
+def _list_of_token_display_ids(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [_string(item) for item in value if _string(item)]
+    return _unique_strings([_token_display_id(item) for item in value])
+
+
+def _list_of_token_keys(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    keys: list[str] = []
+    for item in value:
+        keys.extend(_token_aliases(item))
+    return _unique_strings(keys)
+
+
+def _abag_token(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    token = _string(value.get("token") or value.get("kind"))
+    if not token:
+        return None
+    normalized = {"token": token}
+    for key in ("refines", "resourceType", "description"):
+        text = _string(value.get(key))
+        if text:
+            normalized[key] = text
+    return normalized
+
+
+def _list_of_abag_tokens(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    return [token for item in value if (token := _abag_token(item)) is not None]
 
 
 def _action_graph(context: dict[str, Any] | None) -> dict[str, Any]:
@@ -223,12 +286,20 @@ def _graph_actions(graph: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[st
         action_id = _string(raw_action.get("actionId") or raw_action.get("id"))
         if not action_id or action_id in by_id:
             continue
+        requires_tokens = _list_of_abag_tokens(raw_action.get("requires"))
+        produces_tokens = _list_of_abag_tokens(raw_action.get("produces"))
         action = {
             **raw_action,
             "actionId": action_id,
-            "requires": _list_of_strings(raw_action.get("requires")),
-            "produces": _list_of_strings(raw_action.get("produces")),
+            "requires": _list_of_token_display_ids(raw_action.get("requires")),
+            "produces": _list_of_token_display_ids(raw_action.get("produces")),
+            "_requiresKeys": _list_of_token_keys(raw_action.get("requires")),
+            "_producesKeys": _list_of_token_keys(raw_action.get("produces")),
         }
+        if requires_tokens:
+            action["requiresTokens"] = requires_tokens
+        if produces_tokens:
+            action["producesTokens"] = produces_tokens
         actions.append(action)
         by_id[action_id] = action
     return actions, by_id
@@ -250,24 +321,46 @@ def _goal(rule: dict[str, Any]) -> dict[str, Any]:
     return goal if isinstance(goal, dict) else {}
 
 
-def _param_bindings(goal: dict[str, Any], rule: dict[str, Any]) -> dict[str, str]:
+def _raw_param_bindings(goal: dict[str, Any], rule: dict[str, Any]) -> dict[str, Any]:
     raw_bindings = goal.get("paramBindings")
     if raw_bindings is None:
         raw_bindings = rule.get("paramBindings")
     if not isinstance(raw_bindings, dict):
         return {}
+    return raw_bindings
+
+
+def _param_bindings(goal: dict[str, Any], rule: dict[str, Any]) -> dict[str, str]:
+    raw_bindings = _raw_param_bindings(goal, rule)
     bindings: dict[str, str] = {}
     for name, source in raw_bindings.items():
         param_name = _string(name)
-        source_name = _string(source)
+        source_name = _token_display_id(source)
         if param_name and source_name:
             bindings[param_name] = source_name
     return bindings
 
 
+def _param_binding_keys(goal: dict[str, Any], rule: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    for source in _raw_param_bindings(goal, rule).values():
+        keys.extend(_token_aliases(source))
+    return _unique_strings(keys)
+
+
+def _param_binding_tokens(goal: dict[str, Any], rule: dict[str, Any]) -> dict[str, dict[str, str]]:
+    tokens: dict[str, dict[str, str]] = {}
+    for name, source in _raw_param_bindings(goal, rule).items():
+        param_name = _string(name)
+        token = _abag_token(source)
+        if param_name and token is not None:
+            tokens[param_name] = token
+    return tokens
+
+
 def _producer_for(actions: list[dict[str, Any]], token: str) -> dict[str, Any] | None:
     for action in actions:
-        if token in action["produces"]:
+        if token in action["_producesKeys"]:
             return action
     return None
 
@@ -281,16 +374,16 @@ def _topological_action_order(plan: list[dict[str, Any]], terminal_action_id: st
     while remaining:
         progressed = False
         for action in list(remaining):
-            if all(token in produced for token in action["requires"]):
+            if all(token in produced for token in action["_requiresKeys"]):
                 ordered.append(action)
-                produced.update(action["produces"])
+                produced.update(action["_producesKeys"])
                 remaining.remove(action)
                 progressed = True
         if not progressed:
             return None
 
     if terminal is not None:
-        if not all(token in produced for token in terminal["requires"]):
+        if not all(token in produced for token in terminal["_requiresKeys"]):
             return None
         ordered.append(terminal)
     return ordered
@@ -310,7 +403,7 @@ def _build_sequence(
 
     bindings = _param_bindings(goal, rule)
     required: list[str] = []
-    for token in [*terminal["requires"], *_list_of_strings(rule.get("requiresState")), *bindings.values()]:
+    for token in [*terminal["_requiresKeys"], *_list_of_token_keys(rule.get("requiresState")), *_param_binding_keys(goal, rule)]:
         if token not in required:
             required.append(token)
 
@@ -331,10 +424,10 @@ def _build_sequence(
         action_id = producer["actionId"]
         if action_id in added_actions:
             return None
-        for token in producer["requires"]:
+        for token in producer["_requiresKeys"]:
             if token not in required:
                 required.append(token)
-        produced.update(producer["produces"])
+        produced.update(producer["_producesKeys"])
         added_actions.add(action_id)
         plan.append(producer)
 
@@ -377,17 +470,23 @@ def generate_sequence_proposals(context: dict[str, Any] | None, *, limit: int = 
         seen.add(key)
         proposal_hash = _safe_hash(key)[:10]
         sequence_steps = []
+        binding_tokens = _param_binding_tokens(_goal(rule), rule)
         for index, action in enumerate(sequence, start=1):
             is_terminal = index == len(sequence)
-            sequence_steps.append(
-                {
-                    "connectorAction": action["actionId"],
-                    "params": bindings if is_terminal else {},
-                    "produces": action["produces"],
-                    "requires": action["requires"],
-                    "stepId": f"step.{index:02d}.{_slug_id(action['actionId'])}",
-                }
-            )
+            step = {
+                "connectorAction": action["actionId"],
+                "params": bindings if is_terminal else {},
+                "produces": action["produces"],
+                "requires": action["requires"],
+                "stepId": f"step.{index:02d}.{_slug_id(action['actionId'])}",
+            }
+            if action.get("requiresTokens"):
+                step["requiresTokens"] = action["requiresTokens"]
+            if action.get("producesTokens"):
+                step["producesTokens"] = action["producesTokens"]
+            if is_terminal and binding_tokens:
+                step["paramBindingTokens"] = binding_tokens
+            sequence_steps.append(step)
         proposals.append(
             {
                 "expectedStatus": expected_status,

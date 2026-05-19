@@ -9,6 +9,16 @@ Coding agents should ingest
 before writing a connector. It lists the required source-context fields,
 observed-evidence fields, allowed agent steps, and non-negotiable boundaries.
 
+## ABAG Connector Context
+
+The [ABAG example](https://github.com/sashakolpakov/bayesilisk/blob/main/examples/abag-action-graph-context.json)
+shows a source-only Abstract Bayesilisk Action Graph. It maps concrete connector
+actions such as `create-invite`, `revoke-invite`, and `accept-invite-route` onto
+universal typed tokens such as `identifier.invitation_token` and
+`state.revoked`. Bayesilisk can compose a reusable revoked-token replay motif
+from that graph while the connector remains responsible for executing concrete
+app fixtures and returning observed evidence.
+
 ## Cal.com Connector Evidence
 
 The [Cal.com example](https://github.com/sashakolpakov/bayesilisk/tree/main/examples/calcom)

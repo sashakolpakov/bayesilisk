@@ -32,8 +32,8 @@
             "required": ["actionId"],
             "properties": {
               "actionId": {"type": "string"},
-              "requires": {"type": "array", "items": {"type": "string"}},
-              "produces": {"type": "array", "items": {"type": "string"}}
+              "requires": {"type": "array", "items": {"$ref": "abag-token.schema.json"}},
+              "produces": {"type": "array", "items": {"$ref": "abag-token.schema.json"}}
             }
           }
         },
@@ -48,7 +48,7 @@
               "goal": {"type": "object"},
               "invariantId": {"type": "string"},
               "maxDepth": {"type": "integer", "minimum": 1},
-              "requiresState": {"type": "array", "items": {"type": "string"}},
+              "requiresState": {"type": "array", "items": {"$ref": "abag-token.schema.json"}},
               "ruleId": {"type": "string"},
               "title": {"type": "string"}
             }

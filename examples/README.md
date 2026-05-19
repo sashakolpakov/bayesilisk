@@ -7,6 +7,15 @@ application-specific fixture setup and action mapping outside the verifier while
 feeding Bayesilisk source context, proposal rules, observed evidence, and
 reports.
 
+## ABAG Connector Context
+
+See [abag-action-graph-context.json](abag-action-graph-context.json) for a
+minimal Abstract Bayesilisk Action Graph example. It maps concrete invite
+actions onto universal typed tokens such as `identifier.invitation_token`,
+`state.revoked`, and `boundary`-style route execution. The example is source
+context only: a real connector would execute the proposed sequence against local
+fixtures and then write observed evidence back into a normal Bayesilisk context.
+
 ## Cal.com Connector Evidence
 
 See [calcom/](calcom/) for a real-app connector example against a local Cal.com

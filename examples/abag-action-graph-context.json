@@ -1,0 +1,85 @@
+{
+  "source": "abag-example-connector",
+  "agentNotes": [
+    "Example ABAG source context only: the connector maps concrete invite actions to universal typed tokens."
+  ],
+  "priorAdjustments": {},
+  "repositoryFacts": [],
+  "connectorActionGraph": {
+    "abstractMotif": "create resource -> transition lifecycle state -> replay old identifier across boundary",
+    "actions": [
+      {
+        "actionId": "create-invite",
+        "produces": [
+          {
+            "token": "identifier.invitation_token",
+            "resourceType": "invitation",
+            "refines": "invite.token",
+            "description": "Concrete invitation token produced by the app fixture."
+          },
+          {
+            "token": "state.active",
+            "resourceType": "invitation",
+            "refines": "invite.state.active"
+          }
+        ]
+      },
+      {
+        "actionId": "revoke-invite",
+        "requires": [
+          {
+            "token": "identifier.invitation_token",
+            "resourceType": "invitation",
+            "refines": "invite.token"
+          }
+        ],
+        "produces": [
+          {
+            "token": "state.revoked",
+            "resourceType": "invitation",
+            "refines": "invite.state.revoked"
+          }
+        ]
+      },
+      {
+        "actionId": "accept-invite-route",
+        "requires": []
+      }
+    ],
+    "sequenceRules": [
+      {
+        "ruleId": "revoked-invite-token-replay",
+        "invariantId": "example.revoked_invite_token_rejected",
+        "expectedBehavior": {
+          "description": "A revoked invitation token must not be accepted through the public invite route.",
+          "status": 410
+        },
+        "requiresState": [
+          {
+            "token": "state.revoked",
+            "resourceType": "invitation"
+          }
+        ],
+        "goal": {
+          "action": "accept-invite-route",
+          "paramBindings": {
+            "inviteToken": {
+              "token": "identifier.invitation_token",
+              "resourceType": "invitation",
+              "refines": "invite.token"
+            }
+          }
+        },
+        "maxDepth": 4,
+        "title": "Revoked invitation token replay is rejected"
+      }
+    ]
+  },
+  "playwrightProbe": {
+    "artifactCount": 0,
+    "failedCount": 0,
+    "passedCount": 0,
+    "resultCount": 0,
+    "target": "ABAG documentation example"
+  }
+}

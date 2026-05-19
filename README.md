@@ -146,6 +146,8 @@ For coding agents and LLM teams building connectors, use the ingestible contract
 at [examples/connector-agent-contract.json](examples/connector-agent-contract.json).
 It spells out required source-context fields, observed-evidence fields, allowed
 agent steps, and boundaries that keep app-specific logic out of Bayesilisk core.
+For reusable workflow motifs, see the typed ABAG example at
+[examples/abag-action-graph-context.json](examples/abag-action-graph-context.json).
 
 ### Why This Is Not a Black Box
 

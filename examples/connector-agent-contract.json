@@ -1,6 +1,6 @@
 {
   "name": "bayesilisk-connector-agent-contract",
-  "version": 1,
+  "version": 2,
   "purpose": "Guide a coding agent or LLM team to build app-specific connectors while keeping Bayesilisk core app-agnostic.",
   "nonNegotiableBoundaries": [
     "Do not modify Bayesilisk core for one app connector.",
@@ -98,16 +98,93 @@
     "selector": "connector:open-resource-action",
     "timestamp": "2026-05-18T00:00:00Z"
   },
+  "abagTokenRules": [
+    "Use universal ABAG tokens in connectorActionGraph requires, produces, requiresState, and paramBindings when a workflow motif may be reusable.",
+    "Keep app-specific nouns in resourceType and refines, not in token.",
+    "Use refines for the concrete connector token that app-specific execution code understands.",
+    "Legacy string tokens are accepted as transitional input, but typed tokens are preferred for reusable action graphs."
+  ],
+  "abagTokenVocabulary": [
+    "principal.actor",
+    "session.authenticated",
+    "session.impersonated",
+    "scope.tenant",
+    "scope.owner",
+    "scope.foreign",
+    "resource.type",
+    "resource.id",
+    "resource.public_id",
+    "resource.private_id",
+    "resource.foreign_id",
+    "resource.stale_id",
+    "identifier.replay_token",
+    "identifier.single_use_token",
+    "identifier.invitation_token",
+    "identifier.reset_token",
+    "state.active",
+    "state.cancelled",
+    "state.deleted",
+    "state.expired",
+    "state.revoked",
+    "state.approved",
+    "state.rejected",
+    "boundary.public_route",
+    "boundary.private_route",
+    "boundary.api_route",
+    "boundary.ui_route",
+    "boundary.admin_route",
+    "capability.read",
+    "capability.write",
+    "capability.approve",
+    "capability.cancel",
+    "capability.export",
+    "capability.invite",
+    "capability.replay",
+    "evidence.status",
+    "evidence.redirect",
+    "evidence.rendered_state",
+    "evidence.network_response"
+  ],
+  "abagMotifExamples": [
+    "create resource -> transition lifecycle state -> replay old identifier across boundary",
+    "create privileged context -> downgrade/revoke privilege -> reuse stale session",
+    "create scoped object -> swap tenant/user id -> access through valid route",
+    "submit action -> navigate back/retry -> duplicate submission",
+    "create invitation -> revoke invitation -> accept invitation token"
+  ],
   "connectorActionGraphTemplate": {
     "actions": [
       {
         "actionId": "create-resource",
-        "produces": ["resource.id"]
+        "produces": [
+          {
+            "token": "resource.public_id",
+            "resourceType": "generic_resource",
+            "refines": "resource.id"
+          },
+          {
+            "token": "state.active",
+            "resourceType": "generic_resource",
+            "refines": "resource.state.active"
+          }
+        ]
       },
       {
         "actionId": "retire-resource",
-        "requires": ["resource.id"],
-        "produces": ["resource.state.retired"]
+        "requires": [
+          {
+            "token": "resource.public_id",
+            "resourceType": "generic_resource",
+            "refines": "resource.id"
+          }
+        ],
+        "produces": [
+          {
+            "token": "state.revoked",
+            "resourceType": "generic_resource",
+            "refines": "resource.state.retired"
+          }
+        ]
       },
       {
         "actionId": "open-resource-route",
@@ -119,10 +196,22 @@
         "ruleId": "retired-resource-replay",
         "invariantId": "myapp.retired_resource_rejected",
         "expectedBehavior": {"status": 410},
-        "requiresState": ["resource.state.retired"],
+        "requiresState": [
+          {
+            "token": "state.revoked",
+            "resourceType": "generic_resource",
+            "refines": "resource.state.retired"
+          }
+        ],
         "goal": {
           "action": "open-resource-route",
-          "paramBindings": {"resourceId": "resource.id"}
+          "paramBindings": {
+            "resourceId": {
+              "token": "resource.public_id",
+              "resourceType": "generic_resource",
+              "refines": "resource.id"
+            }
+          }
         },
         "maxDepth": 4,
         "title": "Retired resource replay is rejected"

@@ -1204,6 +1204,8 @@ def test_design_document_pins_trust_boundaries() -> None:
         "Grassmann is the router.",
         "The scenario proposer model is the proposer.",
         "Bayesilisk is the judge.",
+        "Abstract Bayesilisk Action Graph",
+        "identifier.replay_token",
         "No embedding, Grassmann score, model output, issue text, or Playwright observation may directly decide",
         "attentionScore",
         "riskScore",

@@ -196,6 +196,127 @@ sequences from declared action inputs and outputs.
 }
 ```
 
+The string-token form above is accepted as the v1 input form. New connectors
+should prefer ABAG typed tokens when the graph may become reusable across apps.
+Typed tokens separate the universal meaning from the app-specific handle:
+
+```json
+{
+  "token": "resource.public_id",
+  "resourceType": "booking",
+  "refines": "booking.uid"
+}
+```
+
+`token` is the universal ABAG token. `resourceType` narrows broad resource
+tokens when needed. `refines` is the concrete connector token that the app
+action implementation understands. Bayesilisk can match typed tokens by the
+abstract token and resource type, while the connector can still execute through
+the concrete refinement.
+
+The same Cal.com-shaped sequence can therefore be written as:
+
+```json
+{
+  "connectorActionGraph": {
+    "actions": [
+      {
+        "actionId": "create-booking",
+        "produces": [
+          {"token": "resource.public_id", "resourceType": "booking", "refines": "booking.uid"},
+          "eventType.slug",
+          "user.username"
+        ]
+      },
+      {
+        "actionId": "cancel-booking",
+        "requires": [
+          {"token": "resource.public_id", "resourceType": "booking"}
+        ],
+        "produces": [
+          {"token": "state.cancelled", "resourceType": "booking", "refines": "booking.status.cancelled"}
+        ]
+      },
+      {
+        "actionId": "open-public-booking-route",
+        "requires": ["user.username", "eventType.slug"]
+      }
+    ],
+    "sequenceRules": [
+      {
+        "ruleId": "cancelled-booking-public-replay",
+        "invariantId": "calcom.cancelled_booking_replay_rejected",
+        "expectedBehavior": {"status": 409},
+        "requiresState": [
+          {"token": "state.cancelled", "resourceType": "booking"}
+        ],
+        "goal": {
+          "action": "open-public-booking-route",
+          "paramBindings": {
+            "rescheduleUid": {"token": "resource.public_id", "resourceType": "booking", "refines": "booking.uid"}
+          }
+        },
+        "maxDepth": 4,
+        "title": "Cancelled booking UID replay is rejected"
+      }
+    ]
+  }
+}
+```
+
+Universal ABAG tokens should come from a small vocabulary:
+
+```text
+principal.actor
+session.authenticated
+session.impersonated
+scope.tenant
+scope.owner
+scope.foreign
+resource.type
+resource.id
+resource.public_id
+resource.private_id
+resource.foreign_id
+resource.stale_id
+identifier.replay_token
+identifier.single_use_token
+identifier.invitation_token
+identifier.reset_token
+state.active
+state.cancelled
+state.deleted
+state.expired
+state.revoked
+state.approved
+state.rejected
+boundary.public_route
+boundary.private_route
+boundary.api_route
+boundary.ui_route
+boundary.admin_route
+capability.read
+capability.write
+capability.approve
+capability.cancel
+capability.export
+capability.invite
+capability.replay
+evidence.status
+evidence.redirect
+evidence.rendered_state
+evidence.network_response
+```
+
+Use app nouns only in `resourceType` and `refines`. The reusable unit is the
+motif, for example:
+
+```text
+create resource -> transition lifecycle state -> replay old identifier across boundary
+create privileged context -> downgrade/revoke privilege -> reuse stale session
+create scoped object -> swap tenant/user id -> access through valid route
+```
+
 Bayesilisk will emit a `proposalKind: "workflow-sequence"` proposal such as:
 
 ```text

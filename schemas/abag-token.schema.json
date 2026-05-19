@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bayesilisk.local/schemas/abag-token.schema.json",
+  "title": "Bayesilisk ABAG token",
+  "description": "A transitional ABAG token may be a legacy string token or a typed universal token with an app-specific refinement.",
+  "type": ["string", "object"],
+  "additionalProperties": false,
+  "required": ["token"],
+  "properties": {
+    "token": {
+      "type": "string",
+      "pattern": "^(principal|session|scope|resource|identifier|state|boundary|capability|evidence)\\.[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$"
+    },
+    "refines": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resourceType": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

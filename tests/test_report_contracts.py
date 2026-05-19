@@ -143,6 +143,26 @@ def test_golden_playwright_context_report_matches_schemas(monkeypatch: Any) -> N
     assert canonical_report(current) == golden
 
 
+def test_abag_example_context_matches_schema_and_generates_sequence() -> None:
+    from bayesilisk.probe_proposals import generate_sequence_proposals
+
+    registry = schema_registry()
+    context = load_json(REPO_ROOT / "examples" / "abag-action-graph-context.json")
+
+    validate_schema(context, registry["playwright-context.schema.json"], registry=registry)
+    proposals = generate_sequence_proposals(context)
+
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert proposal["proposalKind"] == "workflow-sequence"
+    assert [step["connectorAction"] for step in proposal["sequenceSteps"]] == [
+        "create-invite",
+        "revoke-invite",
+        "accept-invite-route",
+    ]
+    assert proposal["sequenceSteps"][-1]["params"] == {"inviteToken": "invite.token"}
+
+
 def test_current_issue_payloads_match_schema() -> None:
     from bayesilisk import reporting
 
@@ -312,6 +332,106 @@ def test_connector_action_graph_generates_bounded_sequence_proposals(monkeypatch
         "open-public-booking-route",
     ]
     assert proposal["sequenceSteps"][-1]["params"] == {"rescheduleUid": "booking.uid"}
+
+
+def test_connector_action_graph_supports_abag_typed_tokens(monkeypatch: Any) -> None:
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_SCENARIO_MODEL", "0")
+    monkeypatch.setenv("BAYESILISK_USE_OLLAMA_EMBEDDINGS", "0")
+    from bayesilisk.probe_proposals import generate_sequence_proposals
+
+    context = {
+        "source": "connector-source-context",
+        "agentNotes": ["connector exposes ABAG typed tokens"],
+        "priorAdjustments": {},
+        "repositoryFacts": [],
+        "connectorActionGraph": {
+            "actions": [
+                {
+                    "actionId": "create-booking",
+                    "produces": [
+                        {
+                            "token": "resource.public_id",
+                            "resourceType": "booking",
+                            "refines": "booking.uid",
+                        },
+                        "eventType.slug",
+                        "user.username",
+                    ],
+                },
+                {
+                    "actionId": "cancel-booking",
+                    "requires": [
+                        {
+                            "token": "resource.public_id",
+                            "resourceType": "booking",
+                        }
+                    ],
+                    "produces": [
+                        {
+                            "token": "state.cancelled",
+                            "resourceType": "booking",
+                            "refines": "booking.status.cancelled",
+                        }
+                    ],
+                },
+                {
+                    "actionId": "open-public-booking-route",
+                    "requires": ["user.username", "eventType.slug"],
+                },
+            ],
+            "sequenceRules": [
+                {
+                    "ruleId": "cancelled-booking-replay",
+                    "expectedBehavior": {"status": 409},
+                    "goal": {
+                        "action": "open-public-booking-route",
+                        "paramBindings": {
+                            "rescheduleUid": {
+                                "token": "resource.public_id",
+                                "resourceType": "booking",
+                                "refines": "booking.uid",
+                            }
+                        },
+                    },
+                    "invariantId": "external.cancelled_booking_replay_rejected",
+                    "maxDepth": 4,
+                    "requiresState": [
+                        {
+                            "token": "state.cancelled",
+                            "resourceType": "booking",
+                        }
+                    ],
+                    "title": "Cancelled booking UID replay is rejected",
+                }
+            ],
+        },
+        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
+    }
+
+    registry = schema_registry()
+    validate_schema(context, registry["playwright-context.schema.json"], registry=registry)
+
+    proposals = generate_sequence_proposals(context)
+
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert [step["connectorAction"] for step in proposal["sequenceSteps"]] == [
+        "create-booking",
+        "cancel-booking",
+        "open-public-booking-route",
+    ]
+    assert proposal["sequenceSteps"][0]["produces"] == ["booking.uid", "eventType.slug", "user.username"]
+    assert proposal["sequenceSteps"][0]["producesTokens"][0] == {
+        "token": "resource.public_id",
+        "resourceType": "booking",
+        "refines": "booking.uid",
+    }
+    assert proposal["sequenceSteps"][-1]["params"] == {"rescheduleUid": "booking.uid"}
+    assert proposal["sequenceSteps"][-1]["paramBindingTokens"]["rescheduleUid"] == {
+        "token": "resource.public_id",
+        "resourceType": "booking",
+        "refines": "booking.uid",
+    }
 
 
 def test_connector_action_graph_rejects_unsupported_sequences() -> None:

@@ -229,9 +229,9 @@ Required provenance includes:
 
 Only accepted proposals may become generated scenarios, and even then they must be marked as model-proposed.
 
-## Compatibility Pipeline
+## Architecture Summary
 
-The full architecture is:
+The architecture is:
 
 ```text
 Playwright
@@ -261,10 +261,11 @@ Bayesilisk is the judge.
 
 ## Important Task: Generic Sequence Proposals
 
-Bayesilisk is not yet generally capable of synthesizing arbitrary longer
-browser runs while keeping the connector as a dumb executor. Today it can
-generate parameterized probes from connector-supplied proposal rules, but the
-connector still owns the concrete action implementation.
+Bayesilisk can now generate bounded workflow-sequence proposals from a
+connector-declared action graph. This is still not free-form browser wandering:
+the connector exposes declared actions, state facts, and parameter bindings;
+Bayesilisk composes valid sequences; the connector executes concrete app
+behavior.
 
 The right architecture is:
 
@@ -283,15 +284,134 @@ create booking -> cancel booking -> replay uid via public route
 ```
 
 The connector must not become the scenario generator. It should expose a small
-set of typed actions, actor/session fixtures, state-producing outputs, and
-route/action parameter bindings. Bayesilisk should own the generic sequence
-proposal layer that composes those actions into bounded runs.
+set of actions, actor/session fixtures, state-producing outputs, and route/action
+parameter bindings. Bayesilisk should own the generic sequence proposal layer
+that composes those actions into bounded runs.
 
 Current Cal.com status: Bayesilisk generates the cancelled-booking replay as a
 bounded workflow sequence from a connector-declared action graph, and the
 Cal.com connector executes that generated proposal directly. This is evidence
 for the declared-action sequence architecture, not proof that Bayesilisk can
 synthesize arbitrary free-form browser runs.
+
+## Design Sprint: Abstract Action Graphs
+
+The current `connectorActionGraph` is useful but too literal. It composes string
+tokens such as:
+
+```text
+create-booking produces booking.uid
+cancel-booking requires booking.uid, produces booking.status.cancelled
+open-public-booking-route binds rescheduleUid <- booking.uid
+```
+
+This finds the Cal.com sequence, but Bayesilisk does not yet know that the same
+flow shape appears in other apps:
+
+```text
+create-invoice -> void-invoice -> replay invoice public link
+create-reset-token -> expire-token -> replay token
+create-invite -> revoke-invite -> accept invite
+```
+
+Today the core sees only string dependency flow. The design target is an
+Abstract Bayesilisk Action Graph (ABAG): a connector-declared graph whose nodes
+and edges carry universal typed tokens plus optional app-specific refinements.
+The connector still owns execution. Bayesilisk operates on the abstract graph.
+
+### ABAG Token Vocabulary
+
+Start with a small universal vocabulary, not app nouns:
+
+```text
+principal.actor
+session.authenticated
+session.impersonated
+scope.tenant
+scope.owner
+scope.foreign
+
+resource.type
+resource.id
+resource.public_id
+resource.private_id
+resource.foreign_id
+resource.stale_id
+
+identifier.replay_token
+identifier.single_use_token
+identifier.invitation_token
+identifier.reset_token
+
+state.active
+state.cancelled
+state.deleted
+state.expired
+state.revoked
+state.approved
+state.rejected
+
+boundary.public_route
+boundary.private_route
+boundary.api_route
+boundary.ui_route
+boundary.admin_route
+
+capability.read
+capability.write
+capability.approve
+capability.cancel
+capability.export
+capability.invite
+capability.replay
+
+evidence.status
+evidence.redirect
+evidence.rendered_state
+evidence.network_response
+```
+
+App-specific tokens become refinements:
+
+```text
+booking.uid -> resource.public_id + resource.type.booking
+booking.status.cancelled -> state.cancelled + resource.type.booking
+rescheduleUid -> identifier.replay_token + boundary.public_route
+```
+
+The reusable object is the motif, not the product noun:
+
+```text
+create resource -> transition lifecycle state -> replay old identifier across boundary
+create privileged context -> downgrade/revoke privilege -> reuse stale session
+create scoped object -> swap tenant/user id -> access through valid route
+```
+
+### Codebase Connectors
+
+A codebase connector may aggregate multiple app/module connectors and expose one
+ABAG for the whole codebase. Each module connector maps concrete fixtures and
+routes to abstract action nodes. Bayesilisk can then store or learn ranking
+metadata over graph motifs rather than over app-specific action labels.
+
+Possible matching methods include graph edit distance, Weisfeiler-Lehman graph
+kernels, learned graph embeddings, or quasi-isometry-inspired clustering for
+graphs that preserve large-scale token flow despite local naming differences.
+Those methods remain prioritizers. They do not become oracles.
+
+### Sprint Deliverables
+
+- define a JSON schema for ABAG tokens instead of arbitrary string-only
+  `requires` and `produces` entries;
+- document token naming rules and the distinction between universal tokens and
+  app refinements;
+- add connector examples that map concrete app actions into ABAG nodes;
+- add motif examples for stale id replay, revoked token replay, tenant swap,
+  role downgrade, and duplicate submission;
+- update `docs/connectors.md` and `examples/connector-agent-contract.json` so
+  test teams can write ABAG-capable connectors without touching Bayesilisk core;
+- keep the current string-token graph accepted during the design sprint, but
+  treat it as a transitional input form, not the long-term abstraction.
 
 ## Important Task: True Grassmann Attention
 
