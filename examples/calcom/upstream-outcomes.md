@@ -24,6 +24,13 @@ threads.
   `fix: return 404 for unknown rescheduleUid instead of opening booking flow`
 - Fix PR state at capture: `open`
 - Fix PR created at: `2026-05-18T06:51:15Z`
+- Fix PR review state at capture: `APPROVED`
+- Fix PR review submitted at: `2026-05-19T18:31:40Z`
+- Human reviewer: `aayushprsingh`
+- Review URL:
+  https://github.com/calcom/cal.diy/pull/29400#pullrequestreview-4321967236
+- Issue-thread review summary:
+  https://github.com/calcom/cal.diy/issues/29399#issuecomment-4490844295
 - Fix PR changed files at capture:
   - `apps/web/server/lib/[user]/[type]/getServerSideProps.ts`
   - `apps/web/playwright/booking-pages.e2e.ts`
@@ -33,7 +40,8 @@ threads.
   test for unknown `rescheduleUid`.
 
 Interpretation: this is evidence that the Bayesilisk finding was concrete
-enough for a human contributor to produce a targeted fix.
+enough for a human contributor to produce a targeted fix, and for another
+human reviewer to approve the fix as correct with solid regression coverage.
 
 ## Cancelled Booking UID Replay
 

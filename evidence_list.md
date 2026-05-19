@@ -56,6 +56,10 @@ Upstream response:
 - A contributor opened fix PR `calcom/cal.diy#29400`, identifying the root
   cause as a missing null guard in `processReschedule` and adding a Playwright
   regression test.
+- Human reviewer `aayushprsingh` approved PR `calcom/cal.diy#29400` on
+  `2026-05-19T18:31:40Z` and also left an issue-thread summary on
+  `calcom/cal.diy#29399`, stating that the null guard is correct, the
+  regression coverage is solid, and there are no blocking issues.
 - Cancelled booking UID replay was reported as `calcom/cal.diy#29407` and is
   still awaiting upstream response at capture time.
 
