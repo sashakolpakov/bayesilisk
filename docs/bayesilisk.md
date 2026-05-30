@@ -133,19 +133,39 @@ Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent n
 
 ## MCP tool server
 
-Bayesilisk also has a small stdio MCP tool server:
+Bayesilisk also has a local stdio MCP tool server:
+
+```sh
+bayesilisk-mcp
+```
+
+From a checkout, the module form is equivalent:
 
 ```sh
 python3 -m bayesilisk.mcp_server
 ```
 
-It exposes three tools:
+It exposes verifier tools:
 
 - `bayesilisk.run`: run the full contextual report with optional observations and context.
 - `bayesilisk.rank_context`: return the ranked failed probes from supplied agent, tracker, and repository context.
 - `bayesilisk.issue_payloads`: return deduped issue payloads for failed findings marked `ready-for-issue`.
+- `bayesilisk.propose_probes`: expand connector-supplied proposal rules and action graphs into probe proposals.
+
+It also exposes Codex orchestration tools:
+
+- `bayesilisk.interview_connector_need`;
+- `bayesilisk.establish_provenance`;
+- `bayesilisk.connector_prompt_packet`;
+- `bayesilisk.scenario_plan`;
+- `bayesilisk.verify_connector_outputs`;
+- `bayesilisk.fix_packet`.
 
 Agents should pass the current issue list, open PRs, branch facts, local verifier notes, and any known Bayesilisk fingerprints as context. The MCP tools still run locally, use deterministic seeds, and must not contact production systems or mutate issue trackers directly.
+
+The MCP server prints an ASCII Bayesilisk logo and version to `stderr` on
+startup. It keeps `stdout` reserved for framed MCP JSON-RPC messages. For Codex
+configuration and connector onboarding, see {doc}`codex-mcp`.
 
 ## Microsoft Playwright bridge
 

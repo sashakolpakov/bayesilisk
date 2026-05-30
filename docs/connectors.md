@@ -402,14 +402,30 @@ LLMs must not:
 Coding agents should follow this sequence exactly:
 
 ```text
+bayesilisk.interview_connector_need
+  -> bayesilisk.establish_provenance
+  -> bayesilisk.connector_prompt_packet
+  -> read local app tests/source
+  -> write source context facts with explicit proposalRules/proposalGates
+  -> bayesilisk.scenario_plan or bayesilisk.propose_probes
+  -> run only app-specific connector actions against local fixtures
+  -> write observed evidence facts
+  -> bayesilisk.verify_connector_outputs
+  -> bayesilisk.fix_packet only for verified ready findings
+```
+
+The older CLI-only path remains valid:
+
+```text
 read local app tests/source
 write source context facts with explicit proposalRules/proposalGates
-call bayesilisk.propose_probes or --probe-proposals-output
+call python3 -m bayesilisk --probe-proposals-output
 run only app-specific connector actions against local fixtures
 write observed evidence facts
-call bayesilisk.run or bayesilisk.issue_payloads
-open issues or patch code only from verified Bayesilisk output
+call python3 -m bayesilisk --context ... --issue-payloads
 ```
+
+For Codex setup and MCP configuration, see {doc}`codex-mcp`.
 
 The ingestible contract file is:
 

@@ -4,7 +4,27 @@ Bayesilisk runs locally and uses deterministic scenario data by default. A fixed
 
 ## Install
 
-From the repository root:
+Install directly from GitHub:
+
+```sh
+python3 -m pip install 'git+https://github.com/sashakolpakov/bayesilisk.git'
+```
+
+Or clone and install editable for development:
+
+```sh
+git clone https://github.com/sashakolpakov/bayesilisk.git
+cd bayesilisk
+python3 -m pip install -e .
+```
+
+From an existing repository checkout:
+
+```sh
+python3 -m pip install -e .
+```
+
+For development work:
 
 ```sh
 python3 -m pip install -e '.[dev]'
@@ -36,6 +56,47 @@ The installed console entry point is equivalent:
 ```sh
 bayesilisk --seed 150 --format json
 ```
+
+## Run The MCP Server
+
+After installation, start the local stdio MCP server with:
+
+```sh
+bayesilisk-mcp
+```
+
+The module entry point is equivalent when run from a checkout:
+
+```sh
+python3 -m bayesilisk.mcp_server
+```
+
+The MCP server prints an ASCII Bayesilisk logo and version to `stderr` on
+startup. `stdout` is reserved for MCP JSON-RPC frames.
+
+To use Bayesilisk from Codex, add an MCP server entry to Codex config:
+
+```toml
+[mcp_servers.bayesilisk]
+command = "bayesilisk-mcp"
+args = []
+startup_timeout_ms = 20000
+tool_timeout_sec = 120
+```
+
+For a project-local config inside a Bayesilisk checkout, this module form also
+works:
+
+```toml
+[mcp_servers.bayesilisk]
+command = "python3"
+args = ["-m", "bayesilisk.mcp_server"]
+cwd = "."
+startup_timeout_ms = 20000
+tool_timeout_sec = 120
+```
+
+See {doc}`codex-mcp` for the full Codex connector workflow.
 
 ## Run With Context
 

@@ -8,6 +8,14 @@ from typing import Any, BinaryIO
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
+    from bayesilisk.connector_orchestration import (  # type: ignore[no-redef]
+        connector_prompt_packet,
+        establish_provenance,
+        fix_packet,
+        interview_connector_need,
+        scenario_plan,
+        verify_connector_outputs,
+    )
     from bayesilisk.constants import VERSION  # type: ignore[no-redef]
     from bayesilisk.probe_proposals import generate_probe_proposals  # type: ignore[no-redef]
     from bayesilisk.reporting import (  # type: ignore[no-redef]
@@ -17,11 +25,29 @@ if __package__ in {None, ""}:
     )
 else:
     from .config import effective_runtime_config
+    from .connector_orchestration import (
+        connector_prompt_packet,
+        establish_provenance,
+        fix_packet,
+        interview_connector_need,
+        scenario_plan,
+        verify_connector_outputs,
+    )
     from .constants import VERSION
     from .probe_proposals import generate_probe_proposals
     from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
 PROTOCOL_VERSION = "2024-11-05"
+BAYESILISK_ASCII_LOGO = r"""
+       __
+  _.-'  `-..__
+ /  _   _    _`-.
+|  (o) (o)  / \  \
+ \    __   /   |  |
+  `-.___)-'   /  /
+      /      /_.'
+     /__/`--'
+"""
 
 RUNTIME_CONFIG_SCHEMA: dict[str, Any] = {
     "attentionSelectionLimit": {"type": "integer", "default": 4},
@@ -94,6 +120,94 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "context": {"type": "object"},
                 "limit": {"type": ["integer", "null"], "default": 24},
             },
+        },
+    },
+    {
+        "name": "bayesilisk.interview_connector_need",
+        "description": "Normalize a Codex connector request and return bounded follow-up questions.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "requestText": {"type": "string"},
+                "knownAnswers": {"type": "object"},
+                "maxQuestions": {"type": "integer", "default": 5},
+            },
+            "required": ["requestText"],
+        },
+    },
+    {
+        "name": "bayesilisk.establish_provenance",
+        "description": "Create a caller-supplied provenance packet for connector source and execution boundaries.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "connectorNeed": {"type": "object"},
+                "createdAt": {"type": "string"},
+                "executionBoundary": {"type": "object"},
+                "sourceClaims": {"type": "array"},
+            },
+            "required": ["connectorNeed", "executionBoundary", "sourceClaims"],
+        },
+    },
+    {
+        "name": "bayesilisk.connector_prompt_packet",
+        "description": "Emit a bounded prompt/spec packet that tells Codex how to create an app-specific connector safely.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "connectorNeed": {"type": "object"},
+                "includeExamples": {"type": "boolean", "default": True},
+                "provenance": {"type": "object"},
+                "style": {"type": "string", "default": "starter-kit"},
+                "targetLanguage": {"type": "string", "default": "unknown"},
+            },
+            "required": ["connectorNeed", "provenance"],
+        },
+    },
+    {
+        "name": "bayesilisk.scenario_plan",
+        "description": "Build a bounded connector scenario plan from source context, proposal rules, action graphs, and optional drafts.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "draftPlan": {"type": "object"},
+                "limit": {"type": "integer", "default": 24},
+                "provenance": {"type": "object"},
+                "sourceContext": {"type": "object"},
+            },
+            "required": ["provenance", "sourceContext"],
+        },
+    },
+    {
+        "name": "bayesilisk.verify_connector_outputs",
+        "description": "Validate connector observations and run deterministic Bayesilisk verification over accepted local evidence.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "includeIssuePayloads": {"type": "boolean", "default": True},
+                "limit": {"type": ["integer", "null"], "default": 10},
+                "observedContext": {"type": "object"},
+                "provenance": {"type": "object"},
+                "scenarioPlan": {"type": "object"},
+                "seed": {"type": "integer", "default": 150},
+                "sourceContext": {"type": "object"},
+            },
+            "required": ["observedContext", "provenance"],
+        },
+    },
+    {
+        "name": "bayesilisk.fix_packet",
+        "description": "Emit a Codex repair brief from verified Bayesilisk findings or issue payloads only.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "briefStyle": {"type": "string", "default": "concise"},
+                "issuePayloads": {"type": "array"},
+                "maxFindings": {"type": "integer", "default": 3},
+                "provenance": {"type": "object"},
+                "verifiedReport": {"type": "object"},
+            },
+            "required": ["provenance", "verifiedReport"],
         },
     },
 )
@@ -212,8 +326,20 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
             payload = {
                 "proposalCount": len(proposals),
                 "proposals": proposals,
-                "tool": f"bayesilisk.v{VERSION}",
+                "tool": VERSION,
             }
+        elif name == "bayesilisk.interview_connector_need":
+            payload = interview_connector_need(arguments)
+        elif name == "bayesilisk.establish_provenance":
+            payload = establish_provenance(arguments)
+        elif name == "bayesilisk.connector_prompt_packet":
+            payload = connector_prompt_packet(arguments)
+        elif name == "bayesilisk.scenario_plan":
+            payload = scenario_plan(arguments)
+        elif name == "bayesilisk.verify_connector_outputs":
+            payload = verify_connector_outputs(arguments)
+        elif name == "bayesilisk.fix_packet":
+            payload = fix_packet(arguments)
         else:
             return _error_response(request_id, -32602, f"unknown tool: {name}")
     except Exception as exc:
@@ -247,7 +373,13 @@ def write_message(stream: BinaryIO, message: dict[str, Any]) -> None:
     stream.flush()
 
 
+def write_startup_banner(stream: Any) -> None:
+    stream.write(f"{BAYESILISK_ASCII_LOGO.strip()}\n\nBayesilisk MCP\nBill is awake\n{VERSION}\n")
+    stream.flush()
+
+
 def main() -> int:
+    write_startup_banner(sys.stderr)
     while True:
         message = read_message(sys.stdin.buffer)
         if message is None:

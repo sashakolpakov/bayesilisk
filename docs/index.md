@@ -37,6 +37,7 @@ quickstart
 architecture
 reports
 integrations
+codex-mcp
 connectors
 examples
 development

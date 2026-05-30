@@ -12,6 +12,7 @@ bayesilisk/
   context.py             context, observations, and probe-fact ingestion
   attention.py           Grassmann attention surfaces
   model_proposals.py     scenario proposer provider surfaces
+  connector_orchestration.py Codex MCP connector interview, provenance, planning, validation, and fix packets
   reporting.py           report and issue-payload surfaces
   cli.py                 command-line entry point
   demo.py                local workflow pressure demo command

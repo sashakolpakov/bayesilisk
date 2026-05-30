@@ -43,7 +43,7 @@ scenario facts -> invariant checks -> pass/fail -> Bayesian ranking
 No embedding, model output, issue text, or Playwright observation can directly
 declare a bug. Those layers can only steer where Bayesilisk looks next.
 
-See [DESIGN.md](DESIGN.md) for the governing architecture:
+See [docs/architecture.md](docs/architecture.md) for the public architecture:
 
 ```text
 Playwright is the sensor.
@@ -378,15 +378,33 @@ attention/model settings with the Ollama base URL reduced to a safe URL class.
 Bayesilisk includes a small stdio MCP tool server:
 
 ```sh
+bayesilisk-mcp
+```
+
+From a checkout, the module form is equivalent:
+
+```sh
 python3 -m bayesilisk.mcp_server
 ```
 
-It exposes:
+The server prints an ASCII Bayesilisk logo and version to `stderr` on startup.
+It keeps `stdout` reserved for MCP JSON-RPC frames.
+
+Verifier tools:
 
 - `bayesilisk.run`;
 - `bayesilisk.rank_context`;
 - `bayesilisk.issue_payloads`;
 - `bayesilisk.propose_probes`.
+
+Codex orchestration tools:
+
+- `bayesilisk.interview_connector_need`;
+- `bayesilisk.establish_provenance`;
+- `bayesilisk.connector_prompt_packet`;
+- `bayesilisk.scenario_plan`;
+- `bayesilisk.verify_connector_outputs`;
+- `bayesilisk.fix_packet`.
 
 The MCP tools accept the same control names as JSON arguments, including
 `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
@@ -398,18 +416,78 @@ notes, Playwright observations, and known Bayesilisk fingerprints as context.
 The MCP server still runs locally and does not mutate GitHub or production
 systems.
 
-For coding agents, the intended loop is:
+### Codex Setup
+
+Install Bayesilisk directly from GitHub:
+
+```sh
+python3 -m pip install 'git+https://github.com/sashakolpakov/bayesilisk.git'
+```
+
+Or clone and install editable:
+
+```sh
+git clone https://github.com/sashakolpakov/bayesilisk.git
+cd bayesilisk
+python3 -m pip install -e .
+```
+
+From an existing checkout:
+
+```sh
+python3 -m pip install -e .
+```
+
+Then add Bayesilisk to Codex config:
+
+```toml
+[mcp_servers.bayesilisk]
+command = "bayesilisk-mcp"
+args = []
+startup_timeout_ms = 20000
+tool_timeout_sec = 120
+```
+
+For a project-local config inside a Bayesilisk checkout, use:
+
+```toml
+[mcp_servers.bayesilisk]
+command = "python3"
+args = ["-m", "bayesilisk.mcp_server"]
+cwd = "."
+startup_timeout_ms = 20000
+tool_timeout_sec = 120
+```
+
+Restart Codex, then ask:
 
 ```text
-agent gathers repo/test context -> bayesilisk.propose_probes
-connector executes returned proposals -> bayesilisk.run / issue_payloads
-agent opens issues or edits code according to the verified payloads
+Use Bayesilisk to build a connector for this repo. Start by interviewing me
+about the connector need, then establish provenance, generate a connector prompt
+packet, plan scenarios, and verify connector outputs.
+```
+
+The intended loop is:
+
+```text
+bayesilisk.interview_connector_need
+  -> bayesilisk.establish_provenance
+  -> bayesilisk.connector_prompt_packet
+  -> Codex writes connector code in the target app/test repo
+  -> bayesilisk.scenario_plan
+  -> connector executes local fixtures
+  -> bayesilisk.verify_connector_outputs
+  -> bayesilisk.fix_packet
 ```
 
 `bayesilisk.run` can also call the local scenario proposer model/API when
 `enableScenarioProposer=true`. The model proposes; Bayesilisk validates and
-verifies. The agent remains responsible for app-specific connector execution,
-issue creation, and code changes.
+verifies. Codex remains responsible for app-specific connector execution, issue
+creation, and code changes, and should act only on verified Bayesilisk output.
+
+The OpenAI Codex configuration reference documents `mcp_servers.<id>.command`,
+`args`, `cwd`, `startup_timeout_ms`, and `tool_timeout_sec`:
+https://developers.openai.com/codex/config-reference
 
 ## Documentation
 
