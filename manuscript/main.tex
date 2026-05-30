@@ -32,11 +32,13 @@ invariants, and executable probe hooks. The \tool core expands that surface into
 candidate scenarios, rejects malformed candidates by deterministic contract
 validation, prioritizes valid probes with Grassmann-style attention and a
 Bayesian score, and verifies only evidence returned by connector execution.
+The same boundary supports coding-agent assistance: agents may draft connector
+context, action mappings, and repair briefs, but cannot author observations,
+pass/fail results, or issue readiness.
 
 This paper gives a compact formal model for that loop and reports a Cal.com case
-study at a fixed May 2026 revision. From
-connector-declared route facts and a typed Abstract Bayesilisk Action Graph
-(ABAG), \tool generated seven
+study at a fixed May 2026 revision. From connector-declared route facts and a
+typed Abstract Bayesilisk Action Graph (ABAG), \tool generated seven
 probes: six unknown/stale \texttt{rescheduleUid} route mutations and one bounded
 workflow sequence that created a booking, cancelled it, and replayed the
 cancelled booking UID through a public booking route. All seven returned
@@ -135,6 +137,16 @@ screenshot, state transition, or execution error.
 \textbf{Who decides pass or fail?} \tool decides pass/fail by applying
 deterministic invariants to evidence returned by the connector. Neither the LLM nor the
 connector is the oracle.
+
+\textbf{How can coding agents participate safely?} A coding agent may help
+collect connector requirements, draft source context, write connector code in
+the target repository, and propose repairs after a verified finding. Those
+steps are admissible only when provenance is recorded and verifier-owned fields
+are kept out of agent-authored artifacts. Scenario plans cannot contain
+\texttt{observedStatus}, \texttt{passed}, risk scores, or issue readiness.
+Observed evidence is admitted only after connector execution against local
+fixtures. Repair briefs are derived from verified issue-ready findings, not from
+raw connector output.
 
 \textbf{What external validation exists?} The Cal.com artifact produced
 issue-ready findings. One public issue, \#29399~\cite{calcomIssue}, has an
@@ -465,17 +477,28 @@ connector/proposer diagnostic.
 
 \section{Implementation Boundary}
 
-\tool implements three distinct ledgers. The attention ledger records which
-invariant planes should be explored. The model-proposal ledger records accepted
-and rejected model proposals. The verification ledger records deterministic
-invariant outcomes, fingerprints, issue readiness, and risk scores. Only the
-verification ledger contains pass/fail results.
+\tool implements separate ledgers for provenance, attention, proposal, execution
+evidence, and verification. The provenance ledger records which repository,
+source claims, fixture boundary, and connector contract produced a run. The
+attention ledger records which invariant planes should be explored. The
+model-proposal ledger records accepted and rejected model proposals. The
+execution-evidence ledger records connector-returned observations. The
+verification ledger records deterministic invariant outcomes, fingerprints,
+issue readiness, and risk scores. Only the verification ledger contains
+issue-ready pass/fail results.
 
 This boundary matters for connector design. A connector should expose a small
 vocabulary of actions and facts. It should not filter away uncomfortable cases
 or decide that a 200 response is acceptable. The finite-state verifier owns the
 ruleset, which is supplied by context and schema, not hardcoded for a particular
 application. App-specific code is isolated to connector execution.
+
+The agent-facing workflow is therefore a packaging of the same proof boundary,
+not a new oracle. A coding agent can interview for connector requirements,
+record provenance, produce a connector prompt packet, propose a scenario plan,
+and draft a fix brief. The verifier accepts those artifacts only as context or
+candidate input. Concrete observations must still come from connector
+execution, and fix briefs must still trace to verified issue-ready findings.
 
 \section{Cal.com Case Study}
 
@@ -663,6 +686,14 @@ invariants without modifying the \tool core. Connector quality still matters:
 the broader and more accurate the declared surface, the broader the generated
 probe space.
 
+\textbf{Agent-assisted adoption.} The intended adoption path is compatible with
+coding agents, but not dependent on trusting them. An agent can be guided to
+read existing tests and route handlers, write connector source context, and
+implement action mappings in the target repository. The contract prevents that
+agent from also becoming the oracle: generated plans are checked for
+verifier-owned fields, provenance is recorded before execution, and any repair
+brief is downstream of deterministic verification.
+
 \textbf{ABAG refinement boundary.} Typed ABAG tokens are the portability layer.
 The \tool core matches \texttt{token} and optional \texttt{resourceType}. It does
 not treat \texttt{refines} as evidence that a dependency is satisfied.
@@ -745,9 +776,10 @@ real-app findings: seven generated probes, seven observed invariant violations,
 issue-ready payloads, and a review-approved upstream fix PR for one reported
 issue. The
 adoption path is incremental: write the connector around existing app fixtures,
-let \tool expand the scenario space, and keep the oracle deterministic. The next
-research step is to repeat this artifact discipline across additional
-applications while keeping the \tool core app-agnostic.
+or have a coding agent draft it under recorded provenance, let \tool expand the
+scenario space, and keep the oracle deterministic. The next research step is to
+repeat this artifact discipline across additional applications while keeping the
+\tool core app-agnostic.
 
 \bibliographystyle{plain}
 \bibliography{references}
