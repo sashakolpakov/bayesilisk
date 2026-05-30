@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -38,6 +39,8 @@ else:
     from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
 PROTOCOL_VERSION = "2024-11-05"
+DEBUG_LOG_ENV = "BAYESILISK_MCP_DEBUG"
+WIRE_MODE = "framed"
 BAYESILISK_ASCII_LOGO = r"""
        __
   _.-'  `-..__
@@ -66,7 +69,7 @@ RUNTIME_CONFIG_SCHEMA: dict[str, Any] = {
 
 TOOLS: tuple[dict[str, Any], ...] = (
     {
-        "name": "bayesilisk.run",
+        "name": "run",
         "description": "Run Bayesilisk with optional agent/tracker context and return the full contextual report.",
         "inputSchema": {
             "type": "object",
@@ -81,7 +84,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.rank_context",
+        "name": "rank_context",
         "description": "Rank likely fault probes from supplied repository, tracker, and agent context.",
         "inputSchema": {
             "type": "object",
@@ -96,7 +99,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.issue_payloads",
+        "name": "issue_payloads",
         "description": "Return deduped issue payloads for confirmed local invariant failures.",
         "inputSchema": {
             "type": "object",
@@ -112,7 +115,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.propose_probes",
+        "name": "propose_probes",
         "description": "Expand context-supplied connector proposal rules and action graphs into app-agnostic probe proposals.",
         "inputSchema": {
             "type": "object",
@@ -123,7 +126,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.interview_connector_need",
+        "name": "interview_connector_need",
         "description": "Normalize a Codex connector request and return bounded follow-up questions.",
         "inputSchema": {
             "type": "object",
@@ -136,7 +139,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.establish_provenance",
+        "name": "establish_provenance",
         "description": "Create a caller-supplied provenance packet for connector source and execution boundaries.",
         "inputSchema": {
             "type": "object",
@@ -150,7 +153,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.connector_prompt_packet",
+        "name": "connector_prompt_packet",
         "description": "Emit a bounded prompt/spec packet that tells Codex how to create an app-specific connector safely.",
         "inputSchema": {
             "type": "object",
@@ -165,7 +168,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.scenario_plan",
+        "name": "scenario_plan",
         "description": "Build a bounded connector scenario plan from source context, proposal rules, action graphs, and optional drafts.",
         "inputSchema": {
             "type": "object",
@@ -179,7 +182,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.verify_connector_outputs",
+        "name": "verify_connector_outputs",
         "description": "Validate connector observations and run deterministic Bayesilisk verification over accepted local evidence.",
         "inputSchema": {
             "type": "object",
@@ -196,7 +199,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
-        "name": "bayesilisk.fix_packet",
+        "name": "fix_packet",
         "description": "Emit a Codex repair brief from verified Bayesilisk findings or issue payloads only.",
         "inputSchema": {
             "type": "object",
@@ -211,6 +214,22 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
 )
+
+
+def _canonical_tool_name(name: Any) -> str | None:
+    if not isinstance(name, str):
+        return None
+    if name.startswith("bayesilisk."):
+        return name.removeprefix("bayesilisk.")
+    return name
+
+
+def _debug_log(message: str) -> None:
+    log_path = os.environ.get(DEBUG_LOG_ENV)
+    if not log_path:
+        return
+    with Path(log_path).open("a", encoding="utf-8") as handle:
+        handle.write(f"{message}\n")
 
 
 def _tool_content(payload: Any) -> dict[str, Any]:
@@ -285,15 +304,16 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
 
     if not isinstance(params, dict):
         return _error_response(request_id, -32602, "params must be an object")
-    name = params.get("name")
+    requested_name = params.get("name")
+    name = _canonical_tool_name(requested_name)
     arguments = params.get("arguments", {})
     if not isinstance(arguments, dict):
         return _error_response(request_id, -32602, "arguments must be an object")
     try:
-        if name == "bayesilisk.run":
+        if name == "run":
             report = _report_from_arguments(arguments)
             payload = report
-        elif name == "bayesilisk.rank_context":
+        elif name == "rank_context":
             report = _report_from_arguments(arguments)
             payload = {
                 "contextSummary": report["contextSummary"],
@@ -302,7 +322,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 "sections": report["sections"],
                 "tool": report["tool"],
             }
-        elif name == "bayesilisk.issue_payloads":
+        elif name == "issue_payloads":
             report = _report_from_arguments(arguments)
             payload = {
                 "contextSummary": report["contextSummary"],
@@ -315,7 +335,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 ),
                 "tool": report["tool"],
             }
-        elif name == "bayesilisk.propose_probes":
+        elif name == "propose_probes":
             context = arguments.get("context", {})
             if not isinstance(context, dict):
                 raise ValueError("context must be an object")
@@ -328,31 +348,35 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 "proposals": proposals,
                 "tool": VERSION,
             }
-        elif name == "bayesilisk.interview_connector_need":
+        elif name == "interview_connector_need":
             payload = interview_connector_need(arguments)
-        elif name == "bayesilisk.establish_provenance":
+        elif name == "establish_provenance":
             payload = establish_provenance(arguments)
-        elif name == "bayesilisk.connector_prompt_packet":
+        elif name == "connector_prompt_packet":
             payload = connector_prompt_packet(arguments)
-        elif name == "bayesilisk.scenario_plan":
+        elif name == "scenario_plan":
             payload = scenario_plan(arguments)
-        elif name == "bayesilisk.verify_connector_outputs":
+        elif name == "verify_connector_outputs":
             payload = verify_connector_outputs(arguments)
-        elif name == "bayesilisk.fix_packet":
+        elif name == "fix_packet":
             payload = fix_packet(arguments)
         else:
-            return _error_response(request_id, -32602, f"unknown tool: {name}")
+            return _error_response(request_id, -32602, f"unknown tool: {requested_name}")
     except Exception as exc:
         return _error_response(request_id, -32000, str(exc))
     return {"jsonrpc": "2.0", "id": request_id, "result": _tool_content(payload)}
 
 
 def read_message(stream: BinaryIO) -> dict[str, Any] | None:
+    global WIRE_MODE
     headers: dict[str, str] = {}
     while True:
         line = stream.readline()
         if line == b"":
             return None
+        if line.lstrip().startswith(b"{"):
+            WIRE_MODE = "jsonl"
+            return json.loads(line.decode("utf-8"))
         if line in {b"\r\n", b"\n"}:
             break
         name, _, value = line.decode("ascii").partition(":")
@@ -363,13 +387,17 @@ def read_message(stream: BinaryIO) -> dict[str, Any] | None:
     payload = stream.read(length)
     if not payload:
         return None
+    WIRE_MODE = "framed"
     return json.loads(payload.decode("utf-8"))
 
 
 def write_message(stream: BinaryIO, message: dict[str, Any]) -> None:
     payload = json.dumps(message, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    stream.write(f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii"))
-    stream.write(payload)
+    if WIRE_MODE == "jsonl":
+        stream.write(payload + b"\n")
+    else:
+        stream.write(f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii"))
+        stream.write(payload)
     stream.flush()
 
 
@@ -379,13 +407,21 @@ def write_startup_banner(stream: Any) -> None:
 
 
 def main() -> int:
-    write_startup_banner(sys.stderr)
+    _debug_log(f"start executable={sys.executable} cwd={Path.cwd()}")
+    if os.environ.get("BAYESILISK_MCP_BANNER") == "1":
+        write_startup_banner(sys.stderr)
     while True:
         message = read_message(sys.stdin.buffer)
         if message is None:
+            _debug_log("stdin closed")
             return 0
+        _debug_log(f"request method={message.get('method')} id={message.get('id')}")
         response = handle_request(message)
         if response is not None:
+            if "error" in response:
+                _debug_log(f"response error={response['error']}")
+            else:
+                _debug_log(f"response method={message.get('method')} id={response.get('id')}")
             write_message(sys.stdout.buffer, response)
 
 

@@ -71,8 +71,9 @@ The module entry point is equivalent when run from a checkout:
 python3 -m bayesilisk.mcp_server
 ```
 
-The MCP server prints an ASCII Bayesilisk logo and version to `stderr` on
-startup. `stdout` is reserved for MCP JSON-RPC frames.
+By default the MCP server writes only MCP JSON-RPC frames on `stdout` and stays
+quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
+you want the ASCII startup banner.
 
 To use Bayesilisk from Codex, add an MCP server entry to Codex config:
 
@@ -80,19 +81,20 @@ To use Bayesilisk from Codex, add an MCP server entry to Codex config:
 [mcp_servers.bayesilisk]
 command = "bayesilisk-mcp"
 args = []
-startup_timeout_ms = 20000
+startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
-For a project-local config inside a Bayesilisk checkout, this module form also
-works:
+For a project-local config inside a Bayesilisk checkout, use an explicit
+checkout path. An absolute Python path is safest if Codex does not inherit your
+interactive shell `PATH`.
 
 ```toml
 [mcp_servers.bayesilisk]
 command = "python3"
 args = ["-m", "bayesilisk.mcp_server"]
-cwd = "."
-startup_timeout_ms = 20000
+cwd = "/absolute/path/to/bayesilisk"
+startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 

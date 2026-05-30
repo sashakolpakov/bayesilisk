@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import io
 import json
+import re
 import subprocess
 import sys
 import urllib.error
@@ -1024,7 +1025,7 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.rank_context",
+                "name": "rank_context",
                 "arguments": {
                     "seed": 150,
                     "limit": 2,
@@ -1045,17 +1046,18 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
 
     assert initialize["result"]["serverInfo"]["version"] == "bayesilisk.v1.2"
     assert {tool["name"] for tool in tools["result"]["tools"]} == {
-        "bayesilisk.connector_prompt_packet",
-        "bayesilisk.establish_provenance",
-        "bayesilisk.fix_packet",
-        "bayesilisk.interview_connector_need",
-        "bayesilisk.issue_payloads",
-        "bayesilisk.propose_probes",
-        "bayesilisk.rank_context",
-        "bayesilisk.run",
-        "bayesilisk.scenario_plan",
-        "bayesilisk.verify_connector_outputs",
+        "connector_prompt_packet",
+        "establish_provenance",
+        "fix_packet",
+        "interview_connector_need",
+        "issue_payloads",
+        "propose_probes",
+        "rank_context",
+        "run",
+        "scenario_plan",
+        "verify_connector_outputs",
     }
+    assert all(re.fullmatch(r"[A-Za-z0-9_-]+", tool["name"]) for tool in tools["result"]["tools"])
     payload = json.loads(call["result"]["content"][0]["text"])
     assert payload["tool"] == "bayesilisk.v1.2"
     assert payload["contextSummary"]["textSignalCount"] >= 1
@@ -1066,10 +1068,29 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     assert payload["effectiveConfiguration"]["scenarioModel"] == "mcp-scenario"
     assert payload["effectiveConfiguration"]["scenarioProvider"] == "ollama"
 
+    legacy_call = server.handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "tools/call",
+            "params": {"name": "bayesilisk.rank_context", "arguments": {"seed": 150, "limit": 1}},
+        }
+    )
+    legacy_payload = json.loads(legacy_call["result"]["content"][0]["text"])
+    assert len(legacy_payload["rankedProbes"]) == 1
+
+    server.WIRE_MODE = "framed"
     raw = io.BytesIO()
     server.write_message(raw, {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}})
     raw.seek(0)
     assert server.read_message(raw) == {"jsonrpc": "2.0", "id": 4, "result": {"ok": True}}
+
+    jsonl = io.BytesIO(b'{"jsonrpc":"2.0","id":6,"method":"tools/list"}\n')
+    assert server.read_message(jsonl) == {"jsonrpc": "2.0", "id": 6, "method": "tools/list"}
+    raw_jsonl = io.BytesIO()
+    server.write_message(raw_jsonl, {"jsonrpc": "2.0", "id": 7, "result": {"ok": True}})
+    assert raw_jsonl.getvalue().startswith(b'{"id":7,')
+    assert raw_jsonl.getvalue().endswith(b"\n")
 
 
 def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
@@ -1081,7 +1102,7 @@ def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
             "id": 1,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.interview_connector_need",
+                "name": "interview_connector_need",
                 "arguments": {
                     "requestText": "Build a connector for the resource route.",
                     "knownAnswers": {
@@ -1108,7 +1129,7 @@ def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.establish_provenance",
+                "name": "establish_provenance",
                 "arguments": {
                     "connectorNeed": interview["connectorNeed"],
                     "executionBoundary": {
@@ -1139,7 +1160,7 @@ def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.connector_prompt_packet",
+                "name": "connector_prompt_packet",
                 "arguments": {
                     "connectorNeed": interview["connectorNeed"],
                     "provenance": provenance["provenance"],
@@ -1177,7 +1198,7 @@ def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
             "id": 4,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.scenario_plan",
+                "name": "scenario_plan",
                 "arguments": {"provenance": provenance["provenance"], "sourceContext": source_context},
             },
         }
@@ -1216,7 +1237,7 @@ def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
             "id": 5,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.verify_connector_outputs",
+                "name": "verify_connector_outputs",
                 "arguments": {
                     "observedContext": observed_context,
                     "provenance": provenance["provenance"],
@@ -1237,7 +1258,7 @@ def test_bayesilisk_mcp_connector_orchestration_loop() -> None:
             "id": 6,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.fix_packet",
+                "name": "fix_packet",
                 "arguments": {
                     "issuePayloads": verified["issuePayloads"],
                     "provenance": provenance["provenance"],
@@ -1261,7 +1282,7 @@ def test_bayesilisk_mcp_orchestration_rejects_unsafe_inputs() -> None:
             "id": 1,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.interview_connector_need",
+                "name": "interview_connector_need",
                 "arguments": {
                     "requestText": "Use production to verify login.",
                     "knownAnswers": {"productionAccessAllowed": True},
@@ -1279,7 +1300,7 @@ def test_bayesilisk_mcp_orchestration_rejects_unsafe_inputs() -> None:
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.scenario_plan",
+                "name": "scenario_plan",
                 "arguments": {
                     "draftPlan": {"scenarios": [{"observedStatus": 200, "passed": True, "title": "unsafe draft"}]},
                     "provenance": {"provenanceId": "prov.test"},
@@ -1298,7 +1319,7 @@ def test_bayesilisk_mcp_orchestration_rejects_unsafe_inputs() -> None:
             "id": 3,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.verify_connector_outputs",
+                "name": "verify_connector_outputs",
                 "arguments": {
                     "observedContext": {
                         "repositoryFacts": [
@@ -1354,7 +1375,7 @@ def test_bayesilisk_mcp_server_expands_connector_probe_proposals() -> None:
             "id": 1,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.propose_probes",
+                "name": "propose_probes",
                 "arguments": {
                     "context": {
                         "repositoryFacts": [
@@ -1394,7 +1415,7 @@ def test_bayesilisk_mcp_server_expands_connector_sequence_proposals() -> None:
             "id": 1,
             "method": "tools/call",
             "params": {
-                "name": "bayesilisk.propose_probes",
+                "name": "propose_probes",
                 "arguments": {
                     "context": {
                         "connectorActionGraph": {
@@ -1490,8 +1511,8 @@ def test_bayesilisk_documentation_pins_no_production_access_and_report_contract(
         "Grassmann attention",
         "tools/playwright_probe.py --demo",
         "Context ingestion",
-        "bayesilisk.rank_context",
-        "bayesilisk.issue_payloads",
+        "rank_context",
+        "issue_payloads",
         "rental car, train, and airplane",
         "Permission/role matrix",
         "python3 -m bayesilisk --seed 150 --format json",

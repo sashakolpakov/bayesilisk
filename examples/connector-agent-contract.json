@@ -43,7 +43,7 @@
     },
     {
       "step": "ask_bayesilisk_for_proposals",
-      "description": "Call bayesilisk.propose_probes over MCP or `python3 -m bayesilisk --probe-proposals-output`."
+      "description": "Call propose_probes over MCP or `python3 -m bayesilisk --probe-proposals-output`."
     },
     {
       "step": "execute_connector",
@@ -51,7 +51,7 @@
     },
     {
       "step": "verify_with_bayesilisk",
-      "description": "Call bayesilisk.run or bayesilisk.issue_payloads with observed evidence."
+      "description": "Call run or issue_payloads with observed evidence."
     },
     {
       "step": "act_on_verified_output",

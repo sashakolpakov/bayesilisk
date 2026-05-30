@@ -129,7 +129,7 @@ Context ingestion is separate from observation history and is designed for agent
 }
 ```
 
-Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent notes, route/role terms, DMS/process terms, travel/expense terms, support-takeover terms, and related scenario language. Matching context nudges the relevant invariant priors but does not override rule failures. Existing fingerprints are treated as dedupe/mute signals so `bayesilisk.issue_payloads` does not create duplicate tracker issues.
+Bayesilisk scans the supplied context for fingerprints, issue/PR titles, agent notes, route/role terms, DMS/process terms, travel/expense terms, support-takeover terms, and related scenario language. Matching context nudges the relevant invariant priors but does not override rule failures. Existing fingerprints are treated as dedupe/mute signals so `issue_payloads` does not create duplicate tracker issues.
 
 ## MCP tool server
 
@@ -147,25 +147,26 @@ python3 -m bayesilisk.mcp_server
 
 It exposes verifier tools:
 
-- `bayesilisk.run`: run the full contextual report with optional observations and context.
-- `bayesilisk.rank_context`: return the ranked failed probes from supplied agent, tracker, and repository context.
-- `bayesilisk.issue_payloads`: return deduped issue payloads for failed findings marked `ready-for-issue`.
-- `bayesilisk.propose_probes`: expand connector-supplied proposal rules and action graphs into probe proposals.
+- `run`: run the full contextual report with optional observations and context.
+- `rank_context`: return the ranked failed probes from supplied agent, tracker, and repository context.
+- `issue_payloads`: return deduped issue payloads for failed findings marked `ready-for-issue`.
+- `propose_probes`: expand connector-supplied proposal rules and action graphs into probe proposals.
 
 It also exposes Codex orchestration tools:
 
-- `bayesilisk.interview_connector_need`;
-- `bayesilisk.establish_provenance`;
-- `bayesilisk.connector_prompt_packet`;
-- `bayesilisk.scenario_plan`;
-- `bayesilisk.verify_connector_outputs`;
-- `bayesilisk.fix_packet`.
+- `interview_connector_need`;
+- `establish_provenance`;
+- `connector_prompt_packet`;
+- `scenario_plan`;
+- `verify_connector_outputs`;
+- `fix_packet`.
 
 Agents should pass the current issue list, open PRs, branch facts, local verifier notes, and any known Bayesilisk fingerprints as context. The MCP tools still run locally, use deterministic seeds, and must not contact production systems or mutate issue trackers directly.
 
-The MCP server prints an ASCII Bayesilisk logo and version to `stderr` on
-startup. It keeps `stdout` reserved for framed MCP JSON-RPC messages. For Codex
-configuration and connector onboarding, see {doc}`codex-mcp`.
+By default the MCP server writes only framed MCP JSON-RPC messages on `stdout`
+and stays quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` for manual runs if
+you want the ASCII startup banner. For Codex configuration and connector
+onboarding, see {doc}`codex-mcp`.
 
 ## Microsoft Playwright bridge
 

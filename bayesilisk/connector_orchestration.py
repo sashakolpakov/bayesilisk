@@ -254,7 +254,7 @@ def establish_provenance(arguments: dict[str, Any]) -> dict[str, Any]:
     provenance = {
         "connectorNeedHash": connector_need_hash,
         "createdAt": _text(arguments.get("createdAt"), DEFAULT_CREATED_AT),
-        "createdBy": "bayesilisk.establish_provenance",
+        "createdBy": "establish_provenance",
         "executionBoundary": normalized_boundary,
         "provenanceId": _hash_id("prov", provenance_seed, 16),
         "sourceClaims": normalized_claims,
@@ -432,7 +432,7 @@ def scenario_plan(arguments: dict[str, Any]) -> dict[str, Any]:
         "executionInstructions": [
             "Connector executes connectorAction against local fixtures and writes observed facts.",
             "Observed facts must be produced by Playwright/API execution, not by Codex prose.",
-            "Call bayesilisk.verify_connector_outputs after connector execution.",
+            "Call verify_connector_outputs after connector execution.",
         ],
         "generatedProposals": generated,
         "planId": _hash_id("scenario-plan", plan_seed, 16),

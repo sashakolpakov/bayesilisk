@@ -402,16 +402,16 @@ LLMs must not:
 Coding agents should follow this sequence exactly:
 
 ```text
-bayesilisk.interview_connector_need
-  -> bayesilisk.establish_provenance
-  -> bayesilisk.connector_prompt_packet
+interview_connector_need
+  -> establish_provenance
+  -> connector_prompt_packet
   -> read local app tests/source
   -> write source context facts with explicit proposalRules/proposalGates
-  -> bayesilisk.scenario_plan or bayesilisk.propose_probes
+  -> scenario_plan or propose_probes
   -> run only app-specific connector actions against local fixtures
   -> write observed evidence facts
-  -> bayesilisk.verify_connector_outputs
-  -> bayesilisk.fix_packet only for verified ready findings
+  -> verify_connector_outputs
+  -> fix_packet only for verified ready findings
 ```
 
 The older CLI-only path remains valid:

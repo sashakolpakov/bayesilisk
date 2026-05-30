@@ -13,8 +13,9 @@ The MCP server is local-first:
 - it does not let an LLM write observed statuses, pass/fail results, or issue
   readiness.
 
-On startup, the MCP process prints an ASCII Bayesilisk logo and version to
-`stderr`. `stdout` is reserved for framed MCP JSON-RPC messages.
+By default, the MCP process writes only framed MCP JSON-RPC messages on
+`stdout` and stays quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` for manual
+runs if you want the ASCII startup banner.
 
 ## Install From GitHub
 
@@ -67,7 +68,7 @@ python3 -m pip install bayesilisk
 
 Codex MCP servers are configured under `[mcp_servers.<id>]` in Codex config.
 The OpenAI Codex configuration reference documents `command`, `args`, `cwd`,
-`startup_timeout_ms`, and `tool_timeout_sec` for MCP servers:
+`startup_timeout_sec`, and `tool_timeout_sec` for MCP servers:
 <https://developers.openai.com/codex/config-reference>.
 
 Preferred configuration after installing Bayesilisk:
@@ -76,19 +77,20 @@ Preferred configuration after installing Bayesilisk:
 [mcp_servers.bayesilisk]
 command = "bayesilisk-mcp"
 args = []
-startup_timeout_ms = 20000
+startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
-For a project-local config while working inside the Bayesilisk checkout, the
-module form also works:
+For a project-local config while working from another repo, use an explicit
+checkout path. An absolute Python path is safest if Codex does not inherit your
+interactive shell `PATH`.
 
 ```toml
 [mcp_servers.bayesilisk]
 command = "python3"
 args = ["-m", "bayesilisk.mcp_server"]
-cwd = "."
-startup_timeout_ms = 20000
+cwd = "/absolute/path/to/bayesilisk"
+startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
@@ -111,14 +113,14 @@ packet, plan scenarios, and verify connector outputs.
 The intended MCP tool flow is:
 
 ```text
-bayesilisk.interview_connector_need
-  -> bayesilisk.establish_provenance
-  -> bayesilisk.connector_prompt_packet
+interview_connector_need
+  -> establish_provenance
+  -> connector_prompt_packet
   -> Codex writes connector code in the target app/test repo
-  -> bayesilisk.scenario_plan
+  -> scenario_plan
   -> connector executes local fixtures
-  -> bayesilisk.verify_connector_outputs
-  -> bayesilisk.fix_packet
+  -> verify_connector_outputs
+  -> fix_packet
 ```
 
 Bayesilisk provides the contract, scenario proposal layer, validation, and
@@ -129,26 +131,26 @@ the target app's local fixtures through ordinary repo tools.
 
 Verifier tools:
 
-- `bayesilisk.run`: run a contextual report.
-- `bayesilisk.rank_context`: return ranked failed probes from supplied context.
-- `bayesilisk.issue_payloads`: return deduped issue payloads for ready failed
+- `run`: run a contextual report.
+- `rank_context`: return ranked failed probes from supplied context.
+- `issue_payloads`: return deduped issue payloads for ready failed
   findings.
-- `bayesilisk.propose_probes`: expand connector-supplied proposal rules and
+- `propose_probes`: expand connector-supplied proposal rules and
   action graphs into app-agnostic probe proposals.
 
 Codex orchestration tools:
 
-- `bayesilisk.interview_connector_need`: normalize the user request and return
+- `interview_connector_need`: normalize the user request and return
   short follow-up questions.
-- `bayesilisk.establish_provenance`: record caller-supplied repository, source,
+- `establish_provenance`: record caller-supplied repository, source,
   test, and execution-boundary facts.
-- `bayesilisk.connector_prompt_packet`: emit the prompt/spec packet Codex should
+- `connector_prompt_packet`: emit the prompt/spec packet Codex should
   use to create an app-specific connector.
-- `bayesilisk.scenario_plan`: build a bounded scenario plan from source context,
+- `scenario_plan`: build a bounded scenario plan from source context,
   proposal rules, and ABAG action graphs.
-- `bayesilisk.verify_connector_outputs`: validate observed connector evidence
+- `verify_connector_outputs`: validate observed connector evidence
   and run deterministic Bayesilisk verification.
-- `bayesilisk.fix_packet`: emit a repair brief from verified findings or issue
+- `fix_packet`: emit a repair brief from verified findings or issue
   payloads only.
 
 The MCP tools accept the same runtime-control names as the CLI where relevant:
@@ -184,11 +186,11 @@ Bayesilisk deterministic verification may produce issue-ready findings.
 1. Codex reads local app tests, route handlers, schemas, and fixture helpers.
 2. Codex writes source context with explicit `expectedStatus`, `proposalRules`,
    `proposalGates`, or `connectorActionGraph.sequenceRules`.
-3. Codex calls `bayesilisk.scenario_plan` or `bayesilisk.propose_probes`.
+3. Codex calls `scenario_plan` or `propose_probes`.
 4. The connector executes returned actions against local fixtures.
 5. The connector writes observed context with `expectedStatus`,
    `observedStatus`, `passed`, `targetUrl`, artifacts, network responses, and
    timestamps.
-6. Codex calls `bayesilisk.verify_connector_outputs`.
+6. Codex calls `verify_connector_outputs`.
 7. Codex creates issues or app patches only from Bayesilisk verified issue
    payloads or fix packets.

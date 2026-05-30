@@ -387,24 +387,25 @@ From a checkout, the module form is equivalent:
 python3 -m bayesilisk.mcp_server
 ```
 
-The server prints an ASCII Bayesilisk logo and version to `stderr` on startup.
-It keeps `stdout` reserved for MCP JSON-RPC frames.
+By default the server writes only MCP JSON-RPC frames on `stdout` and stays
+quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
+you want the ASCII startup banner.
 
 Verifier tools:
 
-- `bayesilisk.run`;
-- `bayesilisk.rank_context`;
-- `bayesilisk.issue_payloads`;
-- `bayesilisk.propose_probes`.
+- `run`;
+- `rank_context`;
+- `issue_payloads`;
+- `propose_probes`.
 
 Codex orchestration tools:
 
-- `bayesilisk.interview_connector_need`;
-- `bayesilisk.establish_provenance`;
-- `bayesilisk.connector_prompt_packet`;
-- `bayesilisk.scenario_plan`;
-- `bayesilisk.verify_connector_outputs`;
-- `bayesilisk.fix_packet`.
+- `interview_connector_need`;
+- `establish_provenance`;
+- `connector_prompt_packet`;
+- `scenario_plan`;
+- `verify_connector_outputs`;
+- `fix_packet`.
 
 The MCP tools accept the same control names as JSON arguments, including
 `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
@@ -444,18 +445,20 @@ Then add Bayesilisk to Codex config:
 [mcp_servers.bayesilisk]
 command = "bayesilisk-mcp"
 args = []
-startup_timeout_ms = 20000
+startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
-For a project-local config inside a Bayesilisk checkout, use:
+For a project-local config inside a Bayesilisk checkout, use an explicit
+checkout path. An absolute Python path is safest if Codex does not inherit your
+interactive shell `PATH`.
 
 ```toml
 [mcp_servers.bayesilisk]
 command = "python3"
 args = ["-m", "bayesilisk.mcp_server"]
-cwd = "."
-startup_timeout_ms = 20000
+cwd = "/absolute/path/to/bayesilisk"
+startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
@@ -470,23 +473,23 @@ packet, plan scenarios, and verify connector outputs.
 The intended loop is:
 
 ```text
-bayesilisk.interview_connector_need
-  -> bayesilisk.establish_provenance
-  -> bayesilisk.connector_prompt_packet
+interview_connector_need
+  -> establish_provenance
+  -> connector_prompt_packet
   -> Codex writes connector code in the target app/test repo
-  -> bayesilisk.scenario_plan
+  -> scenario_plan
   -> connector executes local fixtures
-  -> bayesilisk.verify_connector_outputs
-  -> bayesilisk.fix_packet
+  -> verify_connector_outputs
+  -> fix_packet
 ```
 
-`bayesilisk.run` can also call the local scenario proposer model/API when
+`run` can also call the local scenario proposer model/API when
 `enableScenarioProposer=true`. The model proposes; Bayesilisk validates and
 verifies. Codex remains responsible for app-specific connector execution, issue
 creation, and code changes, and should act only on verified Bayesilisk output.
 
 The OpenAI Codex configuration reference documents `mcp_servers.<id>.command`,
-`args`, `cwd`, `startup_timeout_ms`, and `tool_timeout_sec`:
+`args`, `cwd`, `startup_timeout_sec`, and `tool_timeout_sec`:
 https://developers.openai.com/codex/config-reference
 
 ## Documentation

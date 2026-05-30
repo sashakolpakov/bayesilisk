@@ -128,27 +128,27 @@ From a checkout, the module form is equivalent:
 python3 -m bayesilisk.mcp_server
 ```
 
-The server prints an ASCII Bayesilisk logo and version to `stderr` on startup.
-It does not print banner text to `stdout`, because stdout is reserved for MCP
-JSON-RPC frames.
+By default the server writes only MCP JSON-RPC frames on `stdout` and stays
+quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
+you want the ASCII startup banner.
 
 Verifier tools:
 
-- `bayesilisk.run`: run a contextual report.
-- `bayesilisk.rank_context`: return ranked failed probes from supplied context.
-- `bayesilisk.issue_payloads`: return deduped issue payloads for ready failed
+- `run`: run a contextual report.
+- `rank_context`: return ranked failed probes from supplied context.
+- `issue_payloads`: return deduped issue payloads for ready failed
   findings.
-- `bayesilisk.propose_probes`: expand connector-supplied rules and action
+- `propose_probes`: expand connector-supplied rules and action
   graphs into probe proposals.
 
 Codex orchestration tools:
 
-- `bayesilisk.interview_connector_need`;
-- `bayesilisk.establish_provenance`;
-- `bayesilisk.connector_prompt_packet`;
-- `bayesilisk.scenario_plan`;
-- `bayesilisk.verify_connector_outputs`;
-- `bayesilisk.fix_packet`.
+- `interview_connector_need`;
+- `establish_provenance`;
+- `connector_prompt_packet`;
+- `scenario_plan`;
+- `verify_connector_outputs`;
+- `fix_packet`.
 
 The MCP tools accept the same control names as JSON arguments:
 `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
@@ -164,18 +164,18 @@ For Codex configuration and connector onboarding, see {doc}`codex-mcp`.
 
 A Codex-style agent can use Bayesilisk MCP as the cheap local drill layer:
 
-1. Call `bayesilisk.interview_connector_need`.
-2. Call `bayesilisk.establish_provenance`.
-3. Call `bayesilisk.connector_prompt_packet`.
+1. Call `interview_connector_need`.
+2. Call `establish_provenance`.
+3. Call `connector_prompt_packet`.
 4. Write connector code and source context in the target app or test repo.
-5. Call `bayesilisk.scenario_plan` or `bayesilisk.propose_probes`.
+5. Call `scenario_plan` or `propose_probes`.
 6. Run the app-specific connector against local fixtures.
-7. Call `bayesilisk.verify_connector_outputs`.
-8. Call `bayesilisk.fix_packet` only for verified issue-ready findings.
+7. Call `verify_connector_outputs`.
+8. Call `fix_packet` only for verified issue-ready findings.
 
 If a local model/API is configured, pass `enableScenarioProposer=true` plus
 `scenarioProvider`, `scenarioModel`, and base URL/API-key settings to
-`bayesilisk.run`. Model proposals stay untrusted; Bayesilisk validates them
+`run`. Model proposals stay untrusted; Bayesilisk validates them
 before deterministic verification.
 
 ## GitHub Issues
