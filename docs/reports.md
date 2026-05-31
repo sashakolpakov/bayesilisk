@@ -88,10 +88,15 @@ Downloadable examples:
 - {download}`Example JSON report <examples/example-report.json>`
 - {download}`Example GitHub issue payloads <examples/example-issue-payloads.json>`
 
-The README also includes a short GIF showing the Bayesilisk proof loop:
+The README includes a proof-loop diagram, and the same boundary is represented
+as a text flow here:
 
 ```text
-Playwright evidence -> Grassmann attention -> model proposal -> Bayesilisk verification -> issue payload
+Playwright evidence
+  -> Grassmann attention
+  -> candidate scenario from catalog, rules, or model
+  -> Bayesilisk deterministic verification
+  -> ready issue payload or reject/watchlist
 ```
 
 ### Why This Is Not a Black Box

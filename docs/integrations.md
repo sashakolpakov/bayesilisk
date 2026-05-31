@@ -26,9 +26,18 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 ```
 
 `bayesilisk-demo` serves an intentionally brittle local workflow app and prints
-Playwright evidence -> Grassmann plane -> optional model-style proposal ->
-deterministic verdict -> issue payload. It can run with `--no-playwright` when a
-tester wants deterministic local evidence without launching Chromium.
+this chain:
+
+```text
+Playwright evidence
+  -> Grassmann plane
+  -> optional model-style proposal
+  -> deterministic verdict
+  -> issue payload
+```
+
+It can run with `--no-playwright` when a tester wants deterministic local
+evidence without launching Chromium.
 
 Capture evidence artifacts:
 

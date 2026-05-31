@@ -118,12 +118,33 @@ automatic issue material.
 
 ## Proof Artifacts
 
-![Bayesilisk proof loop](docs/assets/bayesilisk-proof-loop.gif)
+![Bayesilisk proof loop](docs/assets/bayesilisk-proof-loop.svg)
 
-The proof loop is deliberately split:
+The proof loop is deliberately split. Evidence and proposals can route
+attention, but only deterministic verification can produce automatic issue
+material:
 
 ```text
-Playwright evidence -> Grassmann attention -> model proposal -> Bayesilisk verification -> issue payload
+Playwright evidence + local context
+(browser trace, DOM state, fixture state, app facts)
+        |
+        v
+Grassmann attention
+(rank suspicious contexts; no verdict authority)
+        |
+        v
+Candidate scenario
+(catalog, rule, or model proposed; untrusted)
+        |
+        v
+Bayesilisk verification
+(deterministic invariants and controls decide pass/fail)
+        |
+        +--> ready issue payload
+        |    stable fingerprint + evidence summary
+        |
+        +--> reject / watchlist
+             no automatic issue
 ```
 
 Example artifacts:
@@ -223,14 +244,22 @@ python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.js
 customer app; they are twelve deliberately brittle product-like workflows across
 Travel, Expenses, Billing, HR, Support, and DMS, with stale state, impossible
 ordering, duplicate submission, feature-flag exposure, tenant boundaries, two
-controls, and role lanes. Its output shows the chain: Playwright evidence ->
-Grassmann plane -> generated catalog/attention scenarios -> optional
-model-style proposal -> deterministic verdict -> issue payload. It also includes
-a hard-to-find drill-down showing a route-matrix failure that appears only after
-connecting support takeover state, HR document access, route permissions, and
-module context. The drill-down includes a seeded sweep order, so changing
-`--seed` can make the same buried failure surface earlier or later while
-remaining reproducible for that seed. Use
+controls, and role lanes. Its output shows the chain:
+
+```text
+Playwright evidence
+  -> Grassmann plane
+  -> generated catalog/attention scenarios
+  -> optional model-style proposal
+  -> deterministic verdict
+  -> issue payload
+```
+
+It also includes a hard-to-find drill-down showing a route-matrix failure that
+appears only after connecting support takeover state, HR document access, route
+permissions, and module context. The drill-down includes a seeded sweep order,
+so changing `--seed` can make the same buried failure surface earlier or later
+while remaining reproducible for that seed. Use
 `bayesilisk-demo --recording` to open headed Chromium, slow the probe clicks, and
 hold the browser long enough to screen-record the local workflow pressure. Use
 `bayesilisk-demo --no-playwright` to see the same local loop without launching a

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="620" viewBox="0 0 1180 620" role="img" aria-labelledby="title desc">
+  <title id="title">Bayesilisk proof loop</title>
+  <desc id="desc">Playwright evidence and local context feed Grassmann attention. Grassmann attention routes candidate scenario selection. Model output can supply an untrusted candidate. Bayesilisk verifies candidates against deterministic invariants and controls. Verified failures create issue payloads; other candidates are rejected or watched.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#25313f"/>
+    </marker>
+    <marker id="muted-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .rail { fill: none; stroke: #d8e2ee; stroke-width: 1.5; }
+      .box { fill: #ffffff; stroke: #334155; stroke-width: 2; }
+      .muted { fill: #f1f5f9; stroke: #64748b; stroke-width: 1.8; }
+      .gate { fill: #ecfeff; stroke: #0f766e; stroke-width: 2.5; }
+      .ready { fill: #ecfdf5; stroke: #047857; stroke-width: 2; }
+      .reject { fill: #fff7ed; stroke: #c2410c; stroke-width: 2; }
+      .title { font-family: Arial, sans-serif; font-weight: 700; font-size: 26px; fill: #0f172a; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 16px; fill: #334155; }
+      .section { font-family: Arial, sans-serif; font-weight: 700; font-size: 14px; fill: #64748b; letter-spacing: 0; }
+      .label { font-family: Arial, sans-serif; font-weight: 700; font-size: 20px; fill: #0f172a; }
+      .body { font-family: Arial, sans-serif; font-size: 14px; fill: #334155; }
+      .arrow { stroke: #25313f; stroke-width: 2.8; fill: none; marker-end: url(#arrow); }
+      .muted-arrow { stroke: #64748b; stroke-width: 2.2; fill: none; marker-end: url(#muted-arrow); stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1180" height="620"/>
+  <text class="title" x="42" y="44">Bayesilisk proof loop</text>
+  <text class="subtitle" x="42" y="72">Signals route attention and propose candidates. Bayesilisk alone decides pass/fail and issue readiness.</text>
+
+  <path class="rail" d="M36 100 H1144"/>
+  <path class="rail" d="M36 348 H1144"/>
+
+  <text class="section" x="58" y="128">OBSERVED INPUTS</text>
+  <text class="section" x="372" y="128">ATTENTION ROUTER</text>
+  <text class="section" x="666" y="128">UNTRUSTED PROPOSALS</text>
+  <text class="section" x="372" y="366">DETERMINISTIC RULES</text>
+  <text class="section" x="666" y="366">VERIFICATION</text>
+  <text class="section" x="972" y="366">OUTPUT</text>
+
+  <rect class="box" x="58" y="154" width="270" height="76" rx="9"/>
+  <text class="label" x="78" y="184">Playwright evidence</text>
+  <text class="body" x="78" y="207">trace, DOM, network, fixture state</text>
+
+  <rect class="muted" x="58" y="260" width="270" height="76" rx="9"/>
+  <text class="label" x="78" y="290">Local context</text>
+  <text class="body" x="78" y="313">fragments, history, app facts</text>
+
+  <rect class="box" x="366" y="207" width="244" height="76" rx="9"/>
+  <text class="label" x="386" y="237">Grassmann attention</text>
+  <text class="body" x="386" y="260">ranks where to inspect next</text>
+
+  <rect class="muted" x="666" y="135" width="270" height="68" rx="9"/>
+  <text class="label" x="686" y="164">Model output</text>
+  <text class="body" x="686" y="187">candidate input, never a verdict</text>
+
+  <rect class="box" x="666" y="207" width="270" height="76" rx="9"/>
+  <text class="label" x="686" y="237">Candidate scenario</text>
+  <text class="body" x="686" y="260">catalog, rule, or model proposed</text>
+
+  <rect class="muted" x="366" y="390" width="244" height="82" rx="9"/>
+  <text class="label" x="386" y="422">Known invariants</text>
+  <text class="body" x="386" y="445">controls and expected outcomes</text>
+
+  <rect class="gate" x="666" y="390" width="270" height="82" rx="9"/>
+  <text class="label" x="686" y="422">Bayesilisk verifier</text>
+  <text class="body" x="686" y="445">deterministic pass/fail ledger</text>
+
+  <rect class="ready" x="970" y="376" width="172" height="76" rx="9"/>
+  <text class="label" x="990" y="405">Ready issue</text>
+  <text class="body" x="990" y="428">stable fingerprint</text>
+  <text class="body" x="990" y="446">evidence summary</text>
+
+  <rect class="reject" x="970" y="476" width="172" height="76" rx="9"/>
+  <text class="label" x="990" y="505">Reject / watch</text>
+  <text class="body" x="990" y="528">probe-only, muted,</text>
+  <text class="body" x="990" y="546">or no-issue-control</text>
+
+  <path class="arrow" d="M328 192 C344 192 350 226 366 226"/>
+  <path class="arrow" d="M328 298 C344 298 350 264 366 264"/>
+  <path class="arrow" d="M610 245 H666"/>
+  <path class="muted-arrow" d="M801 203 V207"/>
+  <path class="arrow" d="M801 283 V390"/>
+  <path class="arrow" d="M610 431 H666"/>
+  <path class="arrow" d="M936 419 H970"/>
+  <path class="muted-arrow" d="M936 444 C952 444 952 514 970 514"/>
+</svg>
