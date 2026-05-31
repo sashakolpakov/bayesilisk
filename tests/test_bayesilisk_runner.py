@@ -1598,12 +1598,13 @@ def test_proof_artifacts_are_linked_and_explain_trust_boundaries() -> None:
         assert path.stat().st_size > 0
 
     for fragment in (
-        "docs/assets/bayesilisk-proof-loop.gif",
+        "docs/assets/bayesilisk-proof-loop.svg",
         "docs/examples/example-report.json",
         "docs/examples/example-issue-payloads.json",
         "Why This Is Not a Black Box",
         "Model Unavailable? Still Works",
-        "Playwright evidence -> Grassmann attention -> model proposal -> Bayesilisk verification -> issue payload",
+        "Playwright evidence + local context",
+        "Candidate scenario",
         "Model output remains untrusted candidate input.",
         "Only `verifiedByBayesilisk` contains deterministic invariant results",
     ):
