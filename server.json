@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sashakolpakov/bayesilisk-mcp",
+  "description": "Deterministic local verifier for permission, entitlement, route, and data-boundary scenarios, with connector orchestration tools that keep LLM output out of the final verdict.",
+  "version": "1.2.0",
+  "repository": {
+    "url": "https://github.com/sashakolpakov/bayesilisk",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "bayesilisk",
+      "version": "1.2.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

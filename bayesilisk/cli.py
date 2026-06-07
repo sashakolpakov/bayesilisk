@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +100,14 @@ def runtime_config_from_args(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def main() -> int:
+    # Backward-compatible dispatch: `bayesilisk connector ...` routes to the
+    # connector subcommand group; every other invocation keeps the original flat
+    # verifier flag interface untouched.
+    argv = sys.argv[1:]
+    if argv and argv[0] == "connector":
+        from .connector_cli import main as connector_main
+
+        return connector_main(argv[1:])
     args = parse_args()
     observations = load_observations(args.observations)
     context = load_context(args.context)

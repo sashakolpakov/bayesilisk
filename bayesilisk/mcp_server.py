@@ -11,6 +11,7 @@ if __package__ in {None, ""}:
     from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
     from bayesilisk.connector_orchestration import (  # type: ignore[no-redef]
         connector_prompt_packet,
+        connector_quickstart,
         establish_provenance,
         fix_packet,
         interview_connector_need,
@@ -28,6 +29,7 @@ else:
     from .config import effective_runtime_config
     from .connector_orchestration import (
         connector_prompt_packet,
+        connector_quickstart,
         establish_provenance,
         fix_packet,
         interview_connector_need,
@@ -126,8 +128,13 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
+        "name": "connector_quickstart",
+        "description": "Start here for connectors: returns the ordered tool loop, boundaries, and copy-paste source/observed templates. Agent-side equivalent of `bayesilisk connector init`.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "interview_connector_need",
-        "description": "Normalize a Codex connector request and return bounded follow-up questions.",
+        "description": "Connector loop step 1/6: normalize a connector request and return bounded follow-up questions.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -140,7 +147,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "establish_provenance",
-        "description": "Create a caller-supplied provenance packet for connector source and execution boundaries.",
+        "description": "Connector loop step 2/6: create a caller-supplied provenance packet for connector source and execution boundaries. Call after interview_connector_need.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -154,7 +161,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "connector_prompt_packet",
-        "description": "Emit a bounded prompt/spec packet that tells Codex how to create an app-specific connector safely.",
+        "description": "Connector loop step 3/6: emit a bounded prompt/spec packet that tells Codex how to create an app-specific connector safely. Call after establish_provenance.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -169,7 +176,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "scenario_plan",
-        "description": "Build a bounded connector scenario plan from source context, proposal rules, action graphs, and optional drafts.",
+        "description": "Connector loop step 4/6: build a bounded connector scenario plan from source context, proposal rules, action graphs, and optional drafts.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -183,7 +190,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "verify_connector_outputs",
-        "description": "Validate connector observations and run deterministic Bayesilisk verification over accepted local evidence.",
+        "description": "Connector loop step 5/6: validate connector observations and run deterministic Bayesilisk verification over accepted local evidence. Call after the connector executes the scenario_plan.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -200,7 +207,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "fix_packet",
-        "description": "Emit a Codex repair brief from verified Bayesilisk findings or issue payloads only.",
+        "description": "Connector loop step 6/6: emit a Codex repair brief from verified Bayesilisk findings or issue payloads only.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -348,6 +355,8 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 "proposals": proposals,
                 "tool": VERSION,
             }
+        elif name == "connector_quickstart":
+            payload = connector_quickstart(arguments)
         elif name == "interview_connector_need":
             payload = interview_connector_need(arguments)
         elif name == "establish_provenance":
