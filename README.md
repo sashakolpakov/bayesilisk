@@ -473,6 +473,12 @@ Verifier tools:
 - `issue_payloads`;
 - `propose_probes`.
 
+Motif and loop tools:
+
+- `list_motifs`;
+- `bind_motifs`;
+- `connector_loop`.
+
 Codex orchestration tools:
 
 - `connector_quickstart`;
@@ -646,7 +652,19 @@ https://developers.openai.com/codex/config-reference
 ## Documentation
 
 Sphinx documentation lives in [docs/](docs/). The GitHub Pages workflow builds it
-with MyST Markdown support and publishes it from GitHub Actions.
+with MyST Markdown support and publishes it from GitHub Actions. Key pages:
+
+- [Connector quickstart](docs/connector-quickstart.md) — the guided
+  `init → validate → propose → verify` loop.
+- [Connector authoring](docs/connectors.md) — the full connector contract.
+- [Motif library](docs/motifs.md) — the category-theory motifs, packs, and
+  licensing.
+- [Closed connector loop](docs/connector-loop.md) — the automated
+  `scan → bind → verify → repair` controller.
+- [Codex MCP](docs/codex-mcp.md) — MCP setup and the tool surface.
+
+The methodology and Cal.com case study are written up in the
+[manuscript](manuscript/main.tex) ([PDF](manuscript/main.pdf)).
 
 Local docs build:
 

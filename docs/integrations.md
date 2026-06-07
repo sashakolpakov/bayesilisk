@@ -150,8 +150,15 @@ Verifier tools:
 - `propose_probes`: expand connector-supplied rules and action
   graphs into probe proposals.
 
+Motif and loop tools:
+
+- `list_motifs`: list motif-library packs and unlocked motifs.
+- `bind_motifs`: bind motifs to a source context and expand proposals.
+- `connector_loop`: advance the closed connector loop one step.
+
 Codex orchestration tools:
 
+- `connector_quickstart`;
 - `interview_connector_need`;
 - `establish_provenance`;
 - `connector_prompt_packet`;
@@ -186,6 +193,11 @@ If a local model/API is configured, pass `enableScenarioProposer=true` plus
 `scenarioProvider`, `scenarioModel`, and base URL/API-key settings to
 `run`. Model proposals stay untrusted; Bayesilisk validates them
 before deterministic verification.
+
+To auto-generate probes instead of hand-writing rules, bind the motif library
+(`list_motifs` / `bind_motifs`, or `bayesilisk connector scan --bind-motifs`),
+and drive the whole cycle with `connector_loop`. See {doc}`motifs` and
+{doc}`connector-loop`.
 
 ## GitHub Issues
 

@@ -100,6 +100,30 @@ tool_timeout_sec = 120
 
 See {doc}`codex-mcp` for the full Codex connector workflow.
 
+## Probe Your Own App
+
+To probe a target app, use the connector subcommands rather than hand-writing
+context. Scan an API description, bind the motif library, and run the guided
+loop:
+
+```sh
+bayesilisk connector scan openapi.json --bind-motifs --output source-context.json
+bayesilisk connector validate source-context.json
+bayesilisk connector propose source-context.json
+bayesilisk connector motifs                 # list motif packs/motifs
+```
+
+For a fully automated, agent-driven cycle against a locally-running app, use the
+stateless controller:
+
+```sh
+bayesilisk connector loop --state loop.json --spec openapi.json
+# write/run the connector, capture observed-context.json, then:
+bayesilisk connector loop --state loop.json --observed observed-context.json
+```
+
+See {doc}`connector-quickstart`, {doc}`motifs`, and {doc}`connector-loop`.
+
 ## Run With Context
 
 Context is caller-provided JSON. It can include issue text, agent notes, repository facts, Playwright observations, muted fingerprints, confirmed fingerprints, and prior adjustments.

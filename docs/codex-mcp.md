@@ -138,6 +138,17 @@ Verifier tools:
 - `propose_probes`: expand connector-supplied proposal rules and
   action graphs into app-agnostic probe proposals.
 
+Motif and loop tools:
+
+- `connector_quickstart`: return the ordered tool loop, boundaries, and
+  copy-paste source/observed templates (start here).
+- `list_motifs`: list motif-library packs and unlocked motifs (premium
+  packs show as locked without a license).
+- `bind_motifs`: bind motif-library probes to a source context and return
+  the augmented context plus expanded proposals.
+- `connector_loop`: advance the closed loop one step (scan/bind/validate/
+  verify/fix) and return the next action; pass the returned state back in.
+
 Codex orchestration tools:
 
 - `interview_connector_need`: normalize the user request and return
@@ -194,3 +205,9 @@ Bayesilisk deterministic verification may produce issue-ready findings.
 6. Codex calls `verify_connector_outputs`.
 7. Codex creates issues or app patches only from Bayesilisk verified issue
    payloads or fix packets.
+
+To automate this, `connector_loop` performs every deterministic step and returns
+the single next action for the connector to execute; feed the returned `state`
+back on each call until it reports `converged`. See {doc}`connector-loop` for the
+controller and {doc}`motifs` for the motif library it binds. The same flow is
+available on the CLI (`bayesilisk connector scan|motifs|loop`).

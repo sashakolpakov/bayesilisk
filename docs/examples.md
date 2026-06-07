@@ -9,6 +9,14 @@ Coding agents should ingest
 before writing a connector. It lists the required source-context fields,
 observed-evidence fields, allowed agent steps, and non-negotiable boundaries.
 
+## Motif Packs
+
+The [premium pack template](https://github.com/sashakolpakov/bayesilisk/blob/main/examples/motifs/premium-pack.example.json)
+shows the shape of a gated motif pack. Replace its motifs with curated content,
+sign it with `tools/bayesilisk_pack_sign.py`, and distribute it to licensed
+users; the open core pack ships in the package. See {doc}`motifs` for the motif
+model, packs, and offline licensing.
+
 ## ABAG Connector Context
 
 The [ABAG example](https://github.com/sashakolpakov/bayesilisk/blob/main/examples/abag-action-graph-context.json)
