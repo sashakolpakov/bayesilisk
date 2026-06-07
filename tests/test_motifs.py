@@ -46,6 +46,38 @@ def test_core_pack_loads_and_validates() -> None:
     assert {"param-mutation", "workflow-sequence"} <= {m["kind"] for m in avail}
 
 
+def test_calcom_extracted_motifs_are_present_and_bind() -> None:
+    avail = {m["motifId"]: m for m in motifs.available_motifs()}
+    # Motifs distilled from the worked Cal.com connector example.
+    for motif_id, status in (
+        ("bola.identifier-wrong-parent-context", 409),
+        ("lifecycle.cancelled-id-replay", 409),
+        ("token.superseded-reset-token", 410),
+        ("bola.required-subresource-reference", 403),
+    ):
+        assert motif_id in avail, motif_id
+        assert avail[motif_id]["expectedBehavior"]["status"] == status
+        assert avail[motif_id].get("validatedBy")
+    # The headline Cal.com finding maps to a core motif validated by an upstream fix.
+    assert avail["idor.unknown-id"].get("validatedBy")
+
+    context = {
+        "source": "test",
+        "repositoryFacts": [
+            {
+                "source": "repository-scan",
+                "title": "reset route",
+                "invariantId": "app.reset",
+                "routePattern": "/reset/{resetToken}",
+                "availableActions": ["open-reset"],
+                "params": [{"name": "resetToken", "kind": "token", "location": "path", "tokens": ["identifier.reset_token"]}],
+            }
+        ],
+    }
+    proposals = generate_probe_proposals(motifs.bind_motifs(context, motifs.available_motifs()), limit=100)
+    assert 410 in {p["expectedStatus"] for p in proposals}  # superseded-reset-token
+
+
 def test_binder_generates_proposals_with_motif_statuses() -> None:
     avail = motifs.available_motifs()
     bound = motifs.bind_motifs(_source_fact_context(), avail)

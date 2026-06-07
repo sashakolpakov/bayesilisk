@@ -19,6 +19,12 @@ A **motif** is a template of two kinds:
 Each motif carries a `family` (mapped to access-control failure classes),
 `severity`, `confidence`, `expectedBehavior`, and `references`.
 
+Several core motifs are distilled from the worked {doc}`examples` Cal.com
+connector run and carry a `validatedBy` note pointing at the real finding (some
+with upstream human-authored fixes) — for example unknown-identifier → 404,
+identifier-from-wrong-parent → 409, superseded-reset-token → 410, and the
+cancelled-resource replay sequence → 409.
+
 Motifs ship in **packs** with a `tier`:
 
 - **core** — the free, open `bayesilisk.core.access-control` pack, shipped in the

@@ -1,12 +1,13 @@
 {
   "packId": "bayesilisk.core.access-control",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "tier": "core",
   "title": "Bayesilisk Core Access-Control Motifs",
-  "provenance": "Curated by the Bayesilisk maintainers from common authorization and data-boundary failure classes.",
+  "provenance": "Curated by the Bayesilisk maintainers from common authorization and data-boundary failure classes. Several motifs are validated against the worked Cal.com connector example (examples/calcom), including findings with upstream human-authored fixes.",
   "references": [
     "OWASP API Security Top 10 (2023)",
-    "OWASP Authorization Cheat Sheet"
+    "OWASP Authorization Cheat Sheet",
+    "examples/calcom (worked real-app connector with upstream-validated findings)"
   ],
   "motifs": [
     {
@@ -15,8 +16,9 @@
       "family": "object-level-authorization",
       "severity": "medium",
       "confidence": "deterministic",
-      "rationale": "An identifier that does not resolve to any object must return not-found, not silently expose or fabricate state.",
+      "rationale": "An identifier that does not resolve to any object must return not-found, not silently expose or fabricate state, even when the identifier is an optional reference that otherwise degrades into a default flow.",
       "references": ["OWASP-API1:2023"],
+      "validatedBy": "examples/calcom: unknown/stale rescheduleUid opened the booking flow (HTTP 200) instead of 404; upstream fix PR calcom/cal.com#29400 (approved).",
       "appliesTo": {"paramKind": "id", "tokens": ["resource.id", "resource.public_id"]},
       "mutation": {"id": "unknown-id", "valueTemplate": "missing-{param}", "title": "unknown id"},
       "expectedBehavior": {"status": 404}
@@ -94,6 +96,58 @@
       "expectedBehavior": {"status": 403, "alt": [400]}
     },
     {
+      "motifId": "bola.identifier-wrong-parent-context",
+      "kind": "param-mutation",
+      "family": "object-level-authorization",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "An identifier that is valid but belongs to a different parent/context resource must be rejected, not silently resolved against the requested context.",
+      "references": ["OWASP-API1:2023"],
+      "validatedBy": "examples/calcom: a rescheduleUid for another event type was accepted on the wrong event-type route (expected 409).",
+      "appliesTo": {"paramKind": "id", "tokens": ["resource.id", "resource.public_id"]},
+      "mutation": {"id": "wrong-parent-context", "valueTemplate": "{param}-from-other-parent", "title": "identifier from a different parent context"},
+      "expectedBehavior": {"status": 409, "alt": [404]}
+    },
+    {
+      "motifId": "lifecycle.cancelled-id-replay",
+      "kind": "param-mutation",
+      "family": "lifecycle-state-replay",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "An identifier for a cancelled resource replayed against an action route must be rejected, distinct from a deleted/expired identifier.",
+      "references": ["OWASP-API1:2023"],
+      "validatedBy": "examples/calcom: cancelled booking direct reschedule route is expected to return 409.",
+      "appliesTo": {"paramKind": "id", "tokens": ["resource.public_id", "state.cancelled"]},
+      "mutation": {"id": "cancelled-id-replay", "valueTemplate": "cancelled-{param}", "title": "cancelled-resource identifier replay"},
+      "expectedBehavior": {"status": 409, "alt": [410]}
+    },
+    {
+      "motifId": "token.superseded-reset-token",
+      "kind": "param-mutation",
+      "family": "token-and-session",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "A reset/single-use token that has been superseded by a newer one must remain invalid afterwards.",
+      "references": ["OWASP-API2:2023"],
+      "validatedBy": "examples/calcom: a superseded password-reset token is expected to remain invalid (410).",
+      "appliesTo": {"paramKind": "token", "tokens": ["identifier.reset_token"]},
+      "mutation": {"id": "superseded-token", "valueTemplate": "superseded-{param}", "title": "superseded reset token"},
+      "expectedBehavior": {"status": 410, "alt": [401]}
+    },
+    {
+      "motifId": "bola.required-subresource-reference",
+      "kind": "param-mutation",
+      "family": "object-level-authorization",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "An action on a sub-resource must require a concrete authorized reference; a missing or guessed sub-resource reference must not authorize the action.",
+      "references": ["OWASP-API1:2023"],
+      "validatedBy": "examples/calcom: a random/missing seat reference must not expose seated-booking cancellation (403).",
+      "appliesTo": {"paramKind": "id", "tokens": ["resource.private_id", "resource.foreign_id"]},
+      "mutation": {"id": "random-subresource-reference", "valueTemplate": "random-{param}", "title": "guessed sub-resource reference"},
+      "expectedBehavior": {"status": 403, "alt": [404]}
+    },
+    {
       "motifId": "lifecycle.cancelled-replay",
       "kind": "workflow-sequence",
       "family": "lifecycle-state-replay",
@@ -101,6 +155,7 @@
       "confidence": "deterministic",
       "rationale": "Replaying a public identifier of a cancelled resource across a boundary must be rejected.",
       "references": ["OWASP-API1:2023"],
+      "validatedBy": "examples/calcom: create-booking -> cancel-booking -> open-public-booking-route(rescheduleUid=booking.uid) returned 200 instead of 409 (calcom/cal.com issue #29407).",
       "requiresTokens": [
         {"token": "resource.public_id"},
         {"token": "state.cancelled"}
