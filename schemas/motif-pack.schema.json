@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bayesilisk.local/schemas/motif-pack.schema.json",
+  "title": "Bayesilisk motif pack",
+  "description": "A versioned, app-agnostic library of category-theory motifs for authorization and data-boundary probing. ABAG tokens are objects, connector actions are morphisms (requires->produces), workflow-sequence motifs are composite morphisms, and a connector is a functor F:A->App. Motifs expand into proposalRules and connectorActionGraph.sequenceRules; they never decide a verdict.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["packId", "version", "tier", "motifs"],
+  "properties": {
+    "packId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$",
+      "description": "Stable pack identifier, e.g. bayesilisk.core.access-control."
+    },
+    "version": {"type": "string", "minLength": 1},
+    "tier": {"enum": ["core", "premium"]},
+    "title": {"type": "string"},
+    "provenance": {"type": ["string", "object"]},
+    "references": {"type": "array", "items": {"type": "string"}},
+    "signature": {
+      "type": "string",
+      "description": "base64url Ed25519 signature over the canonical pack (signature field removed). Required to load a premium-tier pack."
+    },
+    "motifs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/motif"}
+    }
+  },
+  "$defs": {
+    "expectedBehavior": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"type": "integer", "minimum": 100, "maximum": 599},
+        "alt": {"type": "array", "items": {"type": "integer", "minimum": 100, "maximum": 599}}
+      }
+    },
+    "abagToken": {
+      "type": "object",
+      "required": ["token"],
+      "properties": {
+        "token": {"type": "string", "pattern": "^(principal|session|scope|resource|identifier|state|boundary|capability|evidence)\\.[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$"},
+        "resourceType": {"type": "string"},
+        "refines": {"type": "string"}
+      }
+    },
+    "motif": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["motifId", "kind", "family", "severity", "confidence", "rationale", "expectedBehavior"],
+      "properties": {
+        "motifId": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+        "kind": {"enum": ["param-mutation", "workflow-sequence"]},
+        "family": {"type": "string"},
+        "severity": {"enum": ["low", "medium", "high", "critical"]},
+        "confidence": {"enum": ["deterministic", "heuristic"]},
+        "rationale": {"type": "string", "minLength": 1},
+        "references": {"type": "array", "items": {"type": "string"}},
+        "expectedBehavior": {"$ref": "#/$defs/expectedBehavior"},
+        "appliesTo": {
+          "type": "object",
+          "description": "param-mutation matcher: a parameter kind and/or ABAG tokens.",
+          "properties": {
+            "paramKind": {"type": "string"},
+            "tokens": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "mutation": {
+          "type": "object",
+          "description": "param-mutation payload.",
+          "required": ["id"],
+          "properties": {
+            "id": {"type": "string"},
+            "valueTemplate": {"type": "string"},
+            "title": {"type": "string"}
+          }
+        },
+        "requiresTokens": {
+          "type": "array",
+          "description": "workflow-sequence precondition tokens.",
+          "items": {"$ref": "#/$defs/abagToken"}
+        },
+        "pattern": {
+          "type": "array",
+          "description": "workflow-sequence step descriptors (capability/boundary motif).",
+          "items": {"type": "string"}
+        },
+        "goalBinding": {
+          "type": "object",
+          "properties": {
+            "param": {"type": "string"},
+            "token": {"$ref": "#/$defs/abagToken"}
+          }
+        }
+      }
+    }
+  }
+}

@@ -7,6 +7,13 @@ application-specific fixture setup and action mapping outside the verifier while
 feeding Bayesilisk source context, proposal rules, observed evidence, and
 reports.
 
+## Motif Packs
+
+See [motifs/premium-pack.example.json](motifs/premium-pack.example.json) for a
+gated premium motif-pack template. The open core pack ships inside the package
+(`bayesilisk/motifs/core/`); premium packs are signed and unlocked by an offline
+license. See [docs/motifs.md](../docs/motifs.md).
+
 ## ABAG Connector Context
 
 See [abag-action-graph-context.json](abag-action-graph-context.json) for a

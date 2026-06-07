@@ -152,8 +152,15 @@ It exposes verifier tools:
 - `issue_payloads`: return deduped issue payloads for failed findings marked `ready-for-issue`.
 - `propose_probes`: expand connector-supplied proposal rules and action graphs into probe proposals.
 
+It also exposes motif and loop tools:
+
+- `list_motifs`: list motif-library packs and unlocked motifs.
+- `bind_motifs`: bind motifs to a source context and expand proposals.
+- `connector_loop`: advance the closed connector loop one step.
+
 It also exposes Codex orchestration tools:
 
+- `connector_quickstart`;
 - `interview_connector_need`;
 - `establish_provenance`;
 - `connector_prompt_packet`;

@@ -38,7 +38,10 @@ architecture
 reports
 integrations
 codex-mcp
+connector-quickstart
 connectors
+motifs
+connector-loop
 examples
 development
 bayesilisk

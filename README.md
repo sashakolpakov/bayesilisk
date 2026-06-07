@@ -69,6 +69,49 @@ bayesilisk --seed 150 --format json
 bayesilisk-mcp
 ```
 
+### Connector Authors: Start Here
+
+To probe your own app, use the guided `connector` subcommands. They share the
+deterministic logic with the MCP/agent path and give clear diagnostics at each
+step (no silent empty output):
+
+```sh
+bayesilisk connector init --kind source --with-action-graph --output source-context.json
+bayesilisk connector validate source-context.json
+bayesilisk connector propose source-context.json --output proposals.json
+# write a connector, execute it against local fixtures, capture observed-context.json
+bayesilisk connector verify --source source-context.json --observed observed-context.json --issue-payloads
+```
+
+`validate` reports verifier-only fields, production URLs, and missing
+`proposalRules`; `verify` runs deterministic verification over observed evidence
+and rejects facts whose `passed` disagrees with the status comparison. Coding
+agents get the same loop over MCP starting from the `connector_quickstart` tool.
+See the full walkthrough in [docs/connector-quickstart.md](docs/connector-quickstart.md)
+and the contract in [docs/connectors.md](docs/connectors.md).
+
+To auto-generate probes instead of hand-writing `proposalRules`, scan an app and
+bind the motif library — the app-agnostic catalog of authorization/data-boundary
+probes. The motifs are **category-theory motifs**: ABAG tokens are objects,
+connector actions are morphisms (`requires` → `produces`), workflow sequences are
+composite morphisms, and a connector is a functor that executes abstract tokens
+through their concrete `refines`. So one motif applies to any app via its own
+functor.
+
+```sh
+bayesilisk connector scan openapi.json --bind-motifs --output source-context.json
+bayesilisk connector motifs               # list packs/motifs (core free; premium gated)
+```
+
+A free `core` pack ships in the package; premium packs are unlocked by an offline
+signed license. See [docs/motifs.md](docs/motifs.md).
+
+To run the whole thing as a closed loop, `bayesilisk connector loop` does every
+deterministic step (scan → bind → validate → verify → fix), tracks convergence,
+and returns the exact next action for the agent's execute step — Bayesilisk stays
+the deterministic gate and never decides the verdict. See
+[docs/connector-loop.md](docs/connector-loop.md).
+
 Run the test suite:
 
 ```sh
@@ -410,6 +453,9 @@ Bayesilisk includes a small stdio MCP tool server:
 bayesilisk-mcp
 ```
 
+<!-- Official MCP Registry ownership verification (do not remove). -->
+mcp-name: io.github.sashakolpakov/bayesilisk-mcp
+
 From a checkout, the module form is equivalent:
 
 ```sh
@@ -427,8 +473,15 @@ Verifier tools:
 - `issue_payloads`;
 - `propose_probes`.
 
+Motif and loop tools:
+
+- `list_motifs`;
+- `bind_motifs`;
+- `connector_loop`.
+
 Codex orchestration tools:
 
+- `connector_quickstart`;
 - `interview_connector_need`;
 - `establish_provenance`;
 - `connector_prompt_packet`;
@@ -445,6 +498,81 @@ Agents should pass current issue lists, open PRs, branch facts, local verifier
 notes, Playwright observations, and known Bayesilisk fingerprints as context.
 The MCP server still runs locally and does not mutate GitHub or production
 systems.
+
+### Add Bayesilisk To Your Coding Agent
+
+`bayesilisk-mcp` is a standard stdio MCP server, so any MCP-capable coding agent
+can use it. Each agent has its own config format; copy the matching block below.
+
+The launch command is the same everywhere:
+
+- installed (editable or from a release): `bayesilisk-mcp`
+- zero-install once published to PyPI: `uvx --from bayesilisk bayesilisk-mcp`
+  (the runnable entry point is `bayesilisk-mcp`, inside the `bayesilisk` package)
+
+**Claude Code** — CLI or a committed `.mcp.json` for the whole team:
+
+```sh
+claude mcp add --scope project bayesilisk -- bayesilisk-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**Cursor** (`~/.cursor/mcp.json` or `.cursor/mcp.json`), **Windsurf**
+(`~/.codeium/windsurf/mcp_config.json`), and **JetBrains AI Assistant** (paste in
+the MCP settings form) all use the same `mcpServers` shape:
+
+```json
+{
+  "mcpServers": {
+    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json`) uses a `servers` key and an explicit type:
+
+```json
+{
+  "servers": {
+    "bayesilisk": { "type": "stdio", "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**Zed** (`settings.json`) uses `context_servers`:
+
+```json
+{
+  "context_servers": {
+    "bayesilisk": { "command": { "path": "bayesilisk-mcp", "args": [] } }
+  }
+}
+```
+
+**Continue** (`~/.continue/mcpServers/bayesilisk.yaml`):
+
+```yaml
+name: Bayesilisk
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: bayesilisk
+    type: stdio
+    command: bayesilisk-mcp
+    args: []
+```
+
+**OpenAI Codex** uses TOML — see [Codex Setup](#codex-setup) below.
+
+Whatever the agent, once connected, call the `connector_quickstart` tool first
+for the ordered connector loop and templates.
 
 ### Codex Setup
 
@@ -524,7 +652,19 @@ https://developers.openai.com/codex/config-reference
 ## Documentation
 
 Sphinx documentation lives in [docs/](docs/). The GitHub Pages workflow builds it
-with MyST Markdown support and publishes it from GitHub Actions.
+with MyST Markdown support and publishes it from GitHub Actions. Key pages:
+
+- [Connector quickstart](docs/connector-quickstart.md) — the guided
+  `init → validate → propose → verify` loop.
+- [Connector authoring](docs/connectors.md) — the full connector contract.
+- [Motif library](docs/motifs.md) — the category-theory motifs, packs, and
+  licensing.
+- [Closed connector loop](docs/connector-loop.md) — the automated
+  `scan → bind → verify → repair` controller.
+- [Codex MCP](docs/codex-mcp.md) — MCP setup and the tool surface.
+
+The methodology and Cal.com case study are written up in the
+[manuscript](manuscript/main.tex) ([PDF](manuscript/main.pdf)).
 
 Local docs build:
 
@@ -544,6 +684,11 @@ The test suite includes scenario-matrix coverage:
   finite-state verifier results.
 
 Current public planning issues are tracked in GitHub Issues.
+
+## Acknowledgments
+
+Thanks to OpenAI for providing model access — including the early ChatGPT-5.5
+preview — which enabled fast deployment of the initial version of Bayesilisk.
 
 ## Boundaries
 

@@ -11,13 +11,20 @@ if __package__ in {None, ""}:
     from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
     from bayesilisk.connector_orchestration import (  # type: ignore[no-redef]
         connector_prompt_packet,
+        connector_quickstart,
         establish_provenance,
         fix_packet,
         interview_connector_need,
         scenario_plan,
         verify_connector_outputs,
     )
+    from bayesilisk.connector_loop import advance as loop_advance  # type: ignore[no-redef]
     from bayesilisk.constants import VERSION  # type: ignore[no-redef]
+    from bayesilisk.motifs import (  # type: ignore[no-redef]
+        available_motifs,
+        bind_motifs,
+        load_packs,
+    )
     from bayesilisk.probe_proposals import generate_probe_proposals  # type: ignore[no-redef]
     from bayesilisk.reporting import (  # type: ignore[no-redef]
         build_contextual_report,
@@ -26,8 +33,10 @@ if __package__ in {None, ""}:
     )
 else:
     from .config import effective_runtime_config
+    from .connector_loop import advance as loop_advance
     from .connector_orchestration import (
         connector_prompt_packet,
+        connector_quickstart,
         establish_provenance,
         fix_packet,
         interview_connector_need,
@@ -35,6 +44,7 @@ else:
         verify_connector_outputs,
     )
     from .constants import VERSION
+    from .motifs import available_motifs, bind_motifs, load_packs
     from .probe_proposals import generate_probe_proposals
     from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
@@ -126,8 +136,55 @@ TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
+        "name": "list_motifs",
+        "description": "List motif-library packs and unlocked motifs (the app-agnostic library of authorization/data-boundary probes). Premium packs show as locked without a license.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "license": {"type": "string"},
+                "packs": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    {
+        "name": "bind_motifs",
+        "description": "Bind motif-library probes to a connector source context, returning an augmented context (proposalRules + sequenceRules) plus the expanded proposals.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sourceContext": {"type": "object"},
+                "license": {"type": "string"},
+                "packs": {"type": "array", "items": {"type": "string"}},
+                "limit": {"type": ["integer", "null"], "default": 24},
+            },
+            "required": ["sourceContext"],
+        },
+    },
+    {
+        "name": "connector_loop",
+        "description": "Advance the closed connector loop one step: does all deterministic work (scan/bind/validate/verify/fix), tracks convergence, and returns the exact next action for the agent's execute step. Pass the returned state back in each call.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "state": {"type": "object"},
+                "spec": {"type": "object"},
+                "sourceContext": {"type": "object"},
+                "observedContext": {"type": "object"},
+                "packs": {"type": "array", "items": {"type": "string"}},
+                "license": {"type": "string"},
+                "maxRounds": {"type": "integer"},
+                "maxDryRounds": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "connector_quickstart",
+        "description": "Start here for connectors: returns the ordered tool loop, boundaries, and copy-paste source/observed templates. Agent-side equivalent of `bayesilisk connector init`.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "interview_connector_need",
-        "description": "Normalize a Codex connector request and return bounded follow-up questions.",
+        "description": "Connector loop step 1/6: normalize a connector request and return bounded follow-up questions.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -140,7 +197,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "establish_provenance",
-        "description": "Create a caller-supplied provenance packet for connector source and execution boundaries.",
+        "description": "Connector loop step 2/6: create a caller-supplied provenance packet for connector source and execution boundaries. Call after interview_connector_need.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -154,7 +211,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "connector_prompt_packet",
-        "description": "Emit a bounded prompt/spec packet that tells Codex how to create an app-specific connector safely.",
+        "description": "Connector loop step 3/6: emit a bounded prompt/spec packet that tells Codex how to create an app-specific connector safely. Call after establish_provenance.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -169,7 +226,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "scenario_plan",
-        "description": "Build a bounded connector scenario plan from source context, proposal rules, action graphs, and optional drafts.",
+        "description": "Connector loop step 4/6: build a bounded connector scenario plan from source context, proposal rules, action graphs, and optional drafts.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -183,7 +240,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "verify_connector_outputs",
-        "description": "Validate connector observations and run deterministic Bayesilisk verification over accepted local evidence.",
+        "description": "Connector loop step 5/6: validate connector observations and run deterministic Bayesilisk verification over accepted local evidence. Call after the connector executes the scenario_plan.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -200,7 +257,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "fix_packet",
-        "description": "Emit a Codex repair brief from verified Bayesilisk findings or issue payloads only.",
+        "description": "Connector loop step 6/6: emit a Codex repair brief from verified Bayesilisk findings or issue payloads only.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -348,6 +405,42 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 "proposals": proposals,
                 "tool": VERSION,
             }
+        elif name == "list_motifs":
+            extra_packs = arguments.get("packs", []) or []
+            packs = load_packs(license_token=arguments.get("license"), extra_packs=extra_packs)
+            payload = {
+                "packs": [{key: pack[key] for key in ("packId", "version", "tier", "title", "unlocked", "reason", "motifCount")} for pack in packs],
+                "motifs": available_motifs(license_token=arguments.get("license"), extra_packs=extra_packs),
+                "tool": VERSION,
+            }
+        elif name == "bind_motifs":
+            source_context = arguments.get("sourceContext", {})
+            if not isinstance(source_context, dict):
+                raise ValueError("sourceContext must be an object")
+            extra_packs = arguments.get("packs", []) or []
+            motifs = available_motifs(license_token=arguments.get("license"), extra_packs=extra_packs)
+            bound = bind_motifs(source_context, motifs)
+            limit = arguments.get("limit", 24)
+            limit = int(limit) if limit is not None else 24
+            payload = {
+                "boundContext": bound,
+                "boundMotifCount": len(motifs),
+                "proposals": generate_probe_proposals(bound, limit=limit),
+                "tool": VERSION,
+            }
+        elif name == "connector_loop":
+            payload = loop_advance(
+                arguments.get("state"),
+                spec=arguments.get("spec"),
+                source_context=arguments.get("sourceContext"),
+                observed_context=arguments.get("observedContext"),
+                packs=arguments.get("packs", []) or [],
+                license_token=arguments.get("license"),
+                max_rounds=arguments.get("maxRounds"),
+                max_dry_rounds=arguments.get("maxDryRounds"),
+            )
+        elif name == "connector_quickstart":
+            payload = connector_quickstart(arguments)
         elif name == "interview_connector_need":
             payload = interview_connector_need(arguments)
         elif name == "establish_provenance":

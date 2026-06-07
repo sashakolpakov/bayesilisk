@@ -85,3 +85,23 @@ Contextual reports should keep these ledgers separate:
 - `verifiedByBayesilisk`: deterministic invariant results.
 
 The issue-worthy result must come from `verifiedByBayesilisk`.
+
+## Motif Library
+
+The motif library is the app-agnostic encoding of *what* to probe. It is a small
+category over the universal ABAG vocabulary: tokens are objects, connector actions
+are morphisms (`requires` → `produces`), workflow sequences are composite
+morphisms, and a connector is a functor that executes abstract tokens through
+their concrete refinements. A motif is a typed diagram obligation that expands
+into the same `proposalRules` / `sequenceRules` the verifier already checks — so
+motifs steer search, never the verdict. Motifs ship in versioned packs (an open
+core pack plus optionally gated packs). See {doc}`motifs`.
+
+## Automated Loop
+
+A deterministic surface scanner turns an API description into a draft connector
+contract, and a stateless loop controller drives
+`scan → bind motifs → validate → verify → fix` to convergence, returning the one
+step it cannot perform — connector execution — for the agent to run. Bayesilisk
+never executes the application and never decides pass/fail. See
+{doc}`connector-loop`.
