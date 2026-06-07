@@ -69,6 +69,27 @@ bayesilisk --seed 150 --format json
 bayesilisk-mcp
 ```
 
+### Connector Authors: Start Here
+
+To probe your own app, use the guided `connector` subcommands. They share the
+deterministic logic with the MCP/agent path and give clear diagnostics at each
+step (no silent empty output):
+
+```sh
+bayesilisk connector init --kind source --with-action-graph --output source-context.json
+bayesilisk connector validate source-context.json
+bayesilisk connector propose source-context.json --output proposals.json
+# write a connector, execute it against local fixtures, capture observed-context.json
+bayesilisk connector verify --source source-context.json --observed observed-context.json --issue-payloads
+```
+
+`validate` reports verifier-only fields, production URLs, and missing
+`proposalRules`; `verify` runs deterministic verification over observed evidence
+and rejects facts whose `passed` disagrees with the status comparison. Coding
+agents get the same loop over MCP starting from the `connector_quickstart` tool.
+See the full walkthrough in [docs/connector-quickstart.md](docs/connector-quickstart.md)
+and the contract in [docs/connectors.md](docs/connectors.md).
+
 Run the test suite:
 
 ```sh
@@ -410,6 +431,9 @@ Bayesilisk includes a small stdio MCP tool server:
 bayesilisk-mcp
 ```
 
+<!-- Official MCP Registry ownership verification (do not remove). -->
+mcp-name: io.github.sashakolpakov/bayesilisk-mcp
+
 From a checkout, the module form is equivalent:
 
 ```sh
@@ -429,6 +453,7 @@ Verifier tools:
 
 Codex orchestration tools:
 
+- `connector_quickstart`;
 - `interview_connector_need`;
 - `establish_provenance`;
 - `connector_prompt_packet`;
@@ -445,6 +470,81 @@ Agents should pass current issue lists, open PRs, branch facts, local verifier
 notes, Playwright observations, and known Bayesilisk fingerprints as context.
 The MCP server still runs locally and does not mutate GitHub or production
 systems.
+
+### Add Bayesilisk To Your Coding Agent
+
+`bayesilisk-mcp` is a standard stdio MCP server, so any MCP-capable coding agent
+can use it. Each agent has its own config format; copy the matching block below.
+
+The launch command is the same everywhere:
+
+- installed (editable or from a release): `bayesilisk-mcp`
+- zero-install once published to PyPI: `uvx --from bayesilisk bayesilisk-mcp`
+  (the runnable entry point is `bayesilisk-mcp`, inside the `bayesilisk` package)
+
+**Claude Code** — CLI or a committed `.mcp.json` for the whole team:
+
+```sh
+claude mcp add --scope project bayesilisk -- bayesilisk-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**Cursor** (`~/.cursor/mcp.json` or `.cursor/mcp.json`), **Windsurf**
+(`~/.codeium/windsurf/mcp_config.json`), and **JetBrains AI Assistant** (paste in
+the MCP settings form) all use the same `mcpServers` shape:
+
+```json
+{
+  "mcpServers": {
+    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json`) uses a `servers` key and an explicit type:
+
+```json
+{
+  "servers": {
+    "bayesilisk": { "type": "stdio", "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**Zed** (`settings.json`) uses `context_servers`:
+
+```json
+{
+  "context_servers": {
+    "bayesilisk": { "command": { "path": "bayesilisk-mcp", "args": [] } }
+  }
+}
+```
+
+**Continue** (`~/.continue/mcpServers/bayesilisk.yaml`):
+
+```yaml
+name: Bayesilisk
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: bayesilisk
+    type: stdio
+    command: bayesilisk-mcp
+    args: []
+```
+
+**OpenAI Codex** uses TOML — see [Codex Setup](#codex-setup) below.
+
+Whatever the agent, once connected, call the `connector_quickstart` tool first
+for the ordered connector loop and templates.
 
 ### Codex Setup
 

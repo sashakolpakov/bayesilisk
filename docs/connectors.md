@@ -1,5 +1,9 @@
 # Connector Authoring
 
+New to connectors? Start with the guided {doc}`connector-quickstart`, which walks
+the `bayesilisk connector init -> validate -> propose -> verify` loop. This page
+is the full reference for the underlying contract.
+
 This page is for test teams writing connectors only. Do not modify Bayesilisk
 core for an app integration. Keep all app knowledge in the target app, a test
 repo, or a small connector package owned by the test team.

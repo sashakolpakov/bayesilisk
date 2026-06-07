@@ -1047,6 +1047,7 @@ def test_bayesilisk_mcp_server_lists_tools_and_returns_ranked_context() -> None:
     assert initialize["result"]["serverInfo"]["version"] == "bayesilisk.v1.2"
     assert {tool["name"] for tool in tools["result"]["tools"]} == {
         "connector_prompt_packet",
+        "connector_quickstart",
         "establish_provenance",
         "fix_packet",
         "interview_connector_need",

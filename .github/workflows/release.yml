@@ -1,0 +1,82 @@
+name: Release
+
+# Publishes Bayesilisk to PyPI and the official MCP Registry.
+#
+# This workflow NEVER runs on a normal push. It triggers only when you push a
+# version tag (e.g. `git tag v1.2.0 && git push --tags`) or run it manually from
+# the Actions tab. Nothing is published until you do one of those.
+#
+# Prerequisites before the first real run:
+#   1. Add a LICENSE file and the matching `license` metadata in pyproject.toml.
+#   2. Configure PyPI Trusted Publishing for this repo/workflow so no API token
+#      is needed: https://docs.pypi.org/trusted-publishers/
+#   3. The README must keep the `mcp-name: io.github.sashakolpakov/bayesilisk-mcp`
+#      line (PyPI ownership check) and server.json must match the released version.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC for PyPI Trusted Publishing
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-registry:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # OIDC for MCP Registry (GitHub auth)
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar -xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      - name: Publish server.json to the MCP Registry
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish

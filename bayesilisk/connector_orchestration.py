@@ -87,6 +87,119 @@ def _hash_id(prefix: str, payload: Any, length: int = 12) -> str:
     return f"{prefix}.{_safe_hash(payload)[:length]}"
 
 
+def connector_boundaries() -> list[str]:
+    """Shared non-negotiable connector boundaries (CLI, MCP, prompt packet)."""
+    return [
+        "Do not modify Bayesilisk core for this app connector.",
+        "Do not let an LLM write observedStatus.",
+        "Do not let an LLM write passed.",
+        "Do not open issues from connector output alone.",
+        "Run connector actions only against local, dev, or staging fixtures.",
+        "Use Bayesilisk issue payloads or verified reports before creating fix briefs.",
+    ]
+
+
+def source_context_template() -> dict[str, Any]:
+    """A fresh starter source-context fact set with explicit proposal rules."""
+    return {
+        "agentNotes": [],
+        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
+        "priorAdjustments": {},
+        "repositoryFacts": [
+            {
+                "availableActions": ["connector-action-name"],
+                "expectedBehavior": {"description": "source-backed expectation", "status": 404},
+                "invariantId": "app.invariant_id",
+                "params": [{"kind": "id", "location": "query", "name": "resourceId", "required": True}],
+                "proposalRules": {"resourceId": [{"id": "unknown-id", "value": "missing-resourceId"}]},
+                "routePattern": "/resource/{resourceId}",
+                "source": "repository-scan",
+                "title": "Source-backed connector expectation",
+            }
+        ],
+        "source": "codex-bayesilisk-source-context",
+    }
+
+
+def observed_fact_template() -> dict[str, Any]:
+    """A fresh observed-fact template; placeholders for connector-produced fields."""
+    return {
+        "actorRole": "local-test-actor",
+        "artifactPaths": [],
+        "expectedStatus": 404,
+        "failureDetail": "<concrete failure detail from connector execution>",
+        "invariantId": "app.invariant_id",
+        "networkResponses": [],
+        "observedStatus": "<must come from Playwright/API execution>",
+        "passed": "<must be deterministic comparison after execution>",
+        "route": "/resource/{resourceId}",
+        "selector": "connector:connector-action-name",
+        "source": "connector-observation",
+        "targetUrl": "http://localhost:3000/resource/missing-resourceId",
+        "timestamp": "<ISO-8601 execution timestamp>",
+        "title": "Observed local connector result",
+    }
+
+
+def local_provenance(source_context: dict[str, Any], *, created_at: str | None = None) -> dict[str, Any]:
+    """Build a minimal local-only provenance for terminal-driven verification.
+
+    Lets a human run `connector verify` without the full agent provenance
+    handshake while keeping the same production/credential guards.
+    """
+    source = _text(_dict(source_context).get("source"), "cli-connector")
+    return establish_provenance(
+        {
+            "connectorNeed": {"source": source, "productionAccessAllowed": False},
+            "createdAt": created_at or DEFAULT_CREATED_AT,
+            "executionBoundary": {
+                "allowedBaseUrls": ["http://localhost"],
+                "credentialPolicy": "no-production-credentials",
+                "target": "local fixtures",
+            },
+            "sourceClaims": [
+                {"kind": "repo", "providedBy": "human", "value": source or "local connector source context"}
+            ],
+        }
+    )
+
+
+def connector_quickstart(arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Single self-describing entry point for agents building a connector.
+
+    The agent-side equivalent of `bayesilisk connector init`: returns the ordered
+    tool loop, the required source/observed fields, the boundaries, and
+    copy-paste templates so a coding agent can drive the whole flow without
+    re-reading the docs.
+    """
+    return _tool_payload(
+        {
+            "loop": [
+                {"step": 1, "tool": "interview_connector_need", "purpose": "Normalize the request and ask bounded follow-ups."},
+                {"step": 2, "tool": "establish_provenance", "purpose": "Record source claims and a local-only execution boundary."},
+                {"step": 3, "tool": "connector_prompt_packet", "purpose": "Get a bounded spec for writing the connector in the app repo."},
+                {"step": 4, "tool": "scenario_plan", "purpose": "Expand source context into a bounded probe plan."},
+                {"step": 5, "tool": "verify_connector_outputs", "purpose": "Deterministically verify observed evidence; emit issue payloads."},
+                {"step": 6, "tool": "fix_packet", "purpose": "Emit a repair brief from verified findings only."},
+            ],
+            "cliEquivalent": [
+                "bayesilisk connector init --kind both --with-action-graph",
+                "bayesilisk connector validate <source-context.json>",
+                "bayesilisk connector propose <source-context.json>",
+                "bayesilisk connector verify --source <s.json> --observed <o.json>",
+            ],
+            "boundaries": connector_boundaries(),
+            "sourceContextTemplate": source_context_template(),
+            "observedFactTemplate": observed_fact_template(),
+            "requiredObservedFactFields": [
+                "actorRole", "artifactPaths", "expectedStatus", "failureDetail", "invariantId",
+                "networkResponses", "observedStatus", "passed", "route", "selector", "source",
+                "targetUrl", "timestamp", "title",
+            ],
+        }
+    )
+
+
 def interview_connector_need(arguments: dict[str, Any]) -> dict[str, Any]:
     request_text = _text(arguments.get("requestText"))
     known_answers = _dict(arguments.get("knownAnswers"))
@@ -276,14 +389,7 @@ def connector_prompt_packet(arguments: dict[str, Any]) -> dict[str, Any]:
     if not provenance_id:
         errors.append("accepted provenance with provenanceId is required")
 
-    boundaries = [
-        "Do not modify Bayesilisk core for this app connector.",
-        "Do not let an LLM write observedStatus.",
-        "Do not let an LLM write passed.",
-        "Do not open issues from connector output alone.",
-        "Run connector actions only against local, dev, or staging fixtures.",
-        "Use Bayesilisk issue payloads or verified reports before creating fix briefs.",
-    ]
+    boundaries = connector_boundaries()
     codex_task = (
         "Create an app-specific Bayesilisk connector in the target app or test repo. "
         "Read local tests, routes, schemas, and fixture helpers; write source context with explicit "
@@ -291,40 +397,8 @@ def connector_prompt_packet(arguments: dict[str, Any]) -> dict[str, Any]:
         "connector action mapping. Do not edit Bayesilisk core. Execute observed facts only through "
         "real local fixture, browser, or API actions."
     )
-    source_context_template = {
-        "agentNotes": [],
-        "playwrightProbe": {"artifactCount": 0, "failedCount": 0, "passedCount": 0, "resultCount": 0, "target": None},
-        "priorAdjustments": {},
-        "repositoryFacts": [
-            {
-                "availableActions": ["connector-action-name"],
-                "expectedBehavior": {"description": "source-backed expectation", "status": 404},
-                "invariantId": "app.invariant_id",
-                "params": [{"kind": "id", "location": "query", "name": "resourceId", "required": True}],
-                "proposalRules": {"resourceId": [{"id": "unknown-id", "value": "missing-resourceId"}]},
-                "routePattern": "/resource/{resourceId}",
-                "source": "repository-scan",
-                "title": "Source-backed connector expectation",
-            }
-        ],
-        "source": "codex-bayesilisk-source-context",
-    }
-    observed_fact_template = {
-        "actorRole": "local-test-actor",
-        "artifactPaths": [],
-        "expectedStatus": 404,
-        "failureDetail": "<concrete failure detail from connector execution>",
-        "invariantId": "app.invariant_id",
-        "networkResponses": [],
-        "observedStatus": "<must come from Playwright/API execution>",
-        "passed": "<must be deterministic comparison after execution>",
-        "route": "/resource/{resourceId}",
-        "selector": "connector:connector-action-name",
-        "source": "connector-observation",
-        "targetUrl": "http://localhost:3000/resource/missing-resourceId",
-        "timestamp": "<ISO-8601 execution timestamp>",
-        "title": "Observed local connector result",
-    }
+    source_context_template_value = source_context_template()
+    observed_fact_template_value = observed_fact_template()
     packet_seed = {
         "connectorNeed": connector_need,
         "includeExamples": include_examples,
@@ -335,7 +409,7 @@ def connector_prompt_packet(arguments: dict[str, Any]) -> dict[str, Any]:
     prompt_packet = {
         "codexTask": codex_task,
         "includeExamples": include_examples,
-        "observedFactTemplate": observed_fact_template,
+        "observedFactTemplate": observed_fact_template_value,
         "packetId": _hash_id("connector-prompt", packet_seed, 16),
         "provenanceId": provenance_id,
         "requiredOutputs": [
@@ -344,7 +418,7 @@ def connector_prompt_packet(arguments: dict[str, Any]) -> dict[str, Any]:
             "local fixture execution instructions",
             "observed context JSON contract",
         ],
-        "sourceContextTemplate": source_context_template,
+        "sourceContextTemplate": source_context_template_value,
         "style": style,
         "systemBoundaries": boundaries,
         "targetLanguage": target_language,
@@ -445,6 +519,72 @@ def scenario_plan(arguments: dict[str, Any]) -> dict[str, Any]:
             "validation": _validation(errors=errors, warnings=warnings),
         }
     )
+
+
+def _expected_status_present(fact: dict[str, Any]) -> bool:
+    behavior = _dict(fact.get("expectedBehavior"))
+    return _is_int(behavior.get("status")) or _is_int(fact.get("expectedStatus"))
+
+
+def validate_source_context(source_context: dict[str, Any]) -> dict[str, Any]:
+    """Lint a connector source context before proposal generation.
+
+    Reuses the same proposal expansion (`generate_probe_proposals`), forbidden
+    verifier-only field detection, and production-marker guards used elsewhere so
+    a terminal author gets the diagnostics that were previously MCP-only. The key
+    fix over `--probe-proposals-output` is a loud warning when zero proposals
+    would be generated instead of a silent empty list.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    source_context = _dict(source_context)
+    facts = [fact for fact in _list(source_context.get("repositoryFacts")) if isinstance(fact, dict)]
+    if not source_context:
+        errors.append("source context is empty or not an object")
+    elif not facts and not _dict(source_context.get("connectorActionGraph")):
+        errors.append("source context has no repositoryFacts and no connectorActionGraph")
+
+    forbidden_paths = _forbidden_field_paths(source_context)
+    if forbidden_paths:
+        errors.append("source context contains verifier-only fields: " + ", ".join(forbidden_paths))
+
+    declared_actions = _declared_connector_actions(source_context)
+    for index, fact in enumerate(facts):
+        prefix = f"repositoryFacts[{index}]"
+        route_pattern = fact.get("routePattern")
+        has_route = isinstance(route_pattern, str) and route_pattern.strip()
+        has_observed = _is_int(fact.get("expectedStatus")) and _is_int(fact.get("observedStatus"))
+        if _is_production_url(route_pattern) or _is_production_url(fact.get("targetUrl")):
+            errors.append(f"{prefix} references a production URL")
+        if has_observed:
+            continue  # observed-evidence fact, not a source fact; verified elsewhere
+        if not has_route:
+            warnings.append(f"{prefix} has no routePattern; it will not produce route proposals")
+            continue
+        if not _expected_status_present(fact):
+            warnings.append(f"{prefix} has no expectedBehavior.status or expectedStatus; no proposals will be generated")
+        has_rules = isinstance(fact.get("proposalRules"), dict) and fact["proposalRules"]
+        has_gate = isinstance(source_context.get("proposalGates"), list) and source_context["proposalGates"]
+        if not has_rules and not has_gate:
+            warnings.append(
+                f"{prefix} has no proposalRules and no proposalGates; "
+                "add proposalRules, proposalGates, or a connectorActionGraph sequence rule"
+            )
+
+    proposals = generate_probe_proposals(source_context) if facts or _dict(source_context.get("connectorActionGraph")) else []
+    if not proposals and not errors:
+        warnings.append(
+            "no probe proposals would be generated; add proposalRules, proposalGates, "
+            "or connectorActionGraph.sequenceRules so Bayesilisk has something to expand"
+        )
+    return {
+        "accepted": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "declaredActions": sorted(declared_actions),
+        "proposalCount": len(proposals),
+        "factCount": len(facts),
+    }
 
 
 def _observed_facts(observed_context: dict[str, Any]) -> list[dict[str, Any]]:
@@ -555,6 +695,15 @@ def _validate_observed_context(
         "observedFactCount": len(facts),
         "warnings": warnings,
     }
+
+
+def validate_observed_context(
+    observed_context: dict[str, Any],
+    *,
+    scenario_plan_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Public wrapper around observed-context validation for the CLI/agents."""
+    return _validate_observed_context(observed_context, scenario_plan_payload=scenario_plan_payload)
 
 
 def verify_connector_outputs(arguments: dict[str, Any]) -> dict[str, Any]:

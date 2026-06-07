@@ -9,6 +9,38 @@ description = "Deterministic local layer for permission, entitlement, route, and
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "playwright",
+    "authorization",
+    "permissions",
+    "security-testing",
+    "verifier",
+    "connector",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Security",
+]
+
+# NOTE: add a LICENSE file and the matching `license`/license classifier before
+# publishing to PyPI. Left unset intentionally — the license is the maintainer's
+# choice.
+
+[project.urls]
+Homepage = "https://github.com/sashakolpakov/bayesilisk"
+Repository = "https://github.com/sashakolpakov/bayesilisk"
+Documentation = "https://sashakolpakov.github.io/bayesilisk/"
+Issues = "https://github.com/sashakolpakov/bayesilisk/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
