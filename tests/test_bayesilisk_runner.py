@@ -1558,13 +1558,14 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
 
     for fragment in (
         "actions/workflows/ci.yml/badge.svg",
+        "actions/workflows/pages.yml/badge.svg",
         "Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle.",
         'python3 -m pytest -m "not live_playwright and not live_ollama"',
         "sphinx-build -b html docs docs/_build/html",
-        "Live browser/model checks are local opt-in tests",
+        "Opt-in local live checks",
         "BAYESILISK_LIVE_OLLAMA=1",
         "without Ollama",
-        "without granting a model authority",
+        "without delegating correctness to an LLM",
         "--enable-embeddings",
         "--enable-scenario-proposer",
         "--scenario-provider",
@@ -1573,13 +1574,10 @@ def test_readme_pins_ci_trust_signals_and_product_motto() -> None:
         "ollamaBaseUrl",
         "bayesilisk-demo",
         "bayesilisk-demo --recording",
-        "breakage.hard-to-find",
-        "finding.candidate-breakage",
-        "control-confirmed",
         "synthetic local fixture",
         "bayesilisk/demo.py::DEMO_PROBES",
-        "tools/playwright_probe.py --url",
-        "Realistic App Integration Demo",
+        "tools/playwright_probe.py --demo",
+        "Realistic Local App Demo",
         "python3 -m bayesilisk.realistic_demo --recording",
         "python3 -m bayesilisk.realistic_demo --serve-only",
         "bayesilisk-realistic-demo --recording",
@@ -1594,7 +1592,6 @@ def test_proof_artifacts_are_linked_and_explain_trust_boundaries() -> None:
     reports = REPORTS_DOC.read_text(encoding="utf-8")
 
     for path in (
-        REPO_ROOT / "docs" / "assets" / "bayesilisk-proof-loop.gif",
         REPO_ROOT / "docs" / "examples" / "example-report.json",
         REPO_ROOT / "docs" / "examples" / "example-issue-payloads.json",
     ):
@@ -1602,15 +1599,12 @@ def test_proof_artifacts_are_linked_and_explain_trust_boundaries() -> None:
         assert path.stat().st_size > 0
 
     for fragment in (
-        "docs/assets/bayesilisk-proof-loop.svg",
         "docs/examples/example-report.json",
         "docs/examples/example-issue-payloads.json",
-        "Why This Is Not a Black Box",
-        "Model Unavailable? Still Works",
-        "Playwright evidence + local context",
-        "Candidate scenario",
-        "Model output remains untrusted candidate input.",
-        "Only `verifiedByBayesilisk` contains deterministic invariant results",
+        "Playwright is an evidence sensor, not an oracle.",
+        "Bayesilisk works without any model provider.",
+        "Models may help propose where to look.",
+        "they remain untrusted inputs",
     ):
         assert fragment in readme
 
