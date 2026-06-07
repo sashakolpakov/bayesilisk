@@ -34,7 +34,12 @@ validation, prioritizes valid probes with Grassmann-style attention and a
 Bayesian score, and verifies only evidence returned by connector execution.
 The same boundary supports coding-agent assistance: agents may draft connector
 context, action mappings, and repair briefs, but cannot author observations,
-pass/fail results, or issue readiness.
+pass/fail results, or issue readiness. The reusable search surface is a library
+of \emph{category-theory motifs}---abstract tokens are objects, connector actions
+are morphisms, and each connector is a functor to its concrete application---so a
+motif applies across apps; a deterministic scanner derives the surface from an
+API description, and a stateless loop controller drives motif binding,
+verification, and repair to convergence while the oracle stays deterministic.
 
 This paper gives a compact formal model for that loop and reports a Cal.com case
 study at a fixed May 2026 revision. From connector-declared route facts and a
@@ -98,18 +103,24 @@ combinations, and emit deterministic issue payloads. Our claim is deliberately
 bounded but useful: \tool does not replace domain knowledge; it turns that
 domain knowledge into a larger, more variable, and repeatable search procedure.
 
-This paper makes four contributions:
+This paper makes five contributions:
 
 \begin{enumerate}
   \item a trust-boundary model for using LLM-proposed scenarios without using an
         LLM as the oracle;
   \item a mathematical formulation of connector contracts, scenario validation,
         Grassmann-style attention, Bayesian ranking, and deterministic
-        evidence verification, including typed ABAG workflow composition;
+        evidence verification, including typed ABAG workflow composition and a
+        category-theoretic motif library (abstract tokens as objects, connector
+        actions as morphisms, connectors as functors);
   \item a Cal.com artifact showing seven generated probes, seven observed
         expected-vs-observed violations, reproducible issue payloads, and an
         upstream targeted fix pull request with human approval review for one
-        reported issue; and
+        reported issue;
+  \item a deterministic API-surface scanner and a stateless loop controller that
+        automate scan, motif binding, execution hand-off, verification, and
+        repair to a bounded convergence criterion, keeping the oracle
+        deterministic throughout; and
   \item an explicit account of scope and generalization: connectors are
         app-specific by design, action-sequence breadth is governed by the
         connector-declared graph, and the Cal.com comparison runs validate the
@@ -268,6 +279,34 @@ the same validation gate. Unknown target planes, unknown ids, duplicate
 proposals, non-string fields, malformed JSON, impossible counts, and unsupported
 actions or ill-typed ABAG tokens are rejected as proposer telemetry rather than
 reported as product failures.
+
+\subsection{Motifs as a Category}
+
+The reusable search surface is organized as a small category \(\mathcal{A}\).
+Objects are abstract token keys \(\kappa(\tau)=(u,c)\); the generating morphisms
+are connector actions \(a\), with domain
+\(\{\kappa(\tau):\tau\in\operatorname{req}(a)\}\) and codomain
+\(\{\kappa(\tau):\tau\in\operatorname{prod}(a)\}\), and composition is the valid
+sequencing above. A \emph{motif} is a typed obligation in \(\mathcal{A}\). A
+parameter motif is an arrow from a single object to an expected status, e.g.\
+\(\texttt{resource.public\_id}(\text{absent})\to 404\); a workflow motif is a
+composite morphism whose adversarial path must \emph{not} commute into success,
+e.g.\ \(\texttt{create}\to\texttt{cancel}\to\texttt{replay}\) must reach
+\(409\), not \(200\). A connector is a functor \(F:\mathcal{A}\to
+\mathcal{C}_{\mathrm{app}}\) into the concrete application: it sends each object
+to a fixture or route through the refinement \(\rho\) and each morphism to an
+executable action. \tool reasons only in \(\mathcal{A}\), matching by \(\kappa\)
+and never by \(\rho\); functoriality is exactly the refinement boundary above~\cite{maclane}.
+Motifs are grouped into versioned packs over the universal vocabulary. Binding a
+pack to a contract \(C\) instantiates each motif's arrows as concrete candidates,
+route mutations or ABAG sequence rules, that re-enter the same validation and
+verification path; nothing in the oracle changes. The motifs distilled from the
+case study below---unknown, foreign, and wrong-parent identifiers,
+cancelled-state replay, superseded tokens, and missing sub-resource
+references---are such app-agnostic arrows and apply to any app through its own
+\(F\). Packs are tiered (an open core pack and optionally gated packs verified by
+an offline signature); tiering is a distribution concern and does not touch
+verification.
 
 \subsection{Grassmann Attention}
 
@@ -500,6 +539,22 @@ and draft a fix brief. The verifier accepts those artifacts only as context or
 candidate input. Concrete observations must still come from connector
 execution, and fix briefs must still trace to verified issue-ready findings.
 
+\subsection{Surface Scanning and the Automated Loop}
+
+\tool can derive the contract surface deterministically: a scanner maps each
+path and operation of an API description to a route fact with typed parameters
+(identifier, tenant, and token kinds with their abstract tokens), yielding a
+draft contract \(C\) that the motif binder expands. The full procedure is exposed
+as a stateless loop controller. Given the current artifacts it performs every
+deterministic step---scan, motif binding, contract validation, evidence
+verification, and repair-brief synthesis---advances a convergence state, and
+returns the one action it cannot perform: connector execution. The agent or human
+supplies observed evidence; the controller verifies it, accumulates verified
+issue-ready fingerprints, and stops when \(K\) consecutive rounds add no new such
+fingerprint or a round cap is reached. The controller holds no session and is
+deterministic; it automates the boundary above without \tool ever executing the
+application or deciding the verdict.
+
 \section{Cal.com Case Study}
 
 We evaluated the current connector architecture on a local Cal.com
@@ -595,7 +650,10 @@ connector-declared invariant. The route mutations expected semantic status
 \texttt{404} and observed \texttt{200}. The cancelled-booking replay expected
 semantic status \texttt{409} and observed \texttt{200}. \tool classified the
 findings as \texttt{breakage.context-observed} and produced issue-ready
-payloads.
+payloads. These patterns are distilled into the app-agnostic core motif pack
+(unknown, foreign, and wrong-parent identifiers; cancelled-state replay;
+superseded token; missing sub-resource reference), each carrying a provenance
+link back to this finding so the case study seeds reusable motifs.
 
 \section{Comparison Runs}
 
@@ -777,9 +835,12 @@ issue-ready payloads, and a review-approved upstream fix PR for one reported
 issue. The
 adoption path is incremental: write the connector around existing app fixtures,
 or have a coding agent draft it under recorded provenance, let \tool expand the
-scenario space, and keep the oracle deterministic. The next research step is to
-repeat this artifact discipline across additional applications while keeping the
-\tool core app-agnostic.
+scenario space, and keep the oracle deterministic. Packaging the surface as a
+category-theoretic motif library, a deterministic scanner, and a stateless loop
+controller makes that surface reusable across apps and runs the
+scan--verify--repair cycle to convergence without moving the oracle. The next
+research step is to repeat this artifact discipline across additional
+applications while keeping the \tool core app-agnostic.
 
 \bibliographystyle{plain}
 \bibliography{references}
