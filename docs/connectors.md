@@ -26,6 +26,29 @@ connector-declared routes, parameters, actors, and actions. The connector
 remains app-specific: it maps `connectorAction` names to real fixture setup,
 browser/API actions, and observed statuses.
 
+## How The Connector Reaches The App
+
+Bayesilisk core never touches the app — it only reads and verifies the observed
+context JSON. The connector is what reaches the app, and it runs against a
+**local, dev, or staging instance only**, never production.
+
+In the reference setup the connector is a Playwright spec living in the target
+app's own test repo and harness (see the Cal.com example,
+[bayesilisk-probes.e2e.ts](https://github.com/sashakolpakov/bayesilisk/blob/main/examples/calcom/bayesilisk-probes.e2e.ts)).
+It reaches the app two ways:
+
+- **HTTP through the browser** — `page.goto("/route?param=…")` against a
+  locally-running server, then reads the observed status and DOM. The connector
+  first asserts the app is reachable and refuses to run if it is not.
+- **State seeding** — the app's own test fixtures and database client (Prisma for
+  Cal.com) set up preconditions such as a cancelled booking or a stale
+  identifier before the probe navigates.
+
+A connector may instead drive the app through API calls, Cypress, or any test
+harness; Playwright is the reference sensor, not a requirement. In every case the
+connector records `observedStatus`/`passed` into the context JSON and hands that
+to Bayesilisk for deterministic verification.
+
 ## What Goes In A Connector
 
 A connector may contain:
@@ -418,18 +441,16 @@ interview_connector_need
   -> fix_packet only for verified ready findings
 ```
 
-The older CLI-only path remains valid:
+The local CLI runs the same loop without an agent:
 
 ```text
-read local app tests/source
-write source context facts with explicit proposalRules/proposalGates
-call python3 -m bayesilisk --probe-proposals-output
+bayesilisk connector init -> validate -> propose
 run only app-specific connector actions against local fixtures
-write observed evidence facts
-call python3 -m bayesilisk --context ... --issue-payloads
+bayesilisk connector verify --issue-payloads
 ```
 
-For Codex setup and MCP configuration, see {doc}`codex-mcp`.
+See {doc}`connector-quickstart` for the guided CLI walkthrough and
+{doc}`codex-mcp` for Codex setup and MCP configuration.
 
 The ingestible contract file is:
 
@@ -471,10 +492,14 @@ The app owns app behavior. Bayesilisk consumes evidence and verifies the report.
 ## Worked Example
 
 See [examples/calcom](https://github.com/sashakolpakov/bayesilisk/tree/main/examples/calcom)
-for a real-app connector example.
-It records the Cal.com repository URL, exact commit hash, connector source
-contexts, Bayesilisk-generated route and workflow proposals, observed local
-execution context, app-only reports, issue payloads, and upstream outcome
-references. Those outcome references distinguish issue existence from stronger
-human validation such as an upstream fix PR, human review approval, and
-regression test linked to the Bayesilisk finding.
+for a real-app connector example, fixed at a May 2026 revision. From
+connector-declared route facts and a typed ABAG workflow surface, Bayesilisk
+generated seven probes — six unknown/stale `rescheduleUid` route mutations and
+one cancelled-booking replay workflow — and all seven returned deterministic
+expected-vs-observed violations. One upstream finding has a targeted fix pull
+request with human review approval and a linked regression test.
+
+The artifact records the repository URL, exact commit hash, connector source
+contexts, generated proposals, observed local execution context, app-only
+reports, issue payloads, and upstream outcome references, which distinguish issue
+existence from that stronger human validation.

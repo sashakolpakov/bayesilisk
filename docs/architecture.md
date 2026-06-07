@@ -1,12 +1,25 @@
 # Architecture
 
-Bayesilisk is built around one hard rule: the finite-state deterministic verifier is the only component that can mark a scenario as pass or fail.
+Bayesilisk separates scenario proposal from verification. A connector declares a
+bounded application surface, the core expands and validates candidate probes, and
+only deterministic verification over connector-returned evidence can mark a
+scenario as pass or fail.
 
 ```text
-scenario facts -> invariant checks -> pass/fail -> Bayesian ranking
+scenario proposal -> contract validation -> connector execution -> deterministic verification
 ```
 
-The surrounding layers improve where Bayesilisk looks next, but they do not decide whether something is a bug.
+Bayesilisk runs in two operating routes over the same deterministic core:
+
+- `local`: you drive the verifier and connector loop directly from the CLI
+  against local fixtures, API descriptions, browser evidence, or caller-provided
+  context;
+- `mcp/agent-bound`: a coding agent such as Codex drives the loop through the
+  local MCP server, while Bayesilisk stays the deterministic oracle.
+
+The surrounding layers — connector or Playwright sensor, Grassmann attention, and
+the scenario proposer model — improve where Bayesilisk looks next, but they do
+not decide whether something is a bug.
 
 ## Core Verifier
 

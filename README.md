@@ -1,6 +1,7 @@
 # Bayesilisk
 
 [![CI](https://github.com/sashakolpakov/bayesilisk/actions/workflows/ci.yml/badge.svg)](https://github.com/sashakolpakov/bayesilisk/actions/workflows/ci.yml)
+[![Docs](https://github.com/sashakolpakov/bayesilisk/actions/workflows/pages.yml/badge.svg)](https://sashakolpakov.github.io/bayesilisk/)
 
 <p align="center">
   <img src="logo/bayesilisk_logo.png" alt="Bayesilisk logo" width="220">
@@ -8,575 +9,66 @@
 
 **Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle.**
 
-Bayesilisk is a deterministic local layer for permission, entitlement, route,
-and data-boundary sitting over Playwright, with Grassmann attention, and
-LLM-generated scenario-proposal workflows gated by a finite-state verifier.
+Bayesilisk is a deterministic verifier for authorization, route, entitlement,
+and data-boundary testing. It separates scenario proposal from verification:
+connectors declare a bounded application surface, Bayesilisk expands and checks
+candidate probes, and only deterministic verification over returned evidence can
+produce issue-ready findings.
 
-Bayesilisk is intentionally local-first. It uses static scenario fragments,
-caller-provided context, optional observation history, optional browser evidence,
-and optional local model proposals. It does not connect to production systems or
-inspect live customer data. It is built for testers and agents that need
-reproducible findings without granting a model authority over the final verdict.
+The current architecture has two operating routes:
 
-## What It Is
+- `local`: you run the verifier and connector loop directly from the CLI against
+  local fixtures, API descriptions, browser evidence, or caller-provided
+  context;
+- `mcp/agent-bound`: a coding agent such as Codex uses the local MCP server to
+  interview for connector requirements, draft connector artifacts, plan
+  scenarios, and verify connector outputs, while Bayesilisk remains the
+  deterministic oracle.
 
-Bayesilisk is designed to find "bad spots" in authorization and data-boundary
-logic before those gaps become hard-to-debug application bugs.
+Bayesilisk is local-first. It does not inspect production systems or live
+customer data, and it does not allow a model, connector, or Playwright trace to
+declare a bug by itself.
 
-It checks scenarios involving:
+## What Bayesilisk Does
 
-- permission and role-route matrices;
-- customer module entitlements;
-- expense approval and receipt evidence;
-- billing export access;
-- HR document access boundaries;
-- support takeover sessions;
-- DMS tenant and process boundaries;
-- travel funding and travel-expense consistency.
+Bayesilisk is for teams that want broader scenario coverage than ordinary E2E
+suites, without delegating correctness to an LLM. A connector publishes the
+search surface:
 
-The core verifier is deterministic:
+- routes;
+- actions;
+- identifiers and state facts;
+- invariants;
+- mutation schemas;
+- optional typed workflow rules through an Abstract Bayesilisk Action Graph
+  (ABAG).
+
+Bayesilisk then:
+
+1. expands that declared surface into candidate probes;
+2. validates candidates against deterministic contracts;
+3. optionally prioritizes them with Grassmann-style attention and a Bayesian
+   score;
+4. accepts observed evidence only after connector execution;
+5. verifies expected-versus-observed behavior deterministically.
+
+The trust boundary is strict:
 
 ```text
-scenario facts -> invariant checks -> pass/fail -> Bayesian ranking
+scenario proposal -> contract validation -> connector execution -> deterministic verification
 ```
 
-No embedding, model output, issue text, or Playwright observation can directly
-declare a bug. Those layers can only steer where Bayesilisk looks next.
+Models may help propose where to look. They do not decide pass/fail, issue
+readiness, or truth.
 
-See [docs/architecture.md](docs/architecture.md) for the public architecture:
-
-```text
-Playwright is the sensor.
-Grassmann attention is the router.
-The scenario proposer model is the proposer.
-Bayesilisk is the judge.
-```
+See [docs/architecture.md](docs/architecture.md) and the
+[manuscript](manuscript/main.tex) ([PDF](manuscript/main.pdf)).
 
 ## Quick Start
 
-Run the CLI from the repository root:
+### 1. Install
 
-```sh
-python3 -m bayesilisk --seed 150 --format json
-python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
-```
-
-After installation, the same entry points are available as:
-
-```sh
-bayesilisk --seed 150 --format json
-bayesilisk-mcp
-```
-
-### Connector Authors: Start Here
-
-To probe your own app, use the guided `connector` subcommands. They share the
-deterministic logic with the MCP/agent path and give clear diagnostics at each
-step (no silent empty output):
-
-```sh
-bayesilisk connector init --kind source --with-action-graph --output source-context.json
-bayesilisk connector validate source-context.json
-bayesilisk connector propose source-context.json --output proposals.json
-# write a connector, execute it against local fixtures, capture observed-context.json
-bayesilisk connector verify --source source-context.json --observed observed-context.json --issue-payloads
-```
-
-`validate` reports verifier-only fields, production URLs, and missing
-`proposalRules`; `verify` runs deterministic verification over observed evidence
-and rejects facts whose `passed` disagrees with the status comparison. Coding
-agents get the same loop over MCP starting from the `connector_quickstart` tool.
-See the full walkthrough in [docs/connector-quickstart.md](docs/connector-quickstart.md)
-and the contract in [docs/connectors.md](docs/connectors.md).
-
-To auto-generate probes instead of hand-writing `proposalRules`, scan an app and
-bind the motif library — the app-agnostic catalog of authorization/data-boundary
-probes. The motifs are **category-theory motifs**: ABAG tokens are objects,
-connector actions are morphisms (`requires` → `produces`), workflow sequences are
-composite morphisms, and a connector is a functor that executes abstract tokens
-through their concrete `refines`. So one motif applies to any app via its own
-functor.
-
-```sh
-bayesilisk connector scan openapi.json --bind-motifs --output source-context.json
-bayesilisk connector motifs               # list packs/motifs (core free; premium gated)
-```
-
-A free `core` pack ships in the package; premium packs are unlocked by an offline
-signed license. See [docs/motifs.md](docs/motifs.md).
-
-To run the whole thing as a closed loop, `bayesilisk connector loop` does every
-deterministic step (scan → bind → validate → verify → fix), tracks convergence,
-and returns the exact next action for the agent's execute step — Bayesilisk stays
-the deterministic gate and never decides the verdict. See
-[docs/connector-loop.md](docs/connector-loop.md).
-
-Run the test suite:
-
-```sh
-python3 -m pytest
-```
-
-GitHub CI runs deterministic tests and the Sphinx docs build without Ollama,
-hosted models, browser services, or hidden local state:
-
-```sh
-python3 -m pytest -m "not live_playwright and not live_ollama"
-sphinx-build -b html docs docs/_build/html
-```
-
-Live browser/model checks are local opt-in tests:
-
-```sh
-python3 -m pytest tests/test_live_integrations.py -m live_playwright -rs
-BAYESILISK_LIVE_OLLAMA=1 python3 -m pytest tests/test_live_integrations.py -m live_ollama -rs
-```
-
-## Reports
-
-Reports include:
-
-- seed and tool version;
-- deterministic production-access boundary;
-- scenario fragments and generated sub-scenarios;
-- access patterns;
-- expected invariant and observed result;
-- stable fingerprint and dedupe key;
-- classification and issue readiness;
-- attention score and attention reasons when context is supplied;
-- posterior probability and risk score;
-- suggested issue title and body.
-
-Only findings with:
-
-```text
-observedResult = fail
-issueReadiness = ready-for-issue
-```
-
-should be opened automatically. `probe-only`, `regression-watch`,
-`do-not-open-muted`, and `no-issue-control` findings are intentionally not
-automatic issue material.
-
-## Proof Artifacts
-
-![Bayesilisk proof loop](docs/assets/bayesilisk-proof-loop.svg)
-
-The proof loop is deliberately split. Evidence and proposals can route
-attention, but only deterministic verification can produce automatic issue
-material:
-
-```text
-Playwright evidence + local context
-(browser trace, DOM state, fixture state, app facts)
-        |
-        v
-Grassmann attention
-(rank suspicious contexts; no verdict authority)
-        |
-        v
-Candidate scenario
-(catalog, rule, or model proposed; untrusted)
-        |
-        v
-Bayesilisk verification
-(deterministic invariants and controls decide pass/fail)
-        |
-        +--> ready issue payload
-        |    stable fingerprint + evidence summary
-        |
-        +--> reject / watchlist
-             no automatic issue
-```
-
-Example artifacts:
-
-- [example JSON report](docs/examples/example-report.json)
-- [example GitHub issue payloads](docs/examples/example-issue-payloads.json)
-- [Cal.com connector evidence](examples/calcom/)
-
-The Cal.com example uses the general Bayesilisk core with an app-specific
-connector that follows the connector docs. It records the Cal.com repository
-URL, exact tested commit, connector source context, generated proposals,
-observed local execution context, reports, and upstream outcome references. In
-the clean current run Bayesilisk generated 7 proposals: 6 route mutations from
-explicit connector rules plus 1 bounded workflow sequence from a
-connector-declared action graph. All 7 local observations were verified as app
-findings. One reported finding already has an upstream human-authored fix PR
-with a human approval review, which is stronger validation than an issue being
-closed without fix context.
-
-For coding agents and LLM teams building connectors, use the ingestible contract
-at [examples/connector-agent-contract.json](examples/connector-agent-contract.json).
-It spells out required source-context fields, observed-evidence fields, allowed
-agent steps, and boundaries that keep app-specific logic out of Bayesilisk core.
-For reusable workflow motifs, see the typed ABAG example at
-[examples/abag-action-graph-context.json](examples/abag-action-graph-context.json).
-
-### Why This Is Not a Black Box
-
-Bayesilisk exposes separate ledgers for `observedByPlaywright`,
-`selectedByGrassmannAttention`, `proposedByModel`, and `verifiedByBayesilisk`.
-Only `verifiedByBayesilisk` contains deterministic invariant results that can
-feed issue payloads. Model output remains untrusted candidate input.
-
-### Model Unavailable? Still Works
-
-The default verifier path requires no model provider. With no Ollama or hosted
-model configured, Bayesilisk still composes deterministic scenarios, evaluates
-finite-state invariants, ranks findings, validates report schemas, and emits
-issue payloads from verified failures.
-
-## Microsoft Playwright Bridge
-
-Bayesilisk includes a local workflow pressure demo and an optional Microsoft
-Playwright probe. Playwright observes concrete browser behavior and writes
-Bayesilisk context; Bayesilisk still performs deterministic verification
-afterward.
-
-Install the optional browser dependency:
-
-```sh
-python3 -m pip install -e '.[playwright]'
-python3 -m playwright install chromium
-```
-
-Run the bundled demo from a repo checkout:
-
-```sh
-cd /path/to/bayesilisk
-python3 -m pip install -e '.[playwright]'
-python3 -m playwright install chromium
-
-# Terminal transcript only; no browser window.
-python3 -m bayesilisk.demo --no-playwright
-
-# Full screen-recordable run with headed Chromium.
-python3 -m bayesilisk.demo --recording
-```
-
-After editable install, the console script is also available from the active
-environment:
-
-```sh
-bayesilisk-demo
-bayesilisk-demo --recording
-bayesilisk-demo --no-playwright
-```
-
-The demo accepts a deterministic seed. Changing it changes the sweep order while
-keeping that run reproducible:
-
-```sh
-python3 -m bayesilisk.demo --seed 150 --recording
-python3 -m bayesilisk.demo --seed 151 --no-playwright
-```
-
-To run only the lower-level Playwright adapter against the bundled static probe
-target and then feed the captured context to Bayesilisk:
-
-```sh
-python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
-```
-
-`bayesilisk-demo` serves a synthetic local fixture defined in
-`bayesilisk/demo.py::DEMO_PROBES`. Those rows are not claims about an existing
-customer app; they are twelve deliberately brittle product-like workflows across
-Travel, Expenses, Billing, HR, Support, and DMS, with stale state, impossible
-ordering, duplicate submission, feature-flag exposure, tenant boundaries, two
-controls, and role lanes. Its output shows the chain:
-
-```text
-Playwright evidence
-  -> Grassmann plane
-  -> generated catalog/attention scenarios
-  -> optional model-style proposal
-  -> deterministic verdict
-  -> issue payload
-```
-
-It also includes a hard-to-find drill-down showing a route-matrix failure that
-appears only after connecting support takeover state, HR document access, route
-permissions, and module context. The drill-down includes a seeded sweep order,
-so changing `--seed` can make the same buried failure surface earlier or later
-while remaining reproducible for that seed. Use
-`bayesilisk-demo --recording` to open headed Chromium, slow the probe clicks, and
-hold the browser long enough to screen-record the local workflow pressure. Use
-`bayesilisk-demo --no-playwright` to see the same local loop without launching a
-browser. The transcript explains every finding class: `breakage.easy`,
-`breakage.hard-to-find`, `finding.candidate-breakage`, and
-`control-confirmed`. `breakage.hard-to-find` means the deterministic invariant
-failed only after context narrowed the search to a cross-role, cross-module,
-stale-state, or unusual workflow path; it does not mean the model guessed the
-verdict.
-
-For a real app, serve a page that exposes `data-bayesilisk-probe` rows with
-actor, route, invariant, expected status, and actual click behavior, then run:
-
-```sh
-python3 tools/playwright_probe.py --url http://localhost:3000/probe-page \
-  --output /tmp/bayesilisk-real-context.json
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-real-context.json --format markdown
-```
-
-### Realistic App Integration Demo
-
-The realistic demo is a small local permission app, not a static table. It has
-users, tenants, module flags, support takeover state, HR documents, DMS
-receipts, billing exports, and expense approvals. The page at
-`/internal/bayesilisk-probes` exposes `data-bayesilisk-probe` rows, and each
-button calls a local permission handler before writing the observed status back
-to the page. Bayesilisk then consumes the captured context exactly like it would
-for a caller-provided app.
-
-Run it without launching a browser:
-
-```sh
-python3 -m bayesilisk.realistic_demo --no-playwright
-```
-
-Run the screen-recordable browser flow:
-
-```sh
-python3 -m bayesilisk.realistic_demo --recording
-```
-
-Write the captured context and inspect it through the normal verifier:
-
-```sh
-python3 -m bayesilisk.realistic_demo \
-  --context-output /tmp/bayesilisk-realistic-context.json \
-  --no-playwright
-python3 -m bayesilisk \
-  --seed 150 \
-  --context /tmp/bayesilisk-realistic-context.json \
-  --format markdown
-```
-
-After editable install, the console script is:
-
-```sh
-bayesilisk-realistic-demo --recording
-```
-
-To run it like a real app integration, keep the local app serving in one
-terminal:
-
-```sh
-python3 -m bayesilisk.realistic_demo --serve-only
-```
-
-Then copy the printed `/internal/bayesilisk-probes` URL into the normal
-Playwright bridge command from a second terminal.
-
-## Grassmann Attention
-
-Contextual reports include a bounded Grassmann-style attention layer. It treats
-Playwright observations, repository facts, issue text, and invariant descriptions
-as local context planes, then scores which planes look bad or under-tested.
-
-By default this uses a dependency-free anchor-plane proxy. Set
-`BAYESILISK_USE_OLLAMA_EMBEDDINGS=1` to add Ollama `/api/embed` similarities with
-`BAYESILISK_OLLAMA_MODEL`, defaulting to `nomic-embed-text`.
-
-The same behavior can be controlled explicitly from the CLI:
-
-```sh
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json \
-  --enable-embeddings \
-  --embedding-model nomic-embed-text \
-  --attention-threshold 0.4 \
-  --attention-selection-limit 3
-```
-
-Attention scores answer:
-
-```text
-Where should Bayesilisk look next?
-```
-
-Risk scores answer:
-
-```text
-Given this deterministic rule result, how important is this finding?
-```
-
-Those are deliberately separate.
-
-## Scenario Proposer Model
-
-Set `BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1` to let a local scenario proposer
-model suggest extra scenario compositions through Ollama `/api/chat`.
-The provider is selected with `BAYESILISK_SCENARIO_PROVIDER`, defaulting to
-`ollama`. API-key backed providers read keys from `BAYESILISK_SCENARIO_API_KEY`
-or the env var named by `BAYESILISK_SCENARIO_API_KEY_ENV`; reports record only
-whether a key was configured, never the key itself.
-Runtime config precedence is explicit CLI/MCP arguments, then environment
-variables, then defaults.
-
-The preferred local proposer is `gemma4:e2b`:
-
-```sh
-BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1 \
-BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format json
-```
-
-Equivalent CLI controls avoid hidden environment-only behavior:
-
-```sh
-python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json \
-  --enable-scenario-proposer \
-  --scenario-provider ollama \
-  --scenario-model gemma4:e2b \
-  --scenario-proposal-limit 3 \
-  --ollama-base-url http://localhost:11434
-```
-
-Model output is untrusted. Bayesilisk accepts a proposal only if it uses known
-fragment ids and invariant ids, targets a selected attention plane, and passes
-schema validation. Accepted proposals appear as `generated.model.*` scenarios
-with `weak-model-proposal:*` provenance for compatibility with the earlier
-report field name.
-
-Every JSON report includes `effectiveConfiguration`, recording the effective
-attention/model settings with the Ollama base URL reduced to a safe URL class.
-
-## MCP Server
-
-Bayesilisk includes a small stdio MCP tool server:
-
-```sh
-bayesilisk-mcp
-```
-
-<!-- Official MCP Registry ownership verification (do not remove). -->
-mcp-name: io.github.sashakolpakov/bayesilisk-mcp
-
-From a checkout, the module form is equivalent:
-
-```sh
-python3 -m bayesilisk.mcp_server
-```
-
-By default the server writes only MCP JSON-RPC frames on `stdout` and stays
-quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
-you want the ASCII startup banner.
-
-Verifier tools:
-
-- `run`;
-- `rank_context`;
-- `issue_payloads`;
-- `propose_probes`.
-
-Motif and loop tools:
-
-- `list_motifs`;
-- `bind_motifs`;
-- `connector_loop`.
-
-Codex orchestration tools:
-
-- `connector_quickstart`;
-- `interview_connector_need`;
-- `establish_provenance`;
-- `connector_prompt_packet`;
-- `scenario_plan`;
-- `verify_connector_outputs`;
-- `fix_packet`.
-
-The MCP tools accept the same control names as JSON arguments, including
-`enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
-`scenarioModel`, `scenarioProposalLimit`, `attentionThreshold`,
-`attentionSelectionLimit`, and `ollamaBaseUrl`.
-
-Agents should pass current issue lists, open PRs, branch facts, local verifier
-notes, Playwright observations, and known Bayesilisk fingerprints as context.
-The MCP server still runs locally and does not mutate GitHub or production
-systems.
-
-### Add Bayesilisk To Your Coding Agent
-
-`bayesilisk-mcp` is a standard stdio MCP server, so any MCP-capable coding agent
-can use it. Each agent has its own config format; copy the matching block below.
-
-The launch command is the same everywhere:
-
-- installed (editable or from a release): `bayesilisk-mcp`
-- zero-install once published to PyPI: `uvx --from bayesilisk bayesilisk-mcp`
-  (the runnable entry point is `bayesilisk-mcp`, inside the `bayesilisk` package)
-
-**Claude Code** — CLI or a committed `.mcp.json` for the whole team:
-
-```sh
-claude mcp add --scope project bayesilisk -- bayesilisk-mcp
-```
-
-```json
-{
-  "mcpServers": {
-    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
-  }
-}
-```
-
-**Cursor** (`~/.cursor/mcp.json` or `.cursor/mcp.json`), **Windsurf**
-(`~/.codeium/windsurf/mcp_config.json`), and **JetBrains AI Assistant** (paste in
-the MCP settings form) all use the same `mcpServers` shape:
-
-```json
-{
-  "mcpServers": {
-    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
-  }
-}
-```
-
-**VS Code** (`.vscode/mcp.json`) uses a `servers` key and an explicit type:
-
-```json
-{
-  "servers": {
-    "bayesilisk": { "type": "stdio", "command": "bayesilisk-mcp", "args": [] }
-  }
-}
-```
-
-**Zed** (`settings.json`) uses `context_servers`:
-
-```json
-{
-  "context_servers": {
-    "bayesilisk": { "command": { "path": "bayesilisk-mcp", "args": [] } }
-  }
-}
-```
-
-**Continue** (`~/.continue/mcpServers/bayesilisk.yaml`):
-
-```yaml
-name: Bayesilisk
-version: 0.0.1
-schema: v1
-mcpServers:
-  - name: bayesilisk
-    type: stdio
-    command: bayesilisk-mcp
-    args: []
-```
-
-**OpenAI Codex** uses TOML — see [Codex Setup](#codex-setup) below.
-
-Whatever the agent, once connected, call the `connector_quickstart` tool first
-for the ordered connector loop and templates.
-
-### Codex Setup
-
-Install Bayesilisk directly from GitHub:
+Install directly from GitHub:
 
 ```sh
 python3 -m pip install 'git+https://github.com/sashakolpakov/bayesilisk.git'
@@ -596,6 +88,35 @@ From an existing checkout:
 python3 -m pip install -e .
 ```
 
+Development extras:
+
+```sh
+python3 -m pip install -e '.[dev]'
+```
+
+Optional browser probing:
+
+```sh
+python3 -m pip install -e '.[playwright]'
+python3 -m playwright install chromium
+```
+
+### 2. Codex Setup First
+
+If you want Bayesilisk through Codex, start here.
+
+Run the local MCP server:
+
+```sh
+bayesilisk-mcp
+```
+
+From a checkout, the module form is equivalent:
+
+```sh
+python3 -m bayesilisk.mcp_server
+```
+
 Then add Bayesilisk to Codex config:
 
 ```toml
@@ -606,9 +127,7 @@ startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
-For a project-local config inside a Bayesilisk checkout, use an explicit
-checkout path. An absolute Python path is safest if Codex does not inherit your
-interactive shell `PATH`.
+If you want a project-local config that points at a checkout directly:
 
 ```toml
 [mcp_servers.bayesilisk]
@@ -619,7 +138,28 @@ startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
-Restart Codex, then ask:
+Restart Codex after changing MCP config.
+
+The launch command is the same across clients:
+
+- installed package: `bayesilisk-mcp`
+- checkout/module form: `python3 -m bayesilisk.mcp_server`
+
+The intended Codex loop is:
+
+```text
+connector_quickstart
+  -> interview_connector_need
+  -> establish_provenance
+  -> connector_prompt_packet
+  -> Codex writes connector code in the target app repo
+  -> scenario_plan
+  -> connector executes local fixtures
+  -> verify_connector_outputs
+  -> fix_packet
+```
+
+Use this prompt in a target repository:
 
 ```text
 Use Bayesilisk to build a connector for this repo. Start by interviewing me
@@ -627,71 +167,390 @@ about the connector need, then establish provenance, generate a connector prompt
 packet, plan scenarios, and verify connector outputs.
 ```
 
-The intended loop is:
+Bayesilisk remains the verifier. Codex may draft connector code and plans, but
+it must not invent observed evidence, pass/fail results, or issue readiness.
 
-```text
-interview_connector_need
-  -> establish_provenance
-  -> connector_prompt_packet
-  -> Codex writes connector code in the target app/test repo
-  -> scenario_plan
-  -> connector executes local fixtures
-  -> verify_connector_outputs
-  -> fix_packet
+### 3. Run The Local Verifier
+
+```sh
+python3 -m bayesilisk --seed 150 --format json
+python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
 ```
 
-`run` can also call the local scenario proposer model/API when
-`enableScenarioProposer=true`. The model proposes; Bayesilisk validates and
-verifies. Codex remains responsible for app-specific connector execution, issue
-creation, and code changes, and should act only on verified Bayesilisk output.
+Installed console entry points:
 
-The OpenAI Codex configuration reference documents `mcp_servers.<id>.command`,
-`args`, `cwd`, `startup_timeout_sec`, and `tool_timeout_sec`:
-https://developers.openai.com/codex/config-reference
+```sh
+bayesilisk --seed 150 --format json
+bayesilisk-mcp
+```
 
-## Documentation
+## Local Route: Connector CLI
 
-Sphinx documentation lives in [docs/](docs/). The GitHub Pages workflow builds it
-with MyST Markdown support and publishes it from GitHub Actions. Key pages:
+If you are using Bayesilisk directly rather than through an agent, use the
+connector subcommands.
 
-- [Connector quickstart](docs/connector-quickstart.md) — the guided
-  `init → validate → propose → verify` loop.
-- [Connector authoring](docs/connectors.md) — the full connector contract.
-- [Motif library](docs/motifs.md) — the category-theory motifs, packs, and
-  licensing.
-- [Closed connector loop](docs/connector-loop.md) — the automated
-  `scan → bind → verify → repair` controller.
-- [Codex MCP](docs/codex-mcp.md) — MCP setup and the tool surface.
+### Guided Connector Loop
 
-The methodology and Cal.com case study are written up in the
-[manuscript](manuscript/main.tex) ([PDF](manuscript/main.pdf)).
+```sh
+bayesilisk connector init --kind source --with-action-graph --output source-context.json
+bayesilisk connector validate source-context.json
+bayesilisk connector propose source-context.json --output proposals.json
+# execute your connector against local fixtures and write observed-context.json
+bayesilisk connector verify --source source-context.json --observed observed-context.json --issue-payloads
+```
 
-Local docs build:
+`validate` rejects verifier-owned fields, production URLs, and malformed
+connector inputs. `verify` accepts only local observed evidence and runs
+deterministic verification over it.
+
+See [docs/connector-quickstart.md](docs/connector-quickstart.md) and
+[docs/connectors.md](docs/connectors.md).
+
+### Scan, Bind Motifs, And Loop
+
+To generate probes from an app surface instead of hand-writing all
+`proposalRules`, scan and bind the motif library:
+
+```sh
+bayesilisk connector scan openapi.json --bind-motifs --output source-context.json
+bayesilisk connector motifs
+```
+
+To run the full stateless controller:
+
+```sh
+bayesilisk connector loop --state loop.json --spec openapi.json
+# after connector execution writes observed-context.json
+bayesilisk connector loop --state loop.json --observed observed-context.json
+```
+
+The closed loop performs deterministic steps only:
+
+```text
+scan -> bind -> validate -> verify -> fix
+```
+
+It tracks convergence and returns the exact next action for the connector or
+agent to perform.
+
+See [docs/motifs.md](docs/motifs.md) and
+[docs/connector-loop.md](docs/connector-loop.md).
+
+## MCP Server
+
+Bayesilisk includes a small local stdio MCP server:
+
+```sh
+bayesilisk-mcp
+```
+
+<!-- Official MCP Registry ownership verification (do not remove). -->
+mcp-name: io.github.sashakolpakov/bayesilisk-mcp
+
+By default the server writes only MCP JSON-RPC frames on `stdout` and stays
+quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
+you want the ASCII startup banner.
+
+### MCP Tools
+
+Verifier tools:
+
+- `run`
+- `rank_context`
+- `issue_payloads`
+- `propose_probes`
+
+Motif and loop tools:
+
+- `list_motifs`
+- `bind_motifs`
+- `connector_loop`
+
+Codex orchestration tools:
+
+- `connector_quickstart`
+- `interview_connector_need`
+- `establish_provenance`
+- `connector_prompt_packet`
+- `scenario_plan`
+- `verify_connector_outputs`
+- `fix_packet`
+
+The MCP tools use the same runtime controls as the CLI where relevant,
+including `enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
+`scenarioProvider`, `scenarioModel`, `scenarioProposalLimit`,
+`attentionThreshold`, `attentionSelectionLimit`, and `ollamaBaseUrl`.
+
+### Other MCP Clients
+
+**Claude Code**
+
+```sh
+claude mcp add --scope project bayesilisk -- bayesilisk-mcp
+```
+
+**Cursor**, **Windsurf**, and **JetBrains AI Assistant**
+
+```json
+{
+  "mcpServers": {
+    "bayesilisk": { "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**VS Code**
+
+```json
+{
+  "servers": {
+    "bayesilisk": { "type": "stdio", "command": "bayesilisk-mcp", "args": [] }
+  }
+}
+```
+
+**Zed**
+
+```json
+{
+  "context_servers": {
+    "bayesilisk": { "command": { "path": "bayesilisk-mcp", "args": [] } }
+  }
+}
+```
+
+**Continue**
+
+```yaml
+name: Bayesilisk
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: bayesilisk
+    type: stdio
+    command: bayesilisk-mcp
+    args: []
+```
+
+## Reports And Findings
+
+Reports can include:
+
+- seed and tool version;
+- deterministic boundary metadata;
+- connector-declared scenarios and generated sub-scenarios;
+- access patterns;
+- expected invariant and observed result;
+- stable fingerprint and dedupe key;
+- classification and issue readiness;
+- attention score and reasons when context is supplied;
+- posterior probability and risk score;
+- suggested issue title and body.
+
+Only findings with:
+
+```text
+observedResult = fail
+issueReadiness = ready-for-issue
+```
+
+should be opened automatically.
+
+Example artifacts:
+
+- [example JSON report](docs/examples/example-report.json)
+- [example GitHub issue payloads](docs/examples/example-issue-payloads.json)
+- [Cal.com connector evidence](examples/calcom/)
+- [connector agent contract](examples/connector-agent-contract.json)
+- [typed ABAG example](examples/abag-action-graph-context.json)
+
+The manuscript documents a Cal.com case study at a fixed May 2026 revision. In
+that artifact, Bayesilisk generated seven probes from connector-declared route
+facts and a typed ABAG workflow surface; all seven produced deterministic
+expected-versus-observed violations, and one upstream finding has a targeted fix
+pull request with human approval review.
+
+## Playwright And Demo Flows
+
+Playwright is an evidence sensor, not an oracle. It can supply browser evidence
+to Bayesilisk, but Bayesilisk still performs deterministic verification.
+
+### Bundled Demo
+
+```sh
+bayesilisk-demo
+bayesilisk-demo --recording
+bayesilisk-demo --no-playwright
+```
+
+Module form:
+
+```sh
+python3 -m bayesilisk.demo --recording
+python3 -m bayesilisk.demo --no-playwright
+```
+
+The demo accepts a deterministic seed:
+
+```sh
+python3 -m bayesilisk.demo --seed 150 --recording
+python3 -m bayesilisk.demo --seed 151 --no-playwright
+```
+
+To run the lower-level Playwright adapter and then verify the captured context:
+
+```sh
+python3 tools/playwright_probe.py --demo --output /tmp/bayesilisk-playwright-context.json
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --format markdown
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-playwright-context.json --issue-payloads
+```
+
+The bundled demo is synthetic local fixture data from
+`bayesilisk/demo.py::DEMO_PROBES`. It is not a claim about a customer system.
+
+### Realistic Local App Demo
+
+```sh
+python3 -m bayesilisk.realistic_demo --no-playwright
+python3 -m bayesilisk.realistic_demo --recording
+python3 -m bayesilisk.realistic_demo \
+  --context-output /tmp/bayesilisk-realistic-context.json \
+  --no-playwright
+python3 -m bayesilisk \
+  --seed 150 \
+  --context /tmp/bayesilisk-realistic-context.json \
+  --format markdown
+```
+
+Installed console entry point:
+
+```sh
+bayesilisk-realistic-demo --recording
+```
+
+To use the realistic app like a normal local integration:
+
+```sh
+python3 -m bayesilisk.realistic_demo --serve-only
+```
+
+Then point the Playwright bridge at the printed
+`/internal/bayesilisk-probes` URL.
+
+## Optional Attention And Scenario-Proposer Layers
+
+Bayesilisk works without any model provider. Optional layers can help rank or
+propose candidate scenarios, but they remain untrusted inputs.
+
+### Grassmann Attention
+
+By default Bayesilisk uses a dependency-free anchor-plane proxy. To add Ollama
+embeddings:
+
+```sh
+BAYESILISK_USE_OLLAMA_EMBEDDINGS=1 \
+BAYESILISK_OLLAMA_MODEL=nomic-embed-text \
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --format json
+```
+
+Equivalent CLI flags:
+
+```sh
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json \
+  --enable-embeddings \
+  --embedding-model nomic-embed-text \
+  --attention-threshold 0.4 \
+  --attention-selection-limit 3
+```
+
+Attention answers:
+
+```text
+Where should Bayesilisk look next?
+```
+
+### Scenario Proposer Model
+
+To let a local or API-backed model suggest extra candidates:
+
+```sh
+BAYESILISK_USE_OLLAMA_SCENARIO_MODEL=1 \
+BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b \
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --format json
+```
+
+Equivalent CLI flags:
+
+```sh
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json \
+  --enable-scenario-proposer \
+  --scenario-provider ollama \
+  --scenario-model gemma4:e2b \
+  --scenario-proposal-limit 3 \
+  --ollama-base-url http://localhost:11434
+```
+
+Model output is accepted only if it uses known fragment and invariant ids,
+targets a selected attention plane, and passes schema validation.
+
+Reports include `effectiveConfiguration`, which records the effective settings
+used for attention and scenario-proposer layers.
+
+## Test And Docs
+
+Run the full test suite:
+
+```sh
+python3 -m pytest
+```
+
+CI deliberately runs deterministic tests and the docs build without Ollama,
+browser services, or hidden local state:
+
+```sh
+python3 -m pytest -m "not live_playwright and not live_ollama"
+sphinx-build -b html docs docs/_build/html
+```
+
+Opt-in local live checks:
+
+```sh
+python3 -m pytest tests/test_live_integrations.py -m live_playwright -rs
+BAYESILISK_LIVE_OLLAMA=1 python3 -m pytest tests/test_live_integrations.py -m live_ollama -rs
+```
+
+Build docs locally:
 
 ```sh
 python3 -m pip install -r docs/requirements.txt
 sphinx-build -b html docs docs/_build/html
 ```
 
-## Development Notes
+Key docs:
 
-The test suite includes scenario-matrix coverage:
-
-- every catalog scenario must reference valid fragments and invariants;
-- every invariant must have at least one passing control and one failing
-  bad-spot case in the deterministic catalog;
-- Playwright, Grassmann attention, and model proposals must not override
-  finite-state verifier results.
-
-Current public planning issues are tracked in GitHub Issues.
-
-## Acknowledgments
-
-Thanks to OpenAI for providing model access — including the early ChatGPT-5.5
-preview — which enabled fast deployment of the initial version of Bayesilisk.
+- [docs/quickstart.md](docs/quickstart.md)
+- [docs/connector-quickstart.md](docs/connector-quickstart.md)
+- [docs/connectors.md](docs/connectors.md)
+- [docs/motifs.md](docs/motifs.md)
+- [docs/connector-loop.md](docs/connector-loop.md)
+- [docs/codex-mcp.md](docs/codex-mcp.md)
 
 ## Boundaries
 
-Bayesilisk is a verifier and prioritizer, not an authorization engine. It must
-not connect to production systems, inspect live customer data, create migrations,
-or emit internal platform claims as customer package claims.
+Bayesilisk is a verifier and prioritizer. It is not:
+
+- an authorization engine;
+- a production scanner;
+- a live customer data inspection tool;
+- an issue tracker mutator;
+- an LLM oracle.
+
+Coding agents may help collect requirements, draft connectors, run local
+fixtures, and prepare repairs from verified findings. They must not author
+observed evidence, `passed`, or `issueReadiness`.
+
+## Acknowledgments
+
+Thanks to OpenAI for providing model access, including early ChatGPT-5.5
+preview access, which helped accelerate the initial Bayesilisk buildout.

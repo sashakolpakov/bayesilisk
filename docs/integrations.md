@@ -1,10 +1,94 @@
 # Integrations
 
-Bayesilisk integrations are optional. The deterministic CLI remains usable with standard-library Python only.
+All integrations are optional; the deterministic CLI works with standard-library
+Python only. The primary integration is the `mcp/agent-bound` route — a coding
+agent such as Codex driving the local MCP server — covered first below. The
+optional sensor and model layers follow. In every case a connector, browser
+trace, or model only proposes where to look; only deterministic verification
+over connector-returned evidence produces issue-ready findings.
 
 For app-specific adapters, see {doc}`connectors`. Connector code belongs in the
-target app or test repo. Test teams should not patch Bayesilisk core to support
-one application.
+target app or test repo, never patched into Bayesilisk core.
+
+## MCP Server
+
+Bayesilisk includes a local stdio MCP tool server:
+
+```sh
+bayesilisk-mcp
+```
+
+From a checkout, the module form is equivalent:
+
+```sh
+python3 -m bayesilisk.mcp_server
+```
+
+By default the server writes only MCP JSON-RPC frames on `stdout` and stays
+quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
+you want the ASCII startup banner.
+
+Verifier tools:
+
+- `run`: run a contextual report.
+- `rank_context`: return ranked failed probes from supplied context.
+- `issue_payloads`: return deduped issue payloads for ready failed
+  findings.
+- `propose_probes`: expand connector-supplied rules and action
+  graphs into probe proposals.
+
+Motif and loop tools:
+
+- `list_motifs`: list motif-library packs and unlocked motifs.
+- `bind_motifs`: bind motifs to a source context and expand proposals.
+- `connector_loop`: advance the closed connector loop one step.
+
+Codex orchestration tools:
+
+- `connector_quickstart`;
+- `interview_connector_need`;
+- `establish_provenance`;
+- `connector_prompt_packet`;
+- `scenario_plan`;
+- `verify_connector_outputs`;
+- `fix_packet`.
+
+The MCP tools accept the same control names as JSON arguments:
+`enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
+`scenarioProvider`, `scenarioModel`, `scenarioProposalLimit`,
+`scenarioBaseUrl`, `scenarioApiKeyEnv`, `attentionThreshold`,
+`attentionSelectionLimit`, and `ollamaBaseUrl`.
+
+The MCP server runs locally and does not mutate issue trackers or production systems.
+
+For Codex configuration and connector onboarding, see {doc}`codex-mcp`.
+
+## Coding Agent Loop
+
+A Codex-style agent can use Bayesilisk MCP as the cheap local drill layer:
+
+1. Call `interview_connector_need`.
+2. Call `establish_provenance`.
+3. Call `connector_prompt_packet`.
+4. Write connector code and source context in the target app or test repo.
+5. Call `scenario_plan` or `propose_probes`.
+6. Run the app-specific connector against local fixtures.
+7. Call `verify_connector_outputs`.
+8. Call `fix_packet` only for verified issue-ready findings.
+
+A coding agent may draft connector context, action mappings, and repair briefs,
+but it cannot author observed evidence, `passed`, or issue readiness — those are
+verifier-owned.
+
+If a local model/API is configured, pass `enableScenarioProposer=true` plus
+`scenarioProvider`, `scenarioModel`, and base URL/API-key settings to
+`run`. Model proposals stay untrusted; Bayesilisk validates them
+before deterministic verification.
+
+To auto-generate probes instead of hand-writing rules, bind the motif library
+(`list_motifs` / `bind_motifs`, or `bayesilisk connector scan --bind-motifs`),
+and drive the whole cycle with `connector_loop`. See {doc}`motifs` and
+{doc}`connector-loop`.
 
 ## Microsoft Playwright
 
@@ -122,82 +206,6 @@ BAYESILISK_LIVE_OLLAMA=1 BAYESILISK_OLLAMA_SCENARIO_MODEL=gemma4:e2b python3 -m 
 
 The GitHub CI workflow skips live Playwright and live Ollama tests by default,
 because it does not assume installed browsers or a local model service.
-
-## MCP Server
-
-Bayesilisk includes a local stdio MCP tool server:
-
-```sh
-bayesilisk-mcp
-```
-
-From a checkout, the module form is equivalent:
-
-```sh
-python3 -m bayesilisk.mcp_server
-```
-
-By default the server writes only MCP JSON-RPC frames on `stdout` and stays
-quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
-you want the ASCII startup banner.
-
-Verifier tools:
-
-- `run`: run a contextual report.
-- `rank_context`: return ranked failed probes from supplied context.
-- `issue_payloads`: return deduped issue payloads for ready failed
-  findings.
-- `propose_probes`: expand connector-supplied rules and action
-  graphs into probe proposals.
-
-Motif and loop tools:
-
-- `list_motifs`: list motif-library packs and unlocked motifs.
-- `bind_motifs`: bind motifs to a source context and expand proposals.
-- `connector_loop`: advance the closed connector loop one step.
-
-Codex orchestration tools:
-
-- `connector_quickstart`;
-- `interview_connector_need`;
-- `establish_provenance`;
-- `connector_prompt_packet`;
-- `scenario_plan`;
-- `verify_connector_outputs`;
-- `fix_packet`.
-
-The MCP tools accept the same control names as JSON arguments:
-`enableEmbeddings`, `embeddingModel`, `enableScenarioProposer`,
-`scenarioProvider`, `scenarioModel`, `scenarioProposalLimit`,
-`scenarioBaseUrl`, `scenarioApiKeyEnv`, `attentionThreshold`,
-`attentionSelectionLimit`, and `ollamaBaseUrl`.
-
-The MCP server runs locally and does not mutate issue trackers or production systems.
-
-For Codex configuration and connector onboarding, see {doc}`codex-mcp`.
-
-## Coding Agent Loop
-
-A Codex-style agent can use Bayesilisk MCP as the cheap local drill layer:
-
-1. Call `interview_connector_need`.
-2. Call `establish_provenance`.
-3. Call `connector_prompt_packet`.
-4. Write connector code and source context in the target app or test repo.
-5. Call `scenario_plan` or `propose_probes`.
-6. Run the app-specific connector against local fixtures.
-7. Call `verify_connector_outputs`.
-8. Call `fix_packet` only for verified issue-ready findings.
-
-If a local model/API is configured, pass `enableScenarioProposer=true` plus
-`scenarioProvider`, `scenarioModel`, and base URL/API-key settings to
-`run`. Model proposals stay untrusted; Bayesilisk validates them
-before deterministic verification.
-
-To auto-generate probes instead of hand-writing rules, bind the motif library
-(`list_motifs` / `bind_motifs`, or `bayesilisk connector scan --bind-motifs`),
-and drive the whole cycle with `connector_loop`. See {doc}`motifs` and
-{doc}`connector-loop`.
 
 ## GitHub Issues
 

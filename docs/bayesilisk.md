@@ -1,10 +1,10 @@
 # Bayesilisk
 
-Bayesilisk is a deterministic local layer for permission, entitlement, route, and data-boundary sitting over Playwright, with Grassmann attention, and LLM-generated scenario-proposal workflows gated by a finite-state verifier.
+Bayesilisk is a deterministic verifier for authorization, route, entitlement, and data-boundary testing. Connectors declare a bounded application surface, Bayesilisk expands and validates candidate probes, and only deterministic verification over connector-returned evidence can produce issue-ready findings.
 
-It combines explicit rule invariants with Bayesian-style prioritization so tester and agent workflows can generate reproducible JSON, Markdown, and issue-ready findings.
+It combines explicit invariants with Bayesian-style prioritization so tester and agent workflows can generate reproducible JSON, Markdown, and issue-ready findings without letting a model or browser trace act as the oracle.
 
-Bayesilisk has no production access. It uses static scenario fragments from the repository, a caller-provided seed, and standard-library Python only.
+Bayesilisk has no production access. It uses connector-declared context, a caller-provided seed, optional local evidence, and standard-library Python only in the core package.
 
 ## Layers
 

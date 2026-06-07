@@ -6,18 +6,21 @@
 :align: center
 ```
 
-Bayesilisk is a deterministic local layer for permission, entitlement, route,
-and data-boundary sitting over Playwright, with Grassmann attention, and
-LLM-generated scenario-proposal workflows gated by a finite-state verifier.
+Bayesilisk is a deterministic verifier for authorization, route, entitlement,
+and data-boundary testing. Connectors declare a bounded application surface,
+Bayesilisk expands and validates candidate probes, and only deterministic
+verification over connector-returned evidence can produce issue-ready findings.
 
 **Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the Oracle.**
 
 It is built for testers and agents that need reproducible findings, stable
 fingerprints, and issue-ready output without granting a model authority over the
-final verdict.
+final verdict. It runs in two routes over the same deterministic core: a `local`
+CLI route, and an `mcp/agent-bound` route where a coding agent such as Codex
+drives the loop through the local MCP server.
 
 ```text
-Playwright is the sensor.
+The connector or Playwright probe is the sensor.
 Grassmann attention is the router.
 The scenario proposer model is the proposer.
 Bayesilisk is the judge.
@@ -26,7 +29,7 @@ Bayesilisk is the judge.
 The rule engine remains deterministic:
 
 ```text
-scenario facts -> invariant checks -> pass/fail -> Bayesian ranking
+scenario proposal -> contract validation -> connector execution -> deterministic verification
 ```
 
 ```{toctree}
@@ -52,8 +55,9 @@ bayesilisk
 Complex application suites often have permission and data-boundary bugs that
 cross feature lines: HR documents plus support takeover, expenses plus DMS
 receipts, travel funding plus approval routes, or billing exports plus customer
-module entitlements. Bayesilisk provides a local way to compose those cases,
-evaluate explicit invariants, and rank findings for follow-up work.
+module entitlements. Bayesilisk provides a local way to declare that app
+surface, compose those cases, evaluate explicit invariants, and rank findings
+for follow-up work.
 
 ## What It Does Not Do
 

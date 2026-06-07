@@ -5,6 +5,7 @@
 ```text
 bayesilisk/
   constants.py           shared constant data and public version string
+  config.py              runtime configuration resolution
   types.py               core dataclasses
   catalog.py             scenario fragments and scenario catalog
   invariants.py          deterministic invariant evaluators
@@ -12,14 +13,18 @@ bayesilisk/
   context.py             context, observations, and probe-fact ingestion
   attention.py           Grassmann attention surfaces
   model_proposals.py     scenario proposer provider surfaces
+  probe_proposals.py     connector rule/action-graph probe expansion
   connector_orchestration.py Codex MCP connector interview, provenance, planning, validation, and fix packets
+  connector_cli.py       `bayesilisk connector` subcommands
+  connector_scan.py      deterministic API-surface scanner
+  connector_loop.py      stateless closed-loop controller
+  motifs/                category-theory motif library, packs, and binder
   reporting.py           report and issue-payload surfaces
   cli.py                 command-line entry point
   demo.py                local workflow pressure demo command
+  realistic_demo.py      realistic local permission-app demo
   playwright_adapter.py  Playwright observation adapter
   mcp_server.py          stdio MCP server
-demo/
-  playwright_target.html local browser-probe target
 docs/
   *.md                   Sphinx/MyST documentation
 tests/
