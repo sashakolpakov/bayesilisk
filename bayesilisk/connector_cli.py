@@ -28,6 +28,7 @@ from .connector_orchestration import (
     validate_source_context,
     verify_connector_outputs,
 )
+from .connector_loop import advance as loop_advance
 from .connector_scan import load_spec, scan_openapi
 from .motifs import available_motifs, bind_motifs, load_packs
 from .probe_proposals import generate_probe_proposals
@@ -268,6 +269,27 @@ def _cmd_motifs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_loop(args: argparse.Namespace) -> int:
+    state = _load_json(args.state) if args.state.exists() else None
+    result = loop_advance(
+        state,
+        spec=load_spec(args.spec) if args.spec else None,
+        source_context=_load_json(args.source) if args.source else None,
+        observed_context=_load_json(args.observed) if args.observed else None,
+        packs=_packs_from_args(args),
+        license_token=getattr(args, "license", None),
+        max_rounds=args.max_rounds,
+        max_dry_rounds=args.max_dry_rounds,
+    )
+    args.state.write_text(_dump(result["state"]) + "\n", encoding="utf-8")
+    _eprint(f"[{result['phase']}] round {result['round']}")
+    _eprint(result["nextAction"])
+    if "newFindingCount" in result:
+        _eprint(f"  new findings: {result['newFindingCount']} | total issue payloads: {len(result.get('issuePayloads', []))}")
+    _emit(_dump({key: value for key, value in result.items() if key != "state"}), args.output)
+    return 1 if result["phase"] == "blocked" else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bayesilisk connector",
@@ -309,6 +331,18 @@ def build_parser() -> argparse.ArgumentParser:
     motifs_parser.add_argument("--pack", type=Path, action="append", help="Extra motif pack file/dir (repeatable).")
     motifs_parser.add_argument("--license", default=None, help="License token or path (or set BAYESILISK_LICENSE).")
     motifs_parser.set_defaults(func=_cmd_motifs)
+
+    loop_parser = sub.add_parser("loop", help="Advance the closed connector loop one step (agent-driven).")
+    loop_parser.add_argument("--state", type=Path, required=True, help="Loop state JSON (created if missing).")
+    loop_parser.add_argument("--spec", type=Path, default=None, help="OpenAPI spec to scan on the first step.")
+    loop_parser.add_argument("--source", type=Path, default=None, help="Source context JSON to start from instead of a spec.")
+    loop_parser.add_argument("--observed", type=Path, default=None, help="Observed-context JSON from connector execution.")
+    loop_parser.add_argument("--pack", type=Path, action="append", help="Extra motif pack file/dir (repeatable).")
+    loop_parser.add_argument("--license", default=None, help="License token or path (or set BAYESILISK_LICENSE).")
+    loop_parser.add_argument("--max-rounds", type=int, default=None, help="Round cap (default 6).")
+    loop_parser.add_argument("--max-dry-rounds", type=int, default=None, help="Stop after K dry rounds (default 2).")
+    loop_parser.add_argument("--output", type=Path, default=None, help="Write the step result JSON to a file instead of stdout.")
+    loop_parser.set_defaults(func=_cmd_loop)
 
     verify_parser = sub.add_parser("verify", help="Run deterministic verification over observed evidence.")
     verify_parser.add_argument("--source", type=Path, default=None, help="Source-context JSON (for explanation).")

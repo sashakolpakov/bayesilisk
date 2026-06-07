@@ -102,6 +102,12 @@ bayesilisk connector motifs               # list packs/motifs (core free; premiu
 A free `core` pack ships in the package; premium packs are unlocked by an offline
 signed license. See [docs/motifs.md](docs/motifs.md).
 
+To run the whole thing as a closed loop, `bayesilisk connector loop` does every
+deterministic step (scan → bind → validate → verify → fix), tracks convergence,
+and returns the exact next action for the agent's execute step — Bayesilisk stays
+the deterministic gate and never decides the verdict. See
+[docs/connector-loop.md](docs/connector-loop.md).
+
 Run the test suite:
 
 ```sh

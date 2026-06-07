@@ -18,6 +18,7 @@ if __package__ in {None, ""}:
         scenario_plan,
         verify_connector_outputs,
     )
+    from bayesilisk.connector_loop import advance as loop_advance  # type: ignore[no-redef]
     from bayesilisk.constants import VERSION  # type: ignore[no-redef]
     from bayesilisk.motifs import (  # type: ignore[no-redef]
         available_motifs,
@@ -32,6 +33,7 @@ if __package__ in {None, ""}:
     )
 else:
     from .config import effective_runtime_config
+    from .connector_loop import advance as loop_advance
     from .connector_orchestration import (
         connector_prompt_packet,
         connector_quickstart,
@@ -156,6 +158,23 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "limit": {"type": ["integer", "null"], "default": 24},
             },
             "required": ["sourceContext"],
+        },
+    },
+    {
+        "name": "connector_loop",
+        "description": "Advance the closed connector loop one step: does all deterministic work (scan/bind/validate/verify/fix), tracks convergence, and returns the exact next action for the agent's execute step. Pass the returned state back in each call.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "state": {"type": "object"},
+                "spec": {"type": "object"},
+                "sourceContext": {"type": "object"},
+                "observedContext": {"type": "object"},
+                "packs": {"type": "array", "items": {"type": "string"}},
+                "license": {"type": "string"},
+                "maxRounds": {"type": "integer"},
+                "maxDryRounds": {"type": "integer"},
+            },
         },
     },
     {
@@ -409,6 +428,17 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 "proposals": generate_probe_proposals(bound, limit=limit),
                 "tool": VERSION,
             }
+        elif name == "connector_loop":
+            payload = loop_advance(
+                arguments.get("state"),
+                spec=arguments.get("spec"),
+                source_context=arguments.get("sourceContext"),
+                observed_context=arguments.get("observedContext"),
+                packs=arguments.get("packs", []) or [],
+                license_token=arguments.get("license"),
+                max_rounds=arguments.get("maxRounds"),
+                max_dry_rounds=arguments.get("maxDryRounds"),
+            )
         elif name == "connector_quickstart":
             payload = connector_quickstart(arguments)
         elif name == "interview_connector_need":
