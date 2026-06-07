@@ -19,6 +19,11 @@ if __package__ in {None, ""}:
         verify_connector_outputs,
     )
     from bayesilisk.constants import VERSION  # type: ignore[no-redef]
+    from bayesilisk.motifs import (  # type: ignore[no-redef]
+        available_motifs,
+        bind_motifs,
+        load_packs,
+    )
     from bayesilisk.probe_proposals import generate_probe_proposals  # type: ignore[no-redef]
     from bayesilisk.reporting import (  # type: ignore[no-redef]
         build_contextual_report,
@@ -37,6 +42,7 @@ else:
         verify_connector_outputs,
     )
     from .constants import VERSION
+    from .motifs import available_motifs, bind_motifs, load_packs
     from .probe_proposals import generate_probe_proposals
     from .reporting import build_contextual_report, issue_payloads, ranked_probes
 
@@ -125,6 +131,31 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "context": {"type": "object"},
                 "limit": {"type": ["integer", "null"], "default": 24},
             },
+        },
+    },
+    {
+        "name": "list_motifs",
+        "description": "List motif-library packs and unlocked motifs (the app-agnostic library of authorization/data-boundary probes). Premium packs show as locked without a license.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "license": {"type": "string"},
+                "packs": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    {
+        "name": "bind_motifs",
+        "description": "Bind motif-library probes to a connector source context, returning an augmented context (proposalRules + sequenceRules) plus the expanded proposals.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sourceContext": {"type": "object"},
+                "license": {"type": "string"},
+                "packs": {"type": "array", "items": {"type": "string"}},
+                "limit": {"type": ["integer", "null"], "default": 24},
+            },
+            "required": ["sourceContext"],
         },
     },
     {
@@ -353,6 +384,29 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
             payload = {
                 "proposalCount": len(proposals),
                 "proposals": proposals,
+                "tool": VERSION,
+            }
+        elif name == "list_motifs":
+            extra_packs = arguments.get("packs", []) or []
+            packs = load_packs(license_token=arguments.get("license"), extra_packs=extra_packs)
+            payload = {
+                "packs": [{key: pack[key] for key in ("packId", "version", "tier", "title", "unlocked", "reason", "motifCount")} for pack in packs],
+                "motifs": available_motifs(license_token=arguments.get("license"), extra_packs=extra_packs),
+                "tool": VERSION,
+            }
+        elif name == "bind_motifs":
+            source_context = arguments.get("sourceContext", {})
+            if not isinstance(source_context, dict):
+                raise ValueError("sourceContext must be an object")
+            extra_packs = arguments.get("packs", []) or []
+            motifs = available_motifs(license_token=arguments.get("license"), extra_packs=extra_packs)
+            bound = bind_motifs(source_context, motifs)
+            limit = arguments.get("limit", 24)
+            limit = int(limit) if limit is not None else 24
+            payload = {
+                "boundContext": bound,
+                "boundMotifCount": len(motifs),
+                "proposals": generate_probe_proposals(bound, limit=limit),
                 "tool": VERSION,
             }
         elif name == "connector_quickstart":

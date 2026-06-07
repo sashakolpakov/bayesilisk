@@ -90,6 +90,18 @@ agents get the same loop over MCP starting from the `connector_quickstart` tool.
 See the full walkthrough in [docs/connector-quickstart.md](docs/connector-quickstart.md)
 and the contract in [docs/connectors.md](docs/connectors.md).
 
+To auto-generate probes instead of hand-writing `proposalRules`, scan an app and
+bind the motif library — the app-agnostic catalog of authorization/data-boundary
+probes:
+
+```sh
+bayesilisk connector scan openapi.json --bind-motifs --output source-context.json
+bayesilisk connector motifs               # list packs/motifs (core free; premium gated)
+```
+
+A free `core` pack ships in the package; premium packs are unlocked by an offline
+signed license. See [docs/motifs.md](docs/motifs.md).
+
 Run the test suite:
 
 ```sh

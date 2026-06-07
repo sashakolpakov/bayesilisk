@@ -1,0 +1,42 @@
+{
+  "packId": "bayesilisk.premium.advanced-workflows",
+  "version": "0.1.0",
+  "tier": "premium",
+  "title": "Bayesilisk Premium Advanced-Workflow Motifs (example template)",
+  "provenance": "Template for a gated premium pack. Replace motifs with curated content, then sign it with tools/bayesilisk_pack_sign.py and distribute to licensed users.",
+  "references": ["OWASP API Security Top 10 (2023)"],
+  "motifs": [
+    {
+      "motifId": "premium.cross-tenant-export-replay",
+      "kind": "workflow-sequence",
+      "family": "tenant-isolation",
+      "severity": "critical",
+      "confidence": "heuristic",
+      "rationale": "An export job id created in one tenant must not be replayable to download another tenant's data.",
+      "references": ["OWASP-API1:2023", "OWASP-API5:2023"],
+      "requiresTokens": [
+        {"token": "resource.public_id"},
+        {"token": "scope.foreign"},
+        {"token": "capability.export"}
+      ],
+      "pattern": ["create export in tenant A", "obtain export id", "download export id as tenant B"],
+      "goalBinding": {"param": "exportId", "token": {"token": "resource.public_id"}},
+      "expectedBehavior": {"status": 403, "alt": [404]}
+    },
+    {
+      "motifId": "premium.approval-bypass-via-reorder",
+      "kind": "workflow-sequence",
+      "family": "workflow-ordering",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "A multi-step approval must not be completable by skipping or reordering a required approval gate.",
+      "references": ["OWASP-API5:2023"],
+      "requiresTokens": [
+        {"token": "capability.approve"},
+        {"token": "state.active"}
+      ],
+      "pattern": ["create request", "skip required approval gate", "execute approved-only action"],
+      "expectedBehavior": {"status": 403, "alt": [409]}
+    }
+  ]
+}

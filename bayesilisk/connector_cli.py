@@ -28,6 +28,8 @@ from .connector_orchestration import (
     validate_source_context,
     verify_connector_outputs,
 )
+from .connector_scan import load_spec, scan_openapi
+from .motifs import available_motifs, bind_motifs, load_packs
 from .probe_proposals import generate_probe_proposals
 from .reporting import markdown_report
 
@@ -152,11 +154,26 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 0 if validation["accepted"] else 1
 
 
+def _packs_from_args(args: argparse.Namespace) -> list[str]:
+    return [str(path) for path in (getattr(args, "pack", None) or [])]
+
+
+def _motifs_from_args(args: argparse.Namespace) -> list[dict[str, Any]]:
+    return available_motifs(
+        license_token=getattr(args, "license", None),
+        extra_packs=_packs_from_args(args),
+    )
+
+
 def _cmd_propose(args: argparse.Namespace) -> int:
     context = _load_json(args.context)
     if not isinstance(context, dict):
         _eprint("FAIL: context file is not a JSON object")
         return 1
+    if getattr(args, "bind_motifs", False):
+        motifs = _motifs_from_args(args)
+        context = bind_motifs(context, motifs)
+        _eprint(f"bound {len(motifs)} motif(s) from {len(_packs_from_args(args)) + 1} pack source(s)")
     limit = args.limit if args.limit is not None else 24
     proposals = generate_probe_proposals(context, limit=limit)
     _emit(_dump(proposals), args.output)
@@ -214,6 +231,43 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_scan(args: argparse.Namespace) -> int:
+    spec = load_spec(args.spec)
+    context = scan_openapi(spec)
+    fact_count = len(context["repositoryFacts"])
+    if args.bind_motifs:
+        motifs = _motifs_from_args(args)
+        context = bind_motifs(context, motifs)
+        _eprint(f"scanned {fact_count} route(s); bound {len(motifs)} motif(s)")
+    else:
+        _eprint(f"scanned {fact_count} route(s); pass --bind-motifs to add probe rules")
+    _emit(_dump(context), args.output)
+    if args.output is not None:
+        _eprint("next: bayesilisk connector validate " + str(args.output))
+    return 0
+
+
+def _cmd_motifs(args: argparse.Namespace) -> int:
+    packs = load_packs(license_token=getattr(args, "license", None), extra_packs=_packs_from_args(args))
+    if args.show:
+        for motif in _motifs_from_args(args):
+            if motif.get("motifId") == args.show:
+                _emit(_dump(motif), None)
+                return 0
+        _eprint(f"no unlocked motif `{args.show}` found")
+        return 1
+    for pack in packs:
+        lock = "unlocked" if pack["unlocked"] else "LOCKED"
+        _eprint(f"[{lock}] {pack['packId']} ({pack['tier']}, v{pack['version']}) - {pack['motifCount']} motif(s): {pack['reason']}")
+        if not pack["valid"]:
+            for error in pack["errors"]:
+                _eprint(f"    error: {error}")
+        for motif in pack["motifs"]:
+            status = motif.get("expectedBehavior", {}).get("status")
+            _eprint(f"    - {motif['motifId']} [{motif['kind']}, {motif.get('severity')}] -> {status}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bayesilisk connector",
@@ -236,8 +290,25 @@ def build_parser() -> argparse.ArgumentParser:
     propose_parser = sub.add_parser("propose", help="Expand source-context proposal rules into probe proposals.")
     propose_parser.add_argument("context", type=Path, help="Path to the source-context JSON.")
     propose_parser.add_argument("--limit", type=int, default=None, help="Maximum proposals.")
+    propose_parser.add_argument("--bind-motifs", action="store_true", help="Bind motif-library probes before expanding.")
+    propose_parser.add_argument("--pack", type=Path, action="append", help="Extra motif pack file/dir (repeatable).")
+    propose_parser.add_argument("--license", default=None, help="License token or path (or set BAYESILISK_LICENSE).")
     propose_parser.add_argument("--output", type=Path, default=None, help="Write to a file instead of stdout.")
     propose_parser.set_defaults(func=_cmd_propose)
+
+    scan_parser = sub.add_parser("scan", help="Scan an OpenAPI spec into a draft source context.")
+    scan_parser.add_argument("spec", type=Path, help="Path to an OpenAPI JSON (or YAML with the [scan] extra).")
+    scan_parser.add_argument("--bind-motifs", action="store_true", help="Bind motif-library probes to the scanned routes.")
+    scan_parser.add_argument("--pack", type=Path, action="append", help="Extra motif pack file/dir (repeatable).")
+    scan_parser.add_argument("--license", default=None, help="License token or path (or set BAYESILISK_LICENSE).")
+    scan_parser.add_argument("--output", type=Path, default=None, help="Write to a file instead of stdout.")
+    scan_parser.set_defaults(func=_cmd_scan)
+
+    motifs_parser = sub.add_parser("motifs", help="List or show motif-library packs and motifs.")
+    motifs_parser.add_argument("--show", default=None, help="Print one motif by id (must be unlocked).")
+    motifs_parser.add_argument("--pack", type=Path, action="append", help="Extra motif pack file/dir (repeatable).")
+    motifs_parser.add_argument("--license", default=None, help="License token or path (or set BAYESILISK_LICENSE).")
+    motifs_parser.set_defaults(func=_cmd_motifs)
 
     verify_parser = sub.add_parser("verify", help="Run deterministic verification over observed evidence.")
     verify_parser.add_argument("--source", type=Path, default=None, help="Source-context JSON (for explanation).")
