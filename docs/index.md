@@ -40,6 +40,7 @@ integrations
 codex-mcp
 connector-quickstart
 connectors
+motifs
 examples
 development
 bayesilisk

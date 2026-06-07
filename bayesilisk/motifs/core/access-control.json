@@ -1,0 +1,145 @@
+{
+  "packId": "bayesilisk.core.access-control",
+  "version": "1.0.0",
+  "tier": "core",
+  "title": "Bayesilisk Core Access-Control Motifs",
+  "provenance": "Curated by the Bayesilisk maintainers from common authorization and data-boundary failure classes.",
+  "references": [
+    "OWASP API Security Top 10 (2023)",
+    "OWASP Authorization Cheat Sheet"
+  ],
+  "motifs": [
+    {
+      "motifId": "idor.unknown-id",
+      "kind": "param-mutation",
+      "family": "object-level-authorization",
+      "severity": "medium",
+      "confidence": "deterministic",
+      "rationale": "An identifier that does not resolve to any object must return not-found, not silently expose or fabricate state.",
+      "references": ["OWASP-API1:2023"],
+      "appliesTo": {"paramKind": "id", "tokens": ["resource.id", "resource.public_id"]},
+      "mutation": {"id": "unknown-id", "valueTemplate": "missing-{param}", "title": "unknown id"},
+      "expectedBehavior": {"status": 404}
+    },
+    {
+      "motifId": "bola.foreign-owned-id",
+      "kind": "param-mutation",
+      "family": "object-level-authorization",
+      "severity": "high",
+      "confidence": "deterministic",
+      "rationale": "A principal must not read or act on an object owned by another principal by swapping its identifier.",
+      "references": ["OWASP-API1:2023"],
+      "appliesTo": {"paramKind": "id", "tokens": ["resource.id", "resource.foreign_id"]},
+      "mutation": {"id": "foreign-owned-id", "valueTemplate": "foreign-{param}", "title": "foreign-owned id"},
+      "expectedBehavior": {"status": 403, "alt": [404]}
+    },
+    {
+      "motifId": "tenant.foreign-tenant-id",
+      "kind": "param-mutation",
+      "family": "tenant-isolation",
+      "severity": "high",
+      "confidence": "deterministic",
+      "rationale": "A principal must not reach a resource scoped to another tenant by swapping a tenant-scoped identifier.",
+      "references": ["OWASP-API1:2023", "OWASP-API5:2023"],
+      "appliesTo": {"paramKind": "tenant-id", "tokens": ["scope.tenant", "scope.foreign"]},
+      "mutation": {"id": "foreign-tenant-id", "valueTemplate": "foreign-tenant-{param}", "title": "foreign-tenant id"},
+      "expectedBehavior": {"status": 403, "alt": [404]}
+    },
+    {
+      "motifId": "lifecycle.stale-id",
+      "kind": "param-mutation",
+      "family": "lifecycle-state-replay",
+      "severity": "medium",
+      "confidence": "heuristic",
+      "rationale": "An identifier for a deleted or expired object must not resolve as if the object were still live.",
+      "references": ["OWASP-API1:2023"],
+      "appliesTo": {"paramKind": "id", "tokens": ["resource.stale_id", "state.deleted", "state.expired"]},
+      "mutation": {"id": "stale-id", "valueTemplate": "stale-{param}", "title": "stale id"},
+      "expectedBehavior": {"status": 410, "alt": [404]}
+    },
+    {
+      "motifId": "session.expired-token",
+      "kind": "param-mutation",
+      "family": "token-and-session",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "An expired credential or session token must be rejected, never accepted as still valid.",
+      "references": ["OWASP-API2:2023"],
+      "appliesTo": {"paramKind": "token", "tokens": ["identifier.reset_token", "session.authenticated", "state.expired"]},
+      "mutation": {"id": "expired-token", "valueTemplate": "expired-{param}", "title": "expired token"},
+      "expectedBehavior": {"status": 401, "alt": [410]}
+    },
+    {
+      "motifId": "identifier.replay-single-use-token",
+      "kind": "param-mutation",
+      "family": "token-and-session",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "A single-use token replayed after consumption must be rejected to prevent action replay.",
+      "references": ["OWASP-API2:2023"],
+      "appliesTo": {"paramKind": "token", "tokens": ["identifier.single_use_token", "identifier.replay_token", "state.revoked"]},
+      "mutation": {"id": "replay-token", "valueTemplate": "replayed-{param}", "title": "replayed single-use token"},
+      "expectedBehavior": {"status": 409, "alt": [401]}
+    },
+    {
+      "motifId": "bopla.mass-assignment-protected-field",
+      "kind": "param-mutation",
+      "family": "property-level-authorization",
+      "severity": "medium",
+      "confidence": "heuristic",
+      "rationale": "A client-supplied value for a server-controlled property must not be honored (mass assignment).",
+      "references": ["OWASP-API3:2023"],
+      "appliesTo": {"paramKind": "field", "tokens": ["capability.write"]},
+      "mutation": {"id": "protected-field-override", "valueTemplate": "escalated-{param}", "title": "protected field override"},
+      "expectedBehavior": {"status": 403, "alt": [400]}
+    },
+    {
+      "motifId": "lifecycle.cancelled-replay",
+      "kind": "workflow-sequence",
+      "family": "lifecycle-state-replay",
+      "severity": "high",
+      "confidence": "deterministic",
+      "rationale": "Replaying a public identifier of a cancelled resource across a boundary must be rejected.",
+      "references": ["OWASP-API1:2023"],
+      "requiresTokens": [
+        {"token": "resource.public_id"},
+        {"token": "state.cancelled"}
+      ],
+      "pattern": ["create resource", "transition to cancelled state", "replay old public identifier across boundary"],
+      "goalBinding": {"param": "rescheduleUid", "token": {"token": "resource.public_id"}},
+      "expectedBehavior": {"status": 409, "alt": [410]}
+    },
+    {
+      "motifId": "session.revoked-privilege-reuse",
+      "kind": "workflow-sequence",
+      "family": "function-level-authorization",
+      "severity": "critical",
+      "confidence": "heuristic",
+      "rationale": "After a privilege is revoked or a session is downgraded, a stale privileged session must not still act.",
+      "references": ["OWASP-API5:2023"],
+      "requiresTokens": [
+        {"token": "session.impersonated"},
+        {"token": "state.revoked"},
+        {"token": "capability.write"}
+      ],
+      "pattern": ["create privileged context", "revoke or downgrade privilege", "reuse stale privileged session"],
+      "expectedBehavior": {"status": 403, "alt": [401]}
+    },
+    {
+      "motifId": "invitation.revoked-accept",
+      "kind": "workflow-sequence",
+      "family": "lifecycle-state-replay",
+      "severity": "high",
+      "confidence": "heuristic",
+      "rationale": "An invitation token that was revoked must not be acceptable afterwards.",
+      "references": ["OWASP-API1:2023"],
+      "requiresTokens": [
+        {"token": "identifier.invitation_token"},
+        {"token": "state.revoked"}
+      ],
+      "pattern": ["create invitation", "revoke invitation", "accept revoked invitation token"],
+      "goalBinding": {"param": "invitationToken", "token": {"token": "identifier.invitation_token"}},
+      "expectedBehavior": {"status": 410, "alt": [409]}
+    }
+  ]
+}
