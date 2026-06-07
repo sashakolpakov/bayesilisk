@@ -663,6 +663,11 @@ The test suite includes scenario-matrix coverage:
 
 Current public planning issues are tracked in GitHub Issues.
 
+## Acknowledgments
+
+Thanks to OpenAI for providing model access — including the early ChatGPT-5.5
+preview — which enabled fast deployment of the initial version of Bayesilisk.
+
 ## Boundaries
 
 Bayesilisk is a verifier and prioritizer, not an authorization engine. It must

@@ -64,3 +64,34 @@ The `connector_loop` tool is the same controller for agents: pass `state` (plus
 on the next call. See {doc}`motifs` for the motif library the loop binds and
 {doc}`connectors` for the connector contract the agent fulfills during the execute
 step.
+
+## Fully automated drive (Claude Code workflow)
+
+For hands-off runs against a **locally-running** app, the repository ships a
+Claude Code workflow at `.claude/workflows/connector-loop.js`. It drives the same
+deterministic controller, spawning a sub-agent only for the irreducible execute
+step:
+
+```text
+Init:  loop CLI scans the spec, binds motifs, returns proposals
+Drive: per round →
+         execute sub-agent: performs the real probes against the app,
+                            writes observed-context.json (never fabricates status)
+         loop CLI:          verifies, repairs, checks convergence
+       … until converged / blocked / round cap
+```
+
+Run it from Claude Code with config in `args` (the app must already be reachable,
+or pass `serveCommand` to start it):
+
+```text
+Workflow connector-loop {
+  "spec": "openapi.json",
+  "appBaseUrl": "http://localhost:3000",
+  "maxRounds": 6
+}
+```
+
+Bayesilisk still owns scan/bind/validate/verify/fix and the verdict; the sub-agent
+only executes real local actions and reports observed status. Open issues only
+from the accumulated verified issue payloads.
