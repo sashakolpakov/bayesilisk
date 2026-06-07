@@ -17,7 +17,7 @@ By default, the MCP process writes only framed MCP JSON-RPC messages on
 `stdout` and stays quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` for manual
 runs if you want the ASCII startup banner.
 
-## Install From GitHub
+## Install
 
 Until Bayesilisk is published to PyPI, install it from GitHub.
 
@@ -64,14 +64,14 @@ be equivalent:
 python3 -m pip install bayesilisk
 ```
 
-## Configure Codex
+## MCP Setup
 
 Codex MCP servers are configured under `[mcp_servers.<id>]` in Codex config.
 The OpenAI Codex configuration reference documents `command`, `args`, `cwd`,
 `startup_timeout_sec`, and `tool_timeout_sec` for MCP servers:
 <https://developers.openai.com/codex/config-reference>.
 
-Preferred configuration after installing Bayesilisk:
+Codex example:
 
 ```toml
 [mcp_servers.bayesilisk]
@@ -99,6 +99,27 @@ and using `command = "bayesilisk-mcp"` so no checkout path is needed.
 
 Restart Codex after changing MCP configuration. In Codex, check the MCP tool
 list with the normal MCP status UI or command for your Codex client.
+
+Other coding agents should use the same launch command in their MCP config:
+
+- installed package: `bayesilisk-mcp`
+- checkout/module form: `python3 -m bayesilisk.mcp_server`
+
+## Run The Local Verifier
+
+You can verify the local install before using it through an agent:
+
+```sh
+python3 -m bayesilisk --seed 150 --format json
+python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
+python3 -m bayesilisk --seed 150 --context /tmp/bayesilisk-context.json --issue-payloads
+```
+
+The installed console entry point is equivalent:
+
+```sh
+bayesilisk --seed 150 --format json
+```
 
 ## Start A Connector Session
 

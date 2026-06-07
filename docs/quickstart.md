@@ -43,21 +43,7 @@ For documentation work:
 python3 -m pip install -r docs/requirements.txt
 ```
 
-## Run the Verifier
-
-```sh
-python3 -m bayesilisk --seed 150 --format json
-python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
-python3 -m bayesilisk --seed 150 --generated-count 16 --format json
-```
-
-The installed console entry point is equivalent:
-
-```sh
-bayesilisk --seed 150 --format json
-```
-
-## Run The MCP Server
+## MCP Setup
 
 After installation, start the local stdio MCP server with:
 
@@ -75,7 +61,7 @@ By default the MCP server writes only MCP JSON-RPC frames on `stdout` and stays
 quiet on `stderr`. Set `BAYESILISK_MCP_BANNER=1` when running it manually if
 you want the ASCII startup banner.
 
-To use Bayesilisk from Codex, add an MCP server entry to Codex config:
+Codex example:
 
 ```toml
 [mcp_servers.bayesilisk]
@@ -99,6 +85,25 @@ tool_timeout_sec = 120
 ```
 
 See {doc}`codex-mcp` for the full Codex connector workflow.
+
+Other coding agents should use the same launch command in their MCP config:
+
+- installed package: `bayesilisk-mcp`
+- checkout/module form: `python3 -m bayesilisk.mcp_server`
+
+## Run The Local Verifier
+
+```sh
+python3 -m bayesilisk --seed 150 --format json
+python3 -m bayesilisk --seed 150 --format markdown --output /tmp/bayesilisk.md
+python3 -m bayesilisk --seed 150 --generated-count 16 --format json
+```
+
+The installed console entry point is equivalent:
+
+```sh
+bayesilisk --seed 150 --format json
+```
 
 ## Probe Your Own App
 

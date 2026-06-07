@@ -101,9 +101,9 @@ python3 -m pip install -e '.[playwright]'
 python3 -m playwright install chromium
 ```
 
-### 2. Codex Setup First
+### 2. MCP Setup
 
-If you want Bayesilisk through Codex, start here.
+If you want Bayesilisk through a coding agent, configure the local MCP server.
 
 Run the local MCP server:
 
@@ -117,7 +117,7 @@ From a checkout, the module form is equivalent:
 python3 -m bayesilisk.mcp_server
 ```
 
-Then add Bayesilisk to Codex config:
+Codex example:
 
 ```toml
 [mcp_servers.bayesilisk]
@@ -140,7 +140,7 @@ tool_timeout_sec = 120
 
 Restart Codex after changing MCP config.
 
-The launch command is the same across clients:
+Other coding agents:
 
 - installed package: `bayesilisk-mcp`
 - checkout/module form: `python3 -m bayesilisk.mcp_server`
