@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bayesilisk.local/schemas/motif-pack.schema.json",
   "title": "Bayesilisk motif pack",
-  "description": "A versioned, app-agnostic library of authorization and data-boundary probe motifs. Motifs are templates that expand into proposalRules and connectorActionGraph.sequenceRules; they never decide a verdict.",
+  "description": "A versioned, app-agnostic library of category-theory motifs for authorization and data-boundary probing. ABAG tokens are objects, connector actions are morphisms (requires->produces), workflow-sequence motifs are composite morphisms, and a connector is a functor F:A->App. Motifs expand into proposalRules and connectorActionGraph.sequenceRules; they never decide a verdict.",
   "type": "object",
   "additionalProperties": true,
   "required": ["packId", "version", "tier", "motifs"],

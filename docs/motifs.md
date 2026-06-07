@@ -6,6 +6,39 @@ A scanner discovers an app's surface; the motif library decides what to probe. A
 motif never decides a verdict — it expands into the same `proposalRules` /
 `connectorActionGraph.sequenceRules` the deterministic verifier already checks.
 
+These are **category-theory motifs**: the library is structured as an abstract
+category over the universal ABAG vocabulary, and each motif is a typed
+diagram obligation rather than an app-specific script (see the *Category-theory
+framing* section below).
+
+## Category-theory framing
+
+Bayesilisk's typed ABAG layer is a small category `A`, and the motifs live in it:
+
+- **Objects** — universal ABAG tokens: typed states of a principal, resource,
+  identifier, or session (`resource.public_id`, `state.cancelled`,
+  `session.impersonated`, …). App nouns never appear here.
+- **Morphisms** — connector actions, typed by `requires` (domain) and `produces`
+  (codomain): e.g. `cancel : {resource.id} → {state.cancelled}`. The
+  `connectorActionGraph` is the generating graph of `A`.
+- **Composition** — `workflow-sequence` motifs are composite morphisms: bounded
+  paths through the action graph (`create ∘ cancel ∘ replay`). The loop's sequence
+  builder is composition with a depth bound.
+- **Motif = a diagram obligation** — a `param-mutation` motif is a morphism on a
+  single object asserting the expected arrow to a status object
+  (`unknown : resource.public_id(absent) → 404`); a `workflow-sequence` motif is a
+  diagram that must resolve to a *rejection* (the adversarial path must not commute
+  into success). Verification checks whether the app's observed arrows agree with
+  the motif's expected arrows.
+- **The connector is a functor** `F : A → App`. `token` + `resourceType` name
+  objects in `A`; `refines` is the concrete app handle. Bayesilisk reasons only in
+  `A` (matching dependencies by `token` + `resourceType`, never by `refines`),
+  while `F` executes through the concrete refinement. The existing boundary rule
+  "match by token, execute by refines" is exactly functoriality.
+
+Because motifs are stated in `A`, one motif fires on any app via its own functor
+`F` — that is what makes the library reusable rather than app-specific.
+
 ## Motifs and packs
 
 A **motif** is a template of two kinds:

@@ -2,7 +2,8 @@
   "packId": "bayesilisk.core.access-control",
   "version": "1.1.0",
   "tier": "core",
-  "title": "Bayesilisk Core Access-Control Motifs",
+  "title": "Bayesilisk Core Access-Control Motifs (category-theory motifs)",
+  "framing": "Category-theory motifs: ABAG tokens are objects, connector actions are morphisms (requires -> produces), workflow-sequence motifs are composite morphisms, and a connector is a functor F:A->App that executes abstract tokens via their concrete `refines`. Motifs are typed diagram obligations checked deterministically.",
   "provenance": "Curated by the Bayesilisk maintainers from common authorization and data-boundary failure classes. Several motifs are validated against the worked Cal.com connector example (examples/calcom), including findings with upstream human-authored fixes.",
   "references": [
     "OWASP API Security Top 10 (2023)",

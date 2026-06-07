@@ -92,7 +92,11 @@ and the contract in [docs/connectors.md](docs/connectors.md).
 
 To auto-generate probes instead of hand-writing `proposalRules`, scan an app and
 bind the motif library — the app-agnostic catalog of authorization/data-boundary
-probes:
+probes. The motifs are **category-theory motifs**: ABAG tokens are objects,
+connector actions are morphisms (`requires` → `produces`), workflow sequences are
+composite morphisms, and a connector is a functor that executes abstract tokens
+through their concrete `refines`. So one motif applies to any app via its own
+functor.
 
 ```sh
 bayesilisk connector scan openapi.json --bind-motifs --output source-context.json
