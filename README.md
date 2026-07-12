@@ -552,5 +552,5 @@ observed evidence, `passed`, or `issueReadiness`.
 
 ## Acknowledgments
 
-Thanks to OpenAI for providing model access, including early ChatGPT-5.5
+Thanks to OpenAI for providing model access, including early ChatGPT-5.6
 preview access, which helped accelerate the initial Bayesilisk buildout.
