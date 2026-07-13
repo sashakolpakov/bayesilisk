@@ -13,47 +13,19 @@
 \newcommand{\Fail}{\mathsf{fail}}
 \newcommand{\Invalid}{\mathsf{invalid}}
 
-\title{\vspace{-2em}\includegraphics[width=0.25\textwidth]{assets/bayesilisk_logo_bw.png}\\[0.8em]
+\title{%\vspace{-2em}\includegraphics[width=0.25\textwidth]{assets/bayesilisk_logo_bw.png}\\[0.8em]
 Beyond E2E Scripts: Using LLM-Proposed Scenarios \\
 Without Letting the LLM Be the Oracle}
-\author{Alexander Kolpakov}
+\author{Alexander Kolpakov\footnote{corresponding author; e-mail address: kolpakov.alexander@gmail.com; postal address: University of Austin, 522~Congress Street, Austin TX, 78701 USA}}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Large language models can enlarge the scenario space explored by end-to-end
-tests, but they are unsafe as test oracles: they can invent impossible states,
-misread application semantics, and overstate weak evidence. \tool separates
-scenario proposal from verification. App-specific connectors publish a bounded
-search surface consisting of routes, actions, identifiers, state facts,
-invariants, and executable probe hooks. The \tool core expands that surface into
-candidate scenarios, rejects malformed candidates by deterministic contract
-validation, prioritizes valid probes with Grassmann-style attention and a
-Bayesian score, and verifies only evidence returned by connector execution.
-The same boundary supports coding-agent assistance: agents may draft connector
-context, action mappings, and repair briefs, but cannot author observations,
-pass/fail results, or issue readiness. The reusable search surface is a library
-of \emph{category-theory motifs}---abstract tokens are objects, connector actions
-are morphisms, and each connector is a functor to its concrete application---so a
-motif applies across apps; a deterministic scanner derives the surface from an
-API description, and a stateless loop controller drives motif binding,
-verification, and repair to convergence while the oracle stays deterministic.
+Large language models can enlarge the scenario space explored by end-to-end tests, but they are unsafe as test oracles: they can invent impossible states, misread application semantics, and overstate weak evidence. Bayesilisk separates scenario proposal from verification. App-specific connectors publish a bounded search surface consisting of routes, actions, identifiers, state facts, invariants, and executable probe hooks. The Bayesilisk core expands that surface into candidate scenarios, rejects malformed candidates by deterministic contract validation, prioritizes valid probes with Grassmann-style attention and a Bayesian score, and verifies only evidence returned by connector execution. The same boundary supports coding-agent assistance: agents may draft connector context, action mappings, and repair briefs, but cannot author observations, pass/fail results, or issue readiness. The reusable search surface is a library of category-theory motifs: abstract tokens are objects, connector actions are morphisms, and each connector is a functor to its concrete application; a deterministic scanner derives the surface from an API description, and a stateless loop controller drives motif binding, verification, and repair to convergence while the oracle stays deterministic.
 
-This paper gives a compact formal model for that loop and reports a Cal.com case
-study at a fixed May 2026 revision. From connector-declared route facts and a
-typed Abstract Bayesilisk Action Graph (ABAG), \tool generated seven
-probes: six unknown/stale \texttt{rescheduleUid} route mutations and one bounded
-workflow sequence that created a booking, cancelled it, and replayed the
-cancelled booking UID through a public booking route. All seven returned
-deterministic expected-vs-observed violations. One upstream report has a
-targeted fix pull request that identifies the root cause and adds a regression
-Playwright test; a separate human reviewer approved that fix.
-
-The result is not a claim that LLMs can judge application
-correctness; it is evidence that LLM-style proposal can be useful when the
-oracle remains deterministic and evidence-bound.
+This paper gives a compact formal model for that loop and reports a Cal.com case study at a fixed May 2026 revision. From connector-declared route facts and a typed Abstract Bayesilisk Action Graph (ABAG), Bayesilisk generated seven probes. All of them returned deterministic expected-vs-observed violations. One upstream report has a targeted fix pull request that identifies the root cause and adds a regression Playwright test; an independent human reviewer approved that fix.
 \end{abstract}
 
 \section{Introduction}
