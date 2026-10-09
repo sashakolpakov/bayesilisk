@@ -3,10 +3,14 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{float}
 \usepackage{graphicx}
 \usepackage{hyperref}
-\usepackage{url}
+\usepackage{needspace}
+\usepackage{xurl}
 \usepackage{xspace}
+
+\setlength{\belowcaptionskip}{6pt}
 
 \newcommand{\tool}{\texttt{Bayesilisk}\xspace}
 \newcommand{\Pass}{\mathsf{pass}}
@@ -16,14 +20,14 @@
 \title{%\vspace{-2em}\includegraphics[width=0.25\textwidth]{assets/bayesilisk_logo_bw.png}\\[0.8em]
 Beyond E2E Scripts: Using LLM-Proposed Scenarios \\
 Without Letting the LLM Be the Oracle}
-\author{Alexander Kolpakov\footnote{corresponding author; e-mail address: kolpakov.alexander@gmail.com; postal address: University of Austin, 522~Congress Street, Austin TX, 78701 USA}}
+\author{Alexander Kolpakov\footnote{corresponding author; e-mail address: akolpakov@uaustin.org; postal address: University of Austin, 522~Congress Street, Austin TX, 78701 USA}}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Large language models can enlarge the scenario space explored by end-to-end tests, but they are unsafe as test oracles: they can invent impossible states, misread application semantics, and overstate weak evidence. Bayesilisk separates scenario proposal from verification. App-specific connectors publish a bounded search surface consisting of routes, actions, identifiers, state facts, invariants, and executable probe hooks. The Bayesilisk core expands that surface into candidate scenarios, rejects malformed candidates by deterministic contract validation, prioritizes valid probes with Grassmann-style attention and a Bayesian score, and verifies only evidence returned by connector execution. The same boundary supports coding-agent assistance: agents may draft connector context, action mappings, and repair briefs, but cannot author observations, pass/fail results, or issue readiness. The reusable search surface is a library of category-theory motifs: abstract tokens are objects, connector actions are morphisms, and each connector is a functor to its concrete application; a deterministic scanner derives the surface from an API description, and a stateless loop controller drives motif binding, verification, and repair to convergence while the oracle stays deterministic.
+Large language models can enlarge the scenario space explored by end-to-end tests, but they are unsafe as test oracles: they can invent impossible states, misread application semantics, and overstate weak evidence. Bayesilisk separates scenario proposal from verification. App-specific connectors publish a bounded search surface consisting of routes, actions, identifiers, state facts, invariants, and executable probe hooks. The Bayesilisk core expands that surface into candidate scenarios, validates their structure and declared dependencies, and verifies connector-returned evidence against explicit invariants. Grassmann-style attention guides exploration of the built-in invariant catalog; a Bayesian score orders evaluated catalog findings. The same boundary supports coding-agent assistance: agents may draft connector context, action mappings, and repair briefs, but observations must come from execution and issue readiness from verification. Reusable typed motifs provide a category-theoretic interpretation of workflow composition. A deterministic OpenAPI scanner drafts part of the search surface, and a stateless controller coordinates motif binding, verification, and repair hand-offs until a bounded stopping criterion is met.
 
 This paper gives a compact formal model for that loop and reports a Cal.com case study at a fixed May 2026 revision. From connector-declared route facts and a typed Abstract Bayesilisk Action Graph (ABAG), Bayesilisk generated seven probes. All of them returned deterministic expected-vs-observed violations. One upstream report has a targeted fix pull request that identifies the root cause and adds a regression Playwright test; an independent human reviewer approved that fix.
 \end{abstract}
@@ -51,8 +55,10 @@ constitutes a failure. Ranking is a later triage step, not an oracle. The
 connector for an application exposes context and executable hooks; it does not
 own the scenario search strategy. The \tool core generates candidate scenarios
 from the declared surface, validates candidates against the connector contract,
-ranks valid probes, asks the connector to execute them, and verifies returned
-evidence against explicit invariants.
+asks the connector to execute them, and verifies returned evidence against
+explicit invariants. Attention guides catalog exploration, and Bayesian scores
+order evaluated catalog findings; connector route and sequence proposals are
+expanded in deterministic declaration order.
 
 The workflow form of this boundary is an Abstract Bayesilisk Action Graph
 (ABAG). In an ABAG, \tool sees typed abstract tokens such as
@@ -83,26 +89,26 @@ This paper makes five contributions:
   \item a mathematical formulation of connector contracts, scenario validation,
         Grassmann-style attention, Bayesian ranking, and deterministic
         evidence verification, including typed ABAG workflow composition and a
-        category-theoretic motif library (abstract tokens as objects, connector
-        actions as morphisms, connectors as functors);
+        motif library with a category-theoretic interpretation of token
+        configurations, action sequences, and connector refinements;
   \item a Cal.com artifact showing seven generated probes, seven observed
         expected-vs-observed violations, reproducible issue payloads, and an
         upstream targeted fix pull request with human approval review for one
         reported issue;
   \item a deterministic API-surface scanner and a stateless loop controller that
-        automate scan, motif binding, execution hand-off, verification, and
-        repair to a bounded convergence criterion, keeping the oracle
-        deterministic throughout; and
+        automate scan, motif binding, verification, and repair-brief generation,
+        with execution and repair hand-offs and a bounded stopping criterion,
+        keeping the oracle deterministic throughout; and
   \item an explicit account of scope and generalization: connectors are
         app-specific by design, action-sequence breadth is governed by the
-        connector-declared graph, and the Cal.com comparison runs validate the
-        architectural separation from E2E-only, Playwright-only, weak-model, and
-        LLM-agent workflows.
+        connector-declared graph, and the Cal.com comparison summaries
+        illustrate the architectural separation from E2E-only, Playwright-only,
+        weak-model, and LLM-agent workflows.
 \end{enumerate}
 
 \section{Claim Audit}
 
-There are four important questions to be answered about \tool, including its architecture and use cases.
+There are five important questions to be answered about \tool, including its architecture and use cases.
 
 \textbf{Who generates scenarios?} The connector declares the app-specific search
 surface: routes, actions, identifiers, state facts, invariants, and valid
@@ -117,9 +123,11 @@ through the real application, local fixtures, Playwright, API calls, or a test
 harness. It returns observed evidence such as semantic status, URL, trace,
 screenshot, state transition, or execution error.
 
-\textbf{Who decides pass or fail?} \tool decides pass/fail by applying
-deterministic invariants to evidence returned by the connector. Neither the LLM nor the
-connector is the oracle.
+\textbf{Who decides pass or fail?} \tool applies deterministic invariants to
+evidence returned by the connector. For status-based observations, the connector
+also emits a Boolean comparison, which the connector-verification interface
+checks against the expected and observed statuses before producing findings.
+The expected behavior is supplied by the contract; the LLM does not judge it.
 
 \textbf{How can coding agents participate safely?} A coding agent may help
 collect connector requirements, draft source context, write connector code in
@@ -166,8 +174,8 @@ connector action, \(i \in I\) is a declared invariant, \(p\) is a declared route
 parameter, and \(m \in M(p)\) is an allowed mutation for that parameter, such as
 unknown, stale, foreign, missing, or duplicate. The connector does not enumerate
 this final candidate. It declares the searchable surface and the allowed
-mutation schema; \tool performs the expansion, deduplication, validation, and
-ranking.
+mutation schema; \tool performs the expansion, deduplication, and structural
+validation.
 
 \subsection{Abstract Bayesilisk Action Graphs}
 
@@ -197,7 +205,11 @@ The abstract key used by the \tool core is
 \]
 The refinement \(\rho\) is not used to satisfy graph dependencies. It is
 connector-facing metadata that lets the adaptor execute a generated abstract
-probe against concrete fixtures.
+probe against concrete fixtures. An unqualified requirement (\(c\) omitted) can
+match any resource class with token \(u\); a qualified requirement must also
+match \(c\). Operationally, let \(K(\tau)=\{u,(u,c)\}\) for a qualified token
+and \(K(\tau)=\{u\}\) otherwise. This models the implementation's qualified and
+unqualified dependency keys.
 
 Each action \(a\in A\) has required and produced token sets,
 \(\operatorname{req}(a)\subseteq T\) and
@@ -208,20 +220,24 @@ Each action \(a\in A\) has required and produced token sets,
 is valid for a terminal goal action \(a_k\) only if
 \[
   \forall t \in \{1,\ldots,k\}:
-  \{\kappa(\tau):\tau\in\operatorname{req}(a_t)\}
+  \bigcup_{\tau\in\operatorname{req}(a_t)} K(\tau)
   \subseteq
-  \bigcup_{j<t}\{\kappa(\tau):\tau\in\operatorname{prod}(a_j)\},
+  \bigcup_{j<t}\ \bigcup_{\tau\in\operatorname{prod}(a_j)} K(\tau),
   \qquad k \le d_{\max}.
 \]
 Goal parameter bindings are also typed. If a terminal action has a parameter
 \(p\), then \(\operatorname{bind}(a_k,p)=\tau\) means that \tool may bind
-\(p\) to a previously produced token with the same abstract key \(\kappa(\tau)\).
+\(p\) to previously produced tokens satisfying \(K(\tau)\).
 If \(\rho\) is present, \tool emits it in the generated proposal so the
 connector can look up the concrete value. Thus \tool may reason over
 \texttt{resource.public\_id}/\texttt{booking}, while the Cal.com connector
 executes with \texttt{booking.uid}. This is the central refinement boundary:
 Bayesilisk composes and validates over abstract tokens; the connector/adaptor
-executes concrete app operations through refinements.
+executes concrete app operations through refinements. The current sequence
+builder selects the first declared producer for each missing dependency and
+topologically orders the selected actions. It emits at most one sequence per
+rule, subject to depth and proposal-count limits; it does not enumerate all
+valid paths through \(G\).
 
 This makes the reusable unit a graph motif rather than an app noun. The same
 abstract sequence
@@ -241,44 +257,53 @@ Validation is deterministic:
 \[
   V_C(s) =
   \begin{cases}
-    1 & \text{if every referenced route, action, parameter, fact, token, and
-         invariant is declared in } C,\\
+    1 & \text{if } s \text{ satisfies the structural and dependency constraints of } C,\\
     0 & \text{otherwise.}
   \end{cases}
 \]
-Only candidates with \(V_C(s)=1\) can become executable probes. LLM output enters
-the same validation gate. Unknown target planes, unknown ids, duplicate
-proposals, non-string fields, malformed JSON, impossible counts, and unsupported
-actions or ill-typed ABAG tokens are rejected as proposer telemetry rather than
-reported as product failures.
+This gate checks declared routes, actions, parameters, mutation rules, and
+token dependencies as applicable to each proposal path. Model proposals are
+also subject to deterministic validation: unknown target planes or ids,
+duplicate proposals, non-string fields, malformed JSON, and impossible counts
+become proposer diagnostics. Connector sequence rules whose dependencies cannot
+be constructed within the bound produce no proposal. These checks constrain
+candidate structure; execution must still establish that the concrete fixture
+and action mappings work.
 
-\subsection{Motifs as a Category}
+\subsection{Motif Library and Categorical Interpretation}
 
-The reusable search surface is organized as a small category \(\mathcal{A}\).
-Objects are abstract token keys \(\kappa(\tau)=(u,c)\); the generating morphisms
-are connector actions \(a\), with domain
-\(\{\kappa(\tau):\tau\in\operatorname{req}(a)\}\) and codomain
-\(\{\kappa(\tau):\tau\in\operatorname{prod}(a)\}\), and composition is the valid
-sequencing above. A \emph{motif} is a typed obligation in \(\mathcal{A}\). A
-parameter motif is an arrow from a single object to an expected status, e.g.\
-\(\texttt{resource.public\_id}(\text{absent})\to 404\); a workflow motif is a
-composite morphism whose adversarial path must \emph{not} commute into success,
-e.g.\ \(\texttt{create}\to\texttt{cancel}\to\texttt{replay}\) must reach
-\(409\), not \(200\). A connector is a functor \(F:\mathcal{A}\to
-\mathcal{C}_{\mathrm{app}}\) into the concrete application: it sends each object
-to a fixture or route through the refinement \(\rho\) and each morphism to an
-executable action. \tool reasons only in \(\mathcal{A}\), matching by \(\kappa\)
-and never by \(\rho\); functoriality is exactly the refinement boundary above~\cite{maclane}.
-Motifs are grouped into versioned packs over the universal vocabulary. Binding a
-pack to a contract \(C\) instantiates each motif's arrows as concrete candidates,
-route mutations or ABAG sequence rules, that re-enter the same validation and
-verification path; nothing in the oracle changes. The motifs distilled from the
-case study below---unknown, foreign, and wrong-parent identifiers,
-cancelled-state replay, superseded tokens, and missing sub-resource
-references---are such app-agnostic arrows and apply to any app through its own
-\(F\). Packs are tiered (an open core pack and optionally gated packs verified by
-an offline signature); tiering is a distribution concern and does not touch
-verification.
+A \emph{motif} is a reusable typed template for a parameter mutation or a
+workflow obligation, together with an expected status. A categorical
+interpretation can be given to the ABAG dependency model~\cite{maclane}: objects
+are configurations \(S\) of available abstract dependency keys, and an enabled
+action induces a transition
+\[
+  S \xrightarrow{a}
+  S \cup \bigcup_{\tau\in\operatorname{prod}(a)} K(\tau),
+  \qquad
+  \bigcup_{\tau\in\operatorname{req}(a)} K(\tau) \subseteq S.
+\]
+Paths through these transitions compose by concatenation, with empty paths as
+identities. The depth bound restricts the search over paths, not the underlying
+category. This is a model of accumulated dependency facts; execution determines
+whether the concrete application satisfies the terminal obligation. For
+example, a create--cancel--replay motif requires rejection of the replay.
+Connector refinements provide an intended interpretation in concrete fixture
+operations. The implementation checks token dependencies and observed
+outcomes; it does not mechanically establish functor laws or connector
+correctness.
+
+Motifs are grouped into versioned packs. The binder matches parameter kinds or
+abstract token names and emits derived route facts or ABAG sequence rules.
+Generated proposals then enter the existing verification workflow. Workflow
+binding still requires a connector-declared action graph, and concrete
+parameter names and fixture values require application-specific adaptation.
+The core pack includes unknown, foreign, and wrong-parent identifiers,
+cancelled-state replay, superseded tokens, and missing sub-resource references.
+The retained Cal.com evidence below directly supports unknown/stale identifier
+handling and cancelled-booking replay; it does not validate every motif in the
+pack. Packs may be distributed as an open core or as optional signed, licensed
+packs; this affects motif availability, not the verification rule.
 
 \subsection{Grassmann Attention}
 
@@ -350,12 +375,13 @@ pass/fail verification. Then
   \qquad
   p_i=\min(1,N_i^{PW}/\tau_P).
 \]
-In the current artifact, the sensitivity \(\sigma_i\) is read from the
+The current attention loop evaluates the built-in invariant catalog. The
+sensitivity \(\sigma_i\) is read from the
 \texttt{INVARIANT\_SENSITIVITY} table maintained by the \tool authors in the
 core configuration. It encodes how sensitive an invariant plane is considered
-for search prioritization. If an invariant id is absent from that table, as may
-be the case for connector-supplied external invariants, the implementation uses
-the neutral default \(0.5\). The novelty term is
+for search prioritization. A catalog invariant absent from that table receives
+the neutral default \(0.5\). External connector invariant ids are not added to
+the attention planes. The novelty term is
 \[
   n_i=\max(\min(1,K_i/\tau_K),E_i),
 \]
@@ -393,8 +419,8 @@ metadata as \texttt{failLikelihood} and \texttt{passLikelihood}. Thus
 \(\pi_i\), \(L_i^{fail}\), and \(L_i^{pass}\) are not inferred during a run.
 They are prior/ranking constants supplied by the invariant author with the
 invariant definition; they are not generated by the LLM and are not derived from
-connector execution. For connector-defined invariants, the same role is played
-by the connector's declared invariant metadata.
+connector execution. External connector observations use the separate
+status-comparison and fixed-priority path described below.
 
 The run-time context adjustment is computed from observation tags and explicit
 context fields. For finding fingerprint \(x\), invariant \(i\), and scenario
@@ -406,15 +432,16 @@ context fields. For finding fingerprint \(x\), invariant \(i\), and scenario
   -0.45\,\mathbf{1}_{x\in Muted}
   +A_i+B_s,
 \]
-where \(x\) is the finding fingerprint, \(A_i\) is an explicit context
-adjustment for invariant \(i\), and \(B_s\) is an explicit context adjustment
-for scenario \(s\); missing explicit adjustments are zero. The sets
+where \(x\) is the finding fingerprint, \(A_i\) is a context adjustment for
+invariant \(i\), and \(B_s\) is an explicit context adjustment for scenario
+\(s\). The sets
 \(Fixed\), \(Confirmed\), and \(Muted\) are populated from
 \texttt{fixedFingerprints}, \texttt{confirmedFingerprints}, and
 \texttt{mutedFingerprints} in the context/observation file, plus fingerprints
-extracted from that context. \(A_i\) is read from the context field
-\texttt{priorAdjustments}; \(B_s\) is read from \texttt{scenarioAdjustments}.
-If these fields are absent or malformed, their contribution is zero.
+extracted from context text, which are treated as muted. In the contextual
+report path, \(A_i\) defaults to \(\min(0.18,0.018K_i)\), using context keyword
+hits, and a numeric entry in \texttt{priorAdjustments} overrides that value.
+\(B_s\) is read from \texttt{scenarioAdjustments} and defaults to zero.
 
 The likelihood used in the posterior is selected after deterministic
 verification. For a concrete scenario \(s\), \tool merges its fragments into
@@ -462,7 +489,9 @@ Direct connector-observed findings use the same general report pipeline but a
 different scoring path. If connector evidence already contains a deterministic
 mismatch between expected and observed status, the finding is evidence-bearing
 before Bayesian ranking. \tool records it as a context-observed breakage, marks
-it issue-ready, and gives it high report priority. This is evidence-first
+it issue-ready, and assigns a fixed risk score of \(0.99\) for report priority.
+This value is not a calibrated probability of a real application defect.
+This is evidence-first
 ranking, not learned Bayesian inference. The path is connector-generic; Cal.com
 is the current case study using it, not a special rule in the core.
 
@@ -478,13 +507,19 @@ target URL, invariant id, and source context. The verifier applies
 \[
   \phi_i(e) =
   \begin{cases}
-    \Fail & \text{if } e.\texttt{observedStatus} \ne e.\texttt{expectedStatus},\\
-    \Pass & \text{if } e.\texttt{observedStatus} = e.\texttt{expectedStatus},\\
-    \Invalid & \text{if required evidence is absent or malformed.}
+    \Invalid & \text{if required evidence is absent or malformed},\\
+    \Fail & \text{if valid } e \text{ has }
+      e.\texttt{observedStatus} \ne e.\texttt{expectedStatus},\\
+    \Pass & \text{otherwise.}
   \end{cases}
 \]
 Only \(\Fail\) with evidence becomes an issue-ready finding. \(\Invalid\) is a
-connector/proposer diagnostic.
+connector/proposer diagnostic. In the connector-verification interface, the
+required observation fields include integer statuses, a Boolean
+\texttt{passed} equal to their comparison, execution-source metadata, and
+artifact references. These checks establish structural consistency; they do
+not independently attest that an execution occurred or that its expected status
+is the correct application specification.
 
 \section{Implementation Boundary}
 
@@ -500,9 +535,10 @@ issue-ready pass/fail results.
 
 This boundary matters for connector design. A connector should expose a small
 vocabulary of actions and facts. It should not filter away uncomfortable cases
-or decide that a 200 response is acceptable. The finite-state verifier owns the
-ruleset, which is supplied by context and schema, not hardcoded for a particular
-application. App-specific code is isolated to connector execution.
+or silently reinterpret a 200 response as acceptable when the contract requires
+rejection. The verifier applies the ruleset supplied by context and schema.
+Application-specific expectations and fixture mappings remain the connector
+author's responsibility.
 
 The agent-facing workflow is therefore a packaging of the same proof boundary,
 not a new oracle. A coding agent can interview for connector requirements,
@@ -513,19 +549,27 @@ execution, and fix briefs must still trace to verified issue-ready findings.
 
 \subsection{Surface Scanning and the Automated Loop}
 
-\tool can derive the contract surface deterministically: a scanner maps each
-path and operation of an API description to a route fact with typed parameters
-(identifier, tenant, and token kinds with their abstract tokens), yielding a
-draft contract \(C\) that the motif binder expands. The full procedure is exposed
-as a stateless loop controller. Given the current artifacts it performs every
-deterministic step---scan, motif binding, contract validation, evidence
-verification, and repair-brief synthesis---advances a convergence state, and
-returns the one action it cannot perform: connector execution. The agent or human
-supplies observed evidence; the controller verifies it, accumulates verified
-issue-ready fingerprints, and stops when \(K\) consecutive rounds add no new such
-fingerprint or a round cap is reached. The controller holds no session and is
-deterministic; it automates the boundary above without \tool ever executing the
-application or deciding the verdict.
+\tool provides a deterministic OpenAPI scanner for drafting route facts. The
+current implementation handles GET, POST, PUT, PATCH, and DELETE operations
+with inline path or query parameters. Parameter names and schema hints suggest
+identifier, tenant, and token kinds. The scanner does not resolve
+\texttt{\$ref} references, inspect request bodies, infer authentication
+fixtures, or construct an action graph. Motif binding supplies candidate
+mutation rules and expected statuses; connector authors must check their
+applicability and implement the concrete actions.
+
+The stateless loop controller accepts this draft or a supplied source context,
+binds motifs, returns source-validation diagnostics and proposals, and requests
+connector execution. On later calls it validates observations, builds reports,
+accumulates issue-ready fingerprints, and produces repair briefs. Connector
+implementation, execution, and application of repairs remain external steps.
+The caller persists the returned state between calls. Invalid observations
+block a round; accepted rounds stop when \(K\) consecutive rounds add no new
+issue-ready fingerprint (default \(K=2\)) or the round limit is reached
+(default six). The phase name \texttt{converged} denotes this stopping rule:
+repeated evidence for an unresolved finding can satisfy it, so it does not
+establish that all defects have been repaired. The controller coordinates the
+workflow while \tool performs deterministic verification of submitted evidence.
 
 \section{Cal.com Case Study}
 
@@ -574,30 +618,41 @@ The \texttt{cancel-booking} action required
 Playwright connector used the \texttt{refines} names to execute real fixture
 operations and return observed status evidence.
 
-\begin{table}[h]
+\Needspace{18\baselineskip}
+Table~\ref{tab:calcom-artifacts} lists the retained artifacts for this case
+study, from connector inputs through execution evidence and issue payloads.
+
+\begin{table}[H]
 \centering
+\caption{Checked-in Cal.com artifact set.}
+\label{tab:calcom-artifacts}
 \small
 \setlength{\tabcolsep}{3pt}
-\begin{tabular}{p{0.31\linewidth}p{0.55\linewidth}}
+\begin{tabular}{@{}p{0.29\linewidth}p{0.68\linewidth}@{}}
 \toprule
 Artifact & Path \\
 \midrule
-Connector code & \texttt{examples/calcom/bayesilisk-probes.e2e.ts} \\
-Route context & \texttt{examples/calcom/source-context.json} \\
-Generated route proposals & \texttt{examples/calcom/generated-proposals.json} \\
-Sequence context & \texttt{examples/calcom/sequence-source-context.json} \\
-Generated sequence proposal & \texttt{examples/calcom/generated-sequence-proposals.json} \\
-Execution evidence & \texttt{examples/calcom/execution-context.json} \\
-Bayesilisk report & \texttt{examples/calcom/reports/report.json} \\
-Issue payloads & \texttt{examples/calcom/reports/issue-payloads.json} \\
-Upstream outcomes & \texttt{examples/calcom/upstream-outcomes.md} \\
+Connector code & \path{examples/calcom/bayesilisk-probes.e2e.ts} \\
+Route context & \path{examples/calcom/source-context.json} \\
+Generated route proposals & \path{examples/calcom/generated-proposals.json} \\
+Sequence context & \path{examples/calcom/sequence-source-context.json} \\
+Generated sequence proposal & \path{examples/calcom/generated-sequence-proposals.json} \\
+Execution evidence & \path{examples/calcom/execution-context.json} \\
+Bayesilisk report & \path{examples/calcom/reports/report.json} \\
+Issue payloads & \path{examples/calcom/reports/issue-payloads.json} \\
+Upstream outcomes & \path{examples/calcom/upstream-outcomes.md} \\
 \bottomrule
 \end{tabular}
-\caption{Checked-in Cal.com artifact set.}
 \end{table}
 
-\begin{table}[h]
+\Needspace{16\baselineskip}
+Table~\ref{tab:calcom-observations} gives the expected and observed semantic
+statuses for all seven executed probes.
+
+\begin{table}[H]
 \centering
+\caption{Verified Cal.com connector observations (semantic statuses).}
+\label{tab:calcom-observations}
 \small
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{p{0.30\linewidth}p{0.20\linewidth}p{0.13\linewidth}p{0.13\linewidth}}
@@ -613,7 +668,6 @@ Dynamic booking page & stale id & 404 & 200 \\
 Cancelled booking replay & cancelled uid & 409 & 200 \\
 \bottomrule
 \end{tabular}
-\caption{Verified Cal.com connector observations.}
 \end{table}
 
 All seven probes executed against local Playwright fixtures without unexpected
@@ -622,19 +676,28 @@ connector-declared invariant. The route mutations expected semantic status
 \texttt{404} and observed \texttt{200}. The cancelled-booking replay expected
 semantic status \texttt{409} and observed \texttt{200}. \tool classified the
 findings as \texttt{breakage.context-observed} and produced issue-ready
-payloads. These patterns are distilled into the app-agnostic core motif pack
-(unknown, foreign, and wrong-parent identifiers; cancelled-state replay;
-superseded token; missing sub-resource reference), each carrying a provenance
-link back to this finding so the case study seeds reusable motifs.
+payloads. Unknown-identifier handling and cancelled-state replay also appear in
+the core motif pack with provenance notes referring to this example. The other
+motif families are broader library coverage, not additional findings in this
+seven-probe artifact. The retained proposals were generated directly from
+connector rules and the ABAG; they do not measure the incremental benefit of
+the later scanner, motif binder, or loop controller.
 
+\Needspace{28\baselineskip}
 \section{Comparison Runs}
 
-The evaluation includes small comparison runs that clarify the role of
-\tool. These are not a broad benchmark; they are local controls around the
-Cal.com artifact.
+Table~\ref{tab:calcom-comparisons} summarizes local exploratory comparisons
+recorded in \path{evidence_list.md}. The retained raw Playwright logs in
+\path{examples/calcom/baselines/} cover the six generated route probes and the
+one generated sequence. The nearby E2E, manual-probe, weak-model, and LLM-agent
+counts are historical summaries whose raw logs are not retained in the current
+artifact. They provide qualitative context, not a reproducible comparative
+benchmark.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
+\caption{Cal.com exploratory comparison summary.}
+\label{tab:calcom-comparisons}
 \small
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{p{0.33\linewidth}p{0.55\linewidth}}
@@ -649,15 +712,14 @@ Weak local model proposals & 3 raw proposals produced 0 accepted probes because 
 LLM-agent browser run & 10 trials produced 3 oracle mismatches before deterministic verification. \\
 \bottomrule
 \end{tabular}
-\caption{Cal.com comparison summary.}
 \end{table}
 
-The comparison supports a bounded claim. Manual Playwright probes can find some
-instances when a human already knows where to look. \tool broadens coverage by
-expanding declared route facts and action graphs into concrete probes. The weak
-model result is also useful: invalid model proposals were contained by schema
-and verifier validation rather than converted into product bugs. The LLM-agent
-browser run illustrates why the model should not be the oracle.
+These summaries motivate the architectural separation. The retained generated
+probes show how \tool expands declared route facts and action graphs into
+concrete cases. The weak-model summary records malformed proposals rejected by
+validation, and the LLM-agent summary records oracle mismatches. Establishing
+comparative effectiveness or model reliability would require retained baseline
+runs, matched execution budgets, and a larger evaluation.
 
 \section{Upstream Validation}
 
@@ -673,8 +735,14 @@ private-link variant was added to the same issue thread to avoid duplicate
 reporting. A separate issue, \#29407~\cite{calcomCancelledIssue}, reports the
 cancelled booking UID replay sequence and remains open at capture time.
 
-\begin{table}[h]
+\Needspace{14\baselineskip}
+Table~\ref{tab:calcom-upstream} maps the reported finding groups to their
+recorded upstream responses.
+
+\begin{table}[H]
 \centering
+\caption{Upstream response to Bayesilisk-generated findings at capture time.}
+\label{tab:calcom-upstream}
 \small
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{p{0.33\linewidth}p{0.53\linewidth}}
@@ -686,7 +754,6 @@ Private-link \texttt{rescheduleUid} & Added to issue \#29399 as a related commen
 Cancelled booking UID replay & Separate state-transition report in issue \#29407; open at capture time \\
 \bottomrule
 \end{tabular}
-\caption{Upstream response to Bayesilisk-generated findings.}
 \end{table}
 
 This validation is practical rather than statistical. A fix PR does not prove
@@ -732,23 +799,27 @@ the connector needs to execute a probe, such as fixture fields, URL parameters,
 database ids, or session handles. This keeps Cal.com names out of the verifier
 while still letting the generated proposal be executable.
 
-\textbf{Bounded workflow generation.} Sequence generation is intentionally
-bounded by the connector-declared action graph and depth. That bound can still
-cover a large workflow space when the connector exposes a broad action
-vocabulary and meaningful state tokens. The design avoids arbitrary free-form
-browser wandering; \tool composes declared actions and the connector executes
-them.
+\textbf{Bounded workflow generation.} Sequence generation is governed by the
+connector-declared action graph, sequence rules, depth bound, and proposal
+limit. The current builder greedily selects producers without backtracking.
+Additional actions and rules can expose more workflows, but the builder offers
+no completeness guarantee over the valid paths through the graph.
 
 \textbf{Oracle scope.} The deterministic oracle is only as good as the supplied
 ruleset. \tool prevents the LLM from being the oracle; it does not remove the
-need for correct invariants.
+need for correct invariants or trustworthy execution evidence. Motif-derived
+expected statuses must be checked against the application's specification.
+The current status verifier compares one expected integer with one observed
+integer; alternative statuses recorded in motif metadata are not automatically
+accepted.
 
-\textbf{Baseline interpretation.} The Cal.com comparison runs validate the
-architectural difference: nearby E2E did not cover the generated states, manual
-Playwright probes were narrower, weak local model output was rejected by
-validation, and browser-driving LLM trials showed oracle instability. A larger
-multi-app study would quantify effect size across projects and models; it is
-not required to establish the core separation demonstrated here.
+\textbf{Baseline interpretation.} The retained Cal.com artifact establishes
+seven generated, executed probes and their status mismatches at one fixed
+application revision. The other comparison rows are summary-level evidence.
+A multi-app study with retained baselines and ablations is needed to quantify
+coverage gains, false-positive rates, ranking benefits, and model-dependent
+effects. The seven probes were generated deterministically, so they do not
+establish an incremental coverage benefit from LLM proposals.
 
 \section{Future Work}
 
@@ -808,11 +879,15 @@ issue. The
 adoption path is incremental: write the connector around existing app fixtures,
 or have a coding agent draft it under recorded provenance, let \tool expand the
 scenario space, and keep the oracle deterministic. Packaging the surface as a
-category-theoretic motif library, a deterministic scanner, and a stateless loop
-controller makes that surface reusable across apps and runs the
-scan--verify--repair cycle to convergence without moving the oracle. The next
+typed motif library, a deterministic scanner, and a stateless loop controller
+supports reuse across apps and coordinates bounded scan--verify--repair rounds
+with external execution and repair. The next
 research step is to repeat this artifact discipline across additional
 applications while keeping the \tool core app-agnostic.
+
+\section*{Funding}
+
+No funding was received for this research or the preparation of this manuscript.
 
 \bibliographystyle{plain}
 \bibliography{references}

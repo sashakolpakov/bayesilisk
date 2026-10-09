@@ -1,25 +1,18 @@
-# Manuscript Draft
+# Manuscript
 
-This directory contains the current concise LaTeX manuscript for Bayesilisk.
+“Beyond E2E Scripts: Using LLM-Proposed Scenarios Without Letting the LLM Be the
+Oracle”
 
-Current target: a compact practice/research case-study article centered on the
-Cal.com artifact and the verifier architecture. The draft now includes:
+- [main.tex](main.tex): manuscript source.
+- [main.pdf](main.pdf): compiled manuscript.
+- [references.bib](references.bib): bibliography.
+- [cover_letter.tex](cover_letter.tex): submission cover letter.
 
-- a claim audit separating scenario generation, connector execution, and
-  deterministic oracle ownership;
-- a mathematical model of connector contracts, route mutations, bounded action
-  sequences, Grassmann-style attention, Bayesian ranking, and evidence
-  verification;
-- the current Cal.com artifact summary: 7 generated probes, 7 connector
-  observations, 7 verified app findings, and issue-ready payloads;
-- upstream validation: Cal.com issue `#29399` has targeted fix PR `#29400`,
-  and cancelled-booking replay issue `#29407` remains open at capture time;
-- scope and generalization: connectors are app-specific by design, bounded
-  sequence generation scales with the connector-declared action graph, and the
-  Cal.com comparison runs validate the difference from E2E-only,
-  Playwright-only, weak-model, and LLM-agent workflows.
+The corresponding-author email is `akolpakov@uaustin.org`.
+Case-study artifacts are in [examples/calcom](../examples/calcom/), with
+comparison summaries in [evidence_list.md](../evidence_list.md).
 
-Build locally with:
+From this directory, build locally with:
 
 ```sh
 pdflatex main.tex
@@ -27,8 +20,3 @@ bibtex main
 pdflatex main.tex
 pdflatex main.tex
 ```
-
-Supporting notes:
-
-- `socratic_passes.md` records the claim-audit passes used to rewrite the text.
-- `venue_notes.md` records likely publication venues and current positioning.

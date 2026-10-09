@@ -22,18 +22,20 @@ The paper presents Bayesilisk, a testing architecture that separates scenario
 proposal from correctness judgment. App-specific connectors expose bounded
 application context, executable probe hooks, and deterministic invariants.
 Bayesilisk then expands the declared scenario space, validates candidate probes,
-prioritizes valid probes, and verifies only connector-returned evidence against
-the deterministic rules. The central claim is deliberately narrow: language
+and verifies connector-returned evidence against the deterministic rules.
+Attention and ranking guide catalog exploration and triage. The central claim
+is deliberately narrow: language
 models and model-like proposal mechanisms can help explore missed application
 states, but they should not act as test oracles.
 
-The manuscript combines a compact formal model with a Cal.com case study. At a
-fixed May 2026 revision, Bayesilisk generated seven deterministic violations
-from connector-declared route facts and a bounded action graph, including
-unknown and stale \texttt{rescheduleUid} route mutations and a create-cancel-
-replay workflow sequence. One upstream report led to a human-authored fix pull
-request with a regression Playwright test, providing external validation that
-the evidence was actionable rather than merely synthetic.
+The manuscript combines a compact formal model with a Cal.com case study at a
+fixed May 2026 revision. Connector-declared route facts and a bounded action
+graph yielded seven probes, all with observed status mismatches. These covered
+unknown and stale values of \texttt{rescheduleUid} and a workflow that created
+a booking, cancelled it, and replayed its identifier. One upstream report led
+to a human-authored fix pull request with a regression Playwright test,
+providing external validation that the evidence was actionable rather than
+merely synthetic.
 
 We believe the work is relevant to readers interested in software testing,
 LLM-assisted development, end-to-end testing, and practical verification of web
