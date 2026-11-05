@@ -169,6 +169,41 @@ def test_connector_verify_emits_payloads_and_rejects_inconsistent_facts(tmp_path
     assert payloads
     assert payloads[0]["issuePayloadSource"] == "verifiedByBayesilisk"
 
+    # Connector verification must never leak unrelated built-in catalog
+    # scenarios into a target application's report.
+    report_path = tmp_path / "report.json"
+    run_connector(
+        "verify",
+        "--source",
+        str(source),
+        "--observed",
+        str(observed),
+        "--output",
+        str(report_path),
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["connectorEvidenceScoped"] is True
+    assert report["generatedScenarioCount"] == 0
+    assert report["domains"] == ["external app connector"]
+    assert len(report["findings"]) == 1
+    assert len(report["verifiedByBayesilisk"]) == 1
+    assert len(report["issuePayloads"]) == 1
+    assert report["findings"][0]["generationBasis"] == "external-observed-context"
+    assert report["findings"][0]["invariantId"] == "external.resource_unknown_target_rejected"
+    assert report["findings"][0]["confidenceType"] == "deterministic-contract-mismatch"
+    assert report["findings"][0]["securitySeverity"] == "unclassified"
+    assert report["verifiedByBayesilisk"][0]["securitySeverity"] == "unclassified"
+    assert report["issuePayloads"][0]["securitySeverity"] == "unclassified"
+    assert report["observedByPlaywright"] == []
+    assert len(report["observedByConnector"]) == 1
+    assert report["observedByConnector"][0]["source"] == "connector-observation"
+    assert report["contextSummary"]["sourceFactCount"] == 1
+    assert report["contextSummary"]["observedFactCount"] == 1
+    assert report["contextSummary"]["failedObservationCount"] == 1
+    assert "keywordHits" not in report["contextSummary"]
+    assert "priorAdjustments" not in report["contextSummary"]
+    assert not any(finding["invariantId"].startswith("dms.") for finding in report["findings"])
+
     # passed inconsistent with observedStatus == expectedStatus must be rejected.
     bad_observed = json.loads(observed.read_text(encoding="utf-8"))
     bad_observed["repositoryFacts"][0]["passed"] = True

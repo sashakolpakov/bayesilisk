@@ -65,6 +65,7 @@
         "finding.candidate-breakage"
       ]
     },
+    "confidenceType": {"type": "string", "enum": ["deterministic-contract-mismatch"]},
     "dedupeKey": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}:"},
     "expectedInvariant": {"type": "string"},
     "fingerprint": {"type": "string", "pattern": "^bayesilisk:[0-9a-f]{16}$"},
@@ -120,6 +121,7 @@
     "posteriorProbability": {"type": "number", "minimum": 0, "maximum": 1},
     "prior": {"type": "number", "minimum": 0, "maximum": 1},
     "riskScore": {"type": "number", "minimum": 0, "maximum": 1},
+    "securitySeverity": {"type": "string", "enum": ["unclassified", "low", "medium", "high", "critical"]},
     "scenarioId": {"type": "string"},
     "scenarioTitle": {"type": "string"},
     "scenarioTone": {"type": "string"},

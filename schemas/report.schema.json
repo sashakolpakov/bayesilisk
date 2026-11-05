@@ -25,6 +25,7 @@
     "weakModelScenarioGeneration"
   ],
   "properties": {
+    "connectorEvidenceScoped": {"type": "boolean"},
     "contextObservationSource": {"type": "string"},
     "contextSummary": {"type": "object"},
     "deterministic": {"type": "boolean", "const": true},
@@ -115,6 +116,24 @@
         }
       }
     },
+    "observedByConnector": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actorRole", "expectedStatus", "invariantId", "observedStatus", "passed", "route", "source", "title"],
+        "properties": {
+          "actorRole": {"type": "string"},
+          "expectedStatus": {"type": ["integer", "null"]},
+          "invariantId": {"type": "string"},
+          "observedStatus": {"type": ["integer", "null"]},
+          "passed": {"type": "boolean"},
+          "route": {"type": "string"},
+          "source": {"type": "string"},
+          "title": {"type": "string"}
+        }
+      }
+    },
     "prioritizationPolicy": {"type": "string"},
     "productionAccess": {"type": "boolean", "const": false},
     "proposedByModel": {
@@ -162,6 +181,7 @@
           "issueReadiness": {"type": "string"},
           "observedResult": {"type": "string", "enum": ["fail", "pass", "probe"]},
           "riskScore": {"type": "number", "minimum": 0, "maximum": 1},
+          "securitySeverity": {"type": "string", "enum": ["unclassified", "low", "medium", "high", "critical"]},
           "scenarioId": {"type": "string"}
         }
       }

@@ -26,6 +26,19 @@ connector-declared routes, parameters, actors, and actions. The connector
 remains app-specific: it maps `connectorAction` names to real fixture setup,
 browser/API actions, and observed statuses.
 
+`bayesilisk connector verify` is evidence-scoped. Its findings, verified
+ledger, ranked probes, and issue payloads contain only failures derived from
+the supplied connector observations. The general Bayesilisk catalog and its
+generated demonstration scenarios are intentionally excluded: a scenario that
+the connector did not execute is not evidence about the target application.
+The report keeps `riskScore` as a contract-breakage ranking value and labels
+external connector findings with `securitySeverity: unclassified`; the score
+is not a CVSS rating or a security-severity decision.
+
+The connector report's `contextSummary` follows the same boundary. It contains
+source, observation, and proposal counts; it does not include keyword matches
+or prior adjustments from the built-in demonstration catalog.
+
 ## How The Connector Reaches The App
 
 Bayesilisk core never touches the app — it only reads and verifies the observed

@@ -39,6 +39,7 @@
     "originalScenario": {"type": ["object", "null"]},
     "posteriorMode": {"type": "string"},
     "riskScore": {"type": "number", "minimum": 0, "maximum": 1},
+    "securitySeverity": {"type": "string", "enum": ["unclassified", "low", "medium", "high", "critical"]},
     "scenarioId": {"type": "string"},
     "title": {"type": "string"}
   }

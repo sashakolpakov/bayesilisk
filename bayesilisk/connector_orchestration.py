@@ -4,7 +4,7 @@ from typing import Any
 
 from .constants import VERSION
 from .probe_proposals import generate_probe_proposals
-from .reporting import build_contextual_report, issue_payloads
+from .reporting import build_connector_report, issue_payloads
 from .utils import _safe_hash
 
 DEFAULT_CREATED_AT = "1970-01-01T00:00:00Z"
@@ -740,7 +740,7 @@ def verify_connector_outputs(arguments: dict[str, Any]) -> dict[str, Any]:
         )
 
     context = _merge_contexts(source_context, observed_context)
-    report = build_contextual_report(seed, limit=limit, context=context)
+    report = build_connector_report(seed, limit=limit, context=context)
     payloads = issue_payloads(report, context=context, limit=limit) if include_issue_payloads else []
     ledgers = {
         "observedByPlaywright": _observed_facts(observed_context),

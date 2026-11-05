@@ -320,6 +320,143 @@ def build_contextual_report(
     return report
 
 
+def build_connector_report(
+    seed: int,
+    limit: int | None = None,
+    context: dict[str, Any] | None = None,
+    runtime_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build an evidence-scoped report for connector verification.
+
+    Connector verification is intentionally different from the general catalog
+    report: only failures derived from connector-returned observed facts may be
+    emitted as findings or issue payloads. Built-in demonstration/catalog
+    scenarios are neither executed by the connector nor evidence about the
+    target application, so including them here would misattribute findings.
+    """
+    context = _dict_or_empty(context)
+    effective_config = effective_runtime_config(runtime_config)
+    findings = sorted(
+        _external_observed_findings(context),
+        key=lambda item: (-item["riskScore"], item["posteriorMode"], item["id"]),
+    )
+    if limit is not None:
+        findings = findings[:limit]
+    observed_facts = [
+        {
+            "actorRole": fact.get("actorRole"),
+            "expectedStatus": fact.get("expectedStatus"),
+            "invariantId": fact.get("invariantId"),
+            "observedStatus": fact.get("observedStatus"),
+            "passed": fact.get("passed"),
+            "route": fact.get("route"),
+            "source": fact.get("source"),
+            "title": fact.get("title"),
+        }
+        for fact in context.get("repositoryFacts", [])
+        if isinstance(fact, dict) and _is_observed_status_fact(fact)
+    ]
+    external_invariants: dict[str, dict[str, Any]] = {}
+    for fact in context.get("repositoryFacts", []):
+        if not isinstance(fact, dict) or _is_observed_status_fact(fact):
+            continue
+        invariant_id = fact.get("invariantId")
+        if not isinstance(invariant_id, str) or not invariant_id:
+            continue
+        behavior = fact.get("expectedBehavior")
+        expected = behavior.get("description") if isinstance(behavior, dict) else None
+        external_invariants[invariant_id] = {
+            "difficulty": "easy",
+            "id": invariant_id,
+            "expected": expected or f"External app invariant `{invariant_id}` must hold.",
+            "failLikelihood": 0.95,
+            "layer": "external app connector",
+            "passLikelihood": 0.05,
+            "prior": 0.5,
+        }
+    verified_ledger = [
+        {
+            "classification": finding["classification"],
+            "fingerprint": finding["fingerprint"],
+            "invariantId": finding["invariantId"],
+            "issueReadiness": finding["issueReadiness"],
+            "observedResult": finding["observedResult"],
+            "riskScore": finding["riskScore"],
+            "securitySeverity": finding.get("securitySeverity", "unclassified"),
+            "scenarioId": finding["scenarioId"],
+        }
+        for finding in findings
+    ]
+    generated_probe_proposals = generate_probe_proposals(context)
+    connector_summary = {
+        "source": context.get("source", "none"),
+        "repositoryFactCount": len(
+            [fact for fact in context.get("repositoryFacts", []) if isinstance(fact, dict)]
+        ),
+        "sourceFactCount": len(
+            [
+                fact
+                for fact in context.get("repositoryFacts", [])
+                if isinstance(fact, dict) and not _is_observed_status_fact(fact)
+            ]
+        ),
+        "observedFactCount": len(observed_facts),
+        "passedObservationCount": sum(fact.get("passed") is True for fact in observed_facts),
+        "failedObservationCount": sum(fact.get("passed") is False for fact in observed_facts),
+        "agentNoteCount": len(
+            [note for note in context.get("agentNotes", []) if isinstance(note, str) and note.strip()]
+        ),
+        "probeProposalCount": len(generated_probe_proposals),
+    }
+    report = {
+        "tool": VERSION,
+        "seed": seed,
+        "deterministic": True,
+        "productionAccess": False,
+        "connectorEvidenceScoped": True,
+        "generatedScenarioCount": 0,
+        "effectiveConfiguration": report_runtime_config(effective_config),
+        "grassmannAttention": {
+            "boundedFeedback": True,
+            "embeddingMode": "disabled-for-connector-verification",
+            "planes": [],
+            "selectedPlaneIds": [],
+            "source": "connector-observed-evidence-only",
+        },
+        "weakModelScenarioGeneration": {"enabled": False, "source": "connector-verification"},
+        # Keep the historical key for report-schema compatibility while adding
+        # the accurately named ledger for new consumers.
+        "observedByPlaywright": [],
+        "observedByConnector": observed_facts,
+        "selectedByGrassmannAttention": [],
+        "proposedByModel": {
+            "acceptedCount": 0,
+            "enabled": False,
+            "provider": "disabled-for-connector-verification",
+            "rejectedCount": 0,
+        },
+        "verifiedByBayesilisk": verified_ledger,
+        "domains": ["external app connector"],
+        "prioritizationPolicy": (
+            "Emit only deterministic failures backed by connector-returned observed evidence."
+        ),
+        "invariants": [external_invariants[key] for key in sorted(external_invariants)],
+        "roleRouteMatrix": {},
+        "sections": report_sections(findings),
+        "findings": findings,
+        # The general report's keyword counter is tied to Bayesilisk's built-in
+        # demo catalog. Connector reports instead summarize only connector
+        # source and observed facts, avoiding unrelated catalog metadata.
+        "contextSummary": connector_summary,
+        "contextObservationSource": context.get("source", "none"),
+    }
+    if generated_probe_proposals:
+        report["generatedProbeProposals"] = generated_probe_proposals
+    report["rankedProbes"] = ranked_probes(report, limit=limit)
+    report["issuePayloads"] = issue_payloads(report, context=context, limit=limit)
+    return report
+
+
 def ranked_probes(report: dict[str, Any], limit: int | None = None) -> list[dict[str, Any]]:
     probes = [
         {
@@ -403,6 +540,11 @@ def issue_payloads(
                 "originalScenario": finding.get("originalScenario"),
                 "posteriorMode": finding["posteriorMode"],
                 "riskScore": finding["riskScore"],
+                **(
+                    {"securitySeverity": finding["securitySeverity"]}
+                    if "securitySeverity" in finding
+                    else {}
+                ),
                 "scenarioId": finding["scenarioId"],
                 "title": title,
             }
@@ -528,7 +670,9 @@ def _external_observed_findings(context: dict[str, Any] | None) -> list[dict[str
                 "observedResult": "fail",
                 "observation": observation,
                 "classification": "breakage.context-observed",
+                "confidenceType": "deterministic-contract-mismatch",
                 "issueReadiness": "ready-for-issue",
+                "securitySeverity": "unclassified",
                 "attentionScore": 1.0,
                 "attentionReasons": ["connector-evidence", "external-context-failure"],
                 "observationBasis": {"source": context.get("source", "context"), "tags": ["confirmed-local-breakage"], "priorDelta": 0.0},
