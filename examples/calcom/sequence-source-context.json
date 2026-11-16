@@ -59,7 +59,14 @@
             "resourceType": "calcom_user",
             "refines": "user.username"
           }
-        ]
+        ],
+        "paramBindings": {
+          "rescheduleUid": {
+            "token": "resource.public_id",
+            "resourceType": "booking",
+            "refines": "booking.uid"
+          }
+        }
       }
     ],
     "sequenceRules": [
@@ -100,5 +107,6 @@
   },
   "priorAdjustments": {},
   "repositoryFacts": [],
-  "source": "calcom-connector-action-graph"
+  "source": "calcom-connector-action-graph",
+  "connectorInstructions": "Use the existing local Cal.com fixtures. Create a booking before cancelling it. Then replay its booking.uid as rescheduleUid through the public booking route. The connector executes each action in sequence; report only observed results."
 }

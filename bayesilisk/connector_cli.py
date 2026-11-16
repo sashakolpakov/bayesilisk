@@ -30,8 +30,8 @@ from .connector_orchestration import (
 )
 from .connector_loop import advance as loop_advance
 from .connector_scan import load_spec, scan_openapi
+from .connector_exploration import explore_connector
 from .motifs import available_motifs, bind_motifs, load_packs
-from .probe_proposals import generate_probe_proposals
 from .reporting import markdown_report
 
 ACTION_GRAPH_TEMPLATE = {
@@ -176,8 +176,33 @@ def _cmd_propose(args: argparse.Namespace) -> int:
         context = bind_motifs(context, motifs)
         _eprint(f"bound {len(motifs)} motif(s) from {len(_packs_from_args(args)) + 1} pack source(s)")
     limit = args.limit if args.limit is not None else 24
-    proposals = generate_probe_proposals(context, limit=limit)
+    draft = _load_json(args.draft_plan) if args.draft_plan else None
+    if draft is not None and (not isinstance(draft, dict) or not isinstance(draft.get("scenarios"), list)):
+        _eprint("FAIL: draft plan must contain a scenarios array")
+        return 1
+    try:
+        exploration = explore_connector(context, runtime_config=_runtime_config(args),
+                                        drafts=draft.get("scenarios", []) if isinstance(draft, dict) else None,
+                                        limit=limit)
+    except ValueError as exc:
+        _eprint("FAIL: " + str(exc))
+        return 1
+    proposals = exploration["proposals"]
     _emit(_dump(proposals), args.output)
+    if args.plan_output:
+        _emit(_dump({"acceptedScenarios": proposals, "sourceContext": context,
+                     "exploration": {key: value for key, value in exploration.items() if key != "proposals"}}), args.plan_output)
+    model = exploration["modelScenarioGeneration"]
+    if model.get("enabled") or draft is not None:
+        _eprint(f"model scenarios: {model['acceptedCount']} admitted, {model['rejectedCount']} rejected")
+        for rejection in model.get("rejected", []):
+            _eprint("  rejected: " + rejection["reason"])
+    if model.get("error"):
+        _eprint("FAIL: scenario proposer: " + model["error"])
+        return 1
+    if draft is not None and not model["acceptedCount"]:
+        _eprint("FAIL: no draft scenario passed contract validation")
+        return 1
     if not proposals:
         # The key fix over `--probe-proposals-output`: never silently emit [].
         validation = validate_source_context(context)
@@ -192,7 +217,8 @@ def _cmd_propose(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    source_context = _load_json(args.source) if args.source else {}
+    plan = _load_json(args.plan) if args.plan else {}
+    source_context = _load_json(args.source) if args.source else plan.get("sourceContext", {})
     observed_context = _load_json(args.observed)
     if not isinstance(observed_context, dict):
         _eprint("FAIL: --observed file is not a JSON object")
@@ -205,7 +231,6 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             _print_diagnostics("local provenance", prov_payload["validation"])
             return 1
         provenance = prov_payload["provenance"]
-    plan = _load_json(args.plan) if args.plan else {}
     result = verify_connector_outputs(
         {
             "sourceContext": source_context if isinstance(source_context, dict) else {},
@@ -280,6 +305,7 @@ def _cmd_loop(args: argparse.Namespace) -> int:
         license_token=getattr(args, "license", None),
         max_rounds=args.max_rounds,
         max_dry_rounds=args.max_dry_rounds,
+        runtime_config=_runtime_config(args),
     )
     args.state.write_text(_dump(result["state"]) + "\n", encoding="utf-8")
     _eprint(f"[{result['phase']}] round {result['round']}")
@@ -288,6 +314,31 @@ def _cmd_loop(args: argparse.Namespace) -> int:
         _eprint(f"  new findings: {result['newFindingCount']} | total issue payloads: {len(result.get('issuePayloads', []))}")
     _emit(_dump({key: value for key, value in result.items() if key != "state"}), args.output)
     return 1 if result["phase"] == "blocked" else 0
+
+
+RUNTIME_OPTIONS = {
+    "scenario-provider": (str, "scenarioProvider"), "scenario-model": (str, "scenarioModel"),
+    "scenario-base-url": (str, "scenarioBaseUrl"), "scenario-api-key-env": (str, "scenarioApiKeyEnv"),
+    "scenario-timeout": (float, "scenarioTimeout"), "scenario-proposal-limit": (int, "scenarioProposalLimit"),
+    "scenario-max-attempts": (int, "scenarioMaxAttempts"),
+    "ollama-base-url": (str, "ollamaBaseUrl"), "embedding-model": (str, "embeddingModel"),
+    "attention-threshold": (float, "attentionThreshold"), "attention-selection-limit": (int, "attentionSelectionLimit"),
+}
+
+
+def _runtime_config(args: argparse.Namespace) -> dict[str, Any]:
+    mapping = {flag.replace("-", "_"): key for flag, (_, key) in RUNTIME_OPTIONS.items()}
+    mapping.update(enable_scenario_proposer="enableScenarioProposer", enable_embeddings="enableEmbeddings")
+    return {key: getattr(args, name) for name, key in mapping.items() if getattr(args, name, None) is not None}
+
+
+def _add_exploration_arguments(parser: argparse.ArgumentParser) -> None:
+    for flag, (kind, _) in RUNTIME_OPTIONS.items():
+        parser.add_argument("--" + flag, type=kind, default=None)
+    for flag in ("scenario-proposer", "embeddings"):
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("--enable-" + flag, dest="enable_" + flag.replace("-", "_"), action="store_true", default=None)
+        group.add_argument("--disable-" + flag, dest="enable_" + flag.replace("-", "_"), action="store_false")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -316,6 +367,9 @@ def build_parser() -> argparse.ArgumentParser:
     propose_parser.add_argument("--pack", type=Path, action="append", help="Extra motif pack file/dir (repeatable).")
     propose_parser.add_argument("--license", default=None, help="License token or path (or set BAYESILISK_LICENSE).")
     propose_parser.add_argument("--output", type=Path, default=None, help="Write to a file instead of stdout.")
+    propose_parser.add_argument("--draft-plan", type=Path, default=None, help="Validate externally proposed ABAG scenarios.")
+    propose_parser.add_argument("--plan-output", type=Path, default=None, help="Save the admitted plan, attention and proposer diagnostics.")
+    _add_exploration_arguments(propose_parser)
     propose_parser.set_defaults(func=_cmd_propose)
 
     scan_parser = sub.add_parser("scan", help="Scan an OpenAPI spec into a draft source context.")
@@ -342,6 +396,7 @@ def build_parser() -> argparse.ArgumentParser:
     loop_parser.add_argument("--max-rounds", type=int, default=None, help="Round cap (default 6).")
     loop_parser.add_argument("--max-dry-rounds", type=int, default=None, help="Stop after K dry rounds (default 2).")
     loop_parser.add_argument("--output", type=Path, default=None, help="Write the step result JSON to a file instead of stdout.")
+    _add_exploration_arguments(loop_parser)
     loop_parser.set_defaults(func=_cmd_loop)
 
     verify_parser = sub.add_parser("verify", help="Run deterministic verification over observed evidence.")

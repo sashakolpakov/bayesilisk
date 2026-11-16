@@ -15,6 +15,8 @@ import {
 } from "./lib/testUtils";
 
 type ProbeResult = {
+  proposalId?: string;
+  executedActions?: string[];
   actorRole: string;
   artifactPaths: string[];
   expectedStatus: number;
@@ -166,6 +168,7 @@ function buildContext(results: ProbeResult[], proposals: ProbeProposal[] = []) {
 async function recordProbe(
   results: ProbeResult[],
   probe: {
+    proposalId?: string;
     actorRole: string;
     expectedStatus: number;
     invariantId: string;
@@ -176,6 +179,7 @@ async function recordProbe(
     | boolean
     | {
         artifactPaths?: string[];
+        executedActions?: string[];
         failureDetail?: string;
         networkResponses?: Array<{ status: number; url: string }>;
         observedStatus?: number;
@@ -187,6 +191,7 @@ async function recordProbe(
   let observedStatus = 500;
   let failureDetail = "";
   let artifactPaths: string[] = [];
+  let executedActions: string[] | undefined;
   let networkResponses: Array<{ status: number; url: string }> = [];
   let targetUrl = probe.route;
   try {
@@ -195,6 +200,7 @@ async function recordProbe(
       observedStatus = result ? probe.expectedStatus : 200;
     } else {
       artifactPaths = result.artifactPaths ?? [];
+      executedActions = result.executedActions;
       failureDetail = result.failureDetail ?? "";
       networkResponses = result.networkResponses ?? [];
       observedStatus = result.observedStatus ?? (result.passed ? probe.expectedStatus : 200);
@@ -209,6 +215,7 @@ async function recordProbe(
   results.push({
     ...probe,
     artifactPaths,
+    executedActions,
     failureDetail,
     networkResponses,
     observedStatus,
@@ -253,6 +260,7 @@ async function executeWorkflowSequenceProposal(
   let bookingFormVisible = false;
   let blockedStateVisible = false;
   const steps = proposal.sequenceSteps ?? [];
+  const executedActions: string[] = [];
 
   for (const step of steps) {
     if (step.connectorAction === "create-booking") {
@@ -263,6 +271,7 @@ async function executeWorkflowSequenceProposal(
       state["booking.id"] = booking.id;
       state["eventType.slug"] = eventType.slug;
       state["user.username"] = user.username;
+      executedActions.push(step.connectorAction);
       continue;
     }
 
@@ -273,6 +282,7 @@ async function executeWorkflowSequenceProposal(
       }
       await prisma.booking.update({ where: { id: bookingId }, data: { status: BookingStatus.CANCELLED } });
       state["booking.status.cancelled"] = "true";
+      executedActions.push(step.connectorAction);
       continue;
     }
 
@@ -298,6 +308,7 @@ async function executeWorkflowSequenceProposal(
         (await fixtures.page.locator('[data-testid="cancelled-headline"]').count()) > 0 ||
         (await fixtures.page.locator("[data-testid=success-page]").count()) > 0 ||
         (await fixtures.page.locator("text=This booking has been cancelled").count()) > 0;
+      executedActions.push(step.connectorAction);
       continue;
     }
 
@@ -305,6 +316,7 @@ async function executeWorkflowSequenceProposal(
   }
 
   return {
+    executedActions,
     failureDetail: blockedStateVisible && !bookingFormVisible
       ? ""
       : `Bayesilisk-generated sequence replayed a cancelled booking UID as public rescheduleUid and reached ${targetUrl} with semantic status ${
@@ -335,6 +347,7 @@ test("Bayesilisk Cal.com workflow probes", async ({ page, users, bookings }) => 
           results,
           {
             actorRole: "attendee",
+            proposalId: proposal.proposalId,
             expectedStatus: proposal.expectedStatus,
             invariantId: proposal.invariantId,
             route: (proposal.sequenceSteps ?? []).map((step) => step.connectorAction).join(" -> "),
@@ -355,6 +368,7 @@ test("Bayesilisk Cal.com workflow probes", async ({ page, users, bookings }) => 
         results,
         {
           actorRole: "attendee",
+          proposalId: proposal.proposalId,
           expectedStatus: proposal.expectedStatus,
           invariantId: proposal.invariantId,
           route: proposal.routePattern,

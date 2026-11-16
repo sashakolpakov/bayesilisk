@@ -12,6 +12,8 @@ bayesilisk/
   facts.py               scenario fact derivation and minimization helpers
   context.py             context, observations, and probe-fact ingestion
   attention.py           Grassmann attention surfaces
+  connector_attention.py connector-goal subspace attention and coverage feedback
+  connector_exploration.py ABAG model prompting, admission, retention and replay checks
   model_proposals.py     scenario proposer provider surfaces
   probe_proposals.py     connector rule/action-graph probe expansion
   connector_orchestration.py Codex MCP connector interview, provenance, planning, validation, and fix packets

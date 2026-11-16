@@ -6,7 +6,8 @@ human babysitting, without ever crossing Bayesilisk's trust boundary.
 Bayesilisk cannot run an arbitrary app — authentication, seed data, fixtures, and
 the browser are app-specific — and it must never let a model decide the verdict.
 So the loop is a **stateless next-step controller**: it performs every
-*deterministic* step (scan → bind motifs → validate → verify → fix) and tracks
+admission and verification step (scan → bind motifs → validate → verify → fix),
+optionally calls a connector-aware model proposer, and tracks
 convergence, then returns the exact next action for the one step it cannot do —
 writing and running the connector. The agent (Codex/Claude, or you) drives by
 calling the controller repeatedly and passing the returned `state` back in.
@@ -33,10 +34,12 @@ calling the controller repeatedly and passing the returned `state` back in.
        await-execution  (expand probes/fixtures, re-execute)
 ```
 
-Convergence: the loop stops after `maxDryRounds` consecutive rounds with no new
-verified ready-for-issue fingerprint (default 2), or when `maxRounds` is reached
-(default 6), accumulating all verified findings and issue payloads. It is
-deterministic — ids derive from content hashes and there are no clocks or RNG.
+Convergence: the loop stops after `maxDryRounds` consecutive rounds with neither
+a new verified finding nor a newly admitted execution-checked procedure (default
+2), or when `maxRounds` is reached (default 6). Model generation is optional and
+can vary; admission, verification and content-derived identities remain
+deterministic for recorded inputs. See {doc}`connector-exploration` for the ABAG
+model, attention, retained library and execution-receipt requirements.
 
 ## CLI
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .constants import VERSION
+from .connector_exploration import explore_connector, is_workflow_proposal, validate_planned_sequences
 from .probe_proposals import generate_probe_proposals
 from .reporting import build_connector_report, issue_payloads
 from .utils import _safe_hash
@@ -479,22 +480,25 @@ def scenario_plan(arguments: dict[str, Any]) -> dict[str, Any]:
         errors.append("accepted provenance with provenanceId is required")
     if not source_context:
         errors.append("sourceContext is required")
+    if "draftPlan" in arguments and (not isinstance(arguments["draftPlan"], dict)
+                                      or not isinstance(arguments["draftPlan"].get("scenarios"), list)):
+        errors.append("draftPlan must contain a scenarios array")
 
     forbidden_paths = _forbidden_field_paths(draft_plan)
     if forbidden_paths:
         errors.append("draftPlan contains verifier-only fields: " + ", ".join(forbidden_paths))
 
-    generated = generate_probe_proposals(source_context, limit=limit) if source_context else []
-    declared_actions = _declared_connector_actions(source_context)
-    for scenario in _list(draft_plan.get("scenarios")):
-        if not isinstance(scenario, dict):
-            continue
-        action = _text(scenario.get("connectorAction"))
-        title = _text(scenario.get("title"), "draft scenario")
-        if action and action not in declared_actions:
-            rejected_scenarios.append({"reason": f"unknown connectorAction `{action}`", "title": title})
-        if not _is_int(scenario.get("expectedStatus")):
-            rejected_scenarios.append({"reason": "missing integer expectedStatus", "title": title})
+    exploration = explore_connector(
+        source_context, runtime_config=arguments,
+        drafts=_list(draft_plan.get("scenarios")) if draft_plan else None,
+        memory=_dict(arguments.get("explorationMemory")),
+        history=_list(arguments.get("executionHistory")), limit=limit,
+    ) if not errors else {}
+    generated = exploration.get("proposals", [])
+    model = exploration.get("modelScenarioGeneration", {})
+    rejected_scenarios = model.get("rejected", [])
+    if model.get("error"):
+        errors.append("connector scenario proposer failed: " + model["error"])
 
     if not generated and not errors:
         warnings.append("sourceContext produced no proposals; add proposalRules, proposalGates, or connectorActionGraph.sequenceRules")
@@ -507,7 +511,9 @@ def scenario_plan(arguments: dict[str, Any]) -> dict[str, Any]:
             "Connector executes connectorAction against local fixtures and writes observed facts.",
             "Observed facts must be produced by Playwright/API execution, not by Codex prose.",
             "Call verify_connector_outputs after connector execution.",
+            "Record proposalId and executedActions for sequence replay and retained-procedure admission.",
         ],
+        "exploration": {key: value for key, value in exploration.items() if key != "proposals"},
         "generatedProposals": generated,
         "planId": _hash_id("scenario-plan", plan_seed, 16),
         "provenanceId": provenance_id or None,
@@ -657,6 +663,10 @@ def _validate_observed_context(
     if not facts:
         errors.append("observedContext.repositoryFacts must contain at least one observed fact")
     allowed_actions = _scenario_plan_actions(scenario_plan_payload or {})
+    planned = {proposal.get("proposalId"): proposal
+               for proposal in _list((scenario_plan_payload or {}).get("acceptedScenarios"))
+               if isinstance(proposal, dict) and isinstance(proposal.get("proposalId"), str)}
+    workflow_plan = any(is_workflow_proposal(proposal) for proposal in planned.values())
     forbidden_observed_fields = FORBIDDEN_DRAFT_FIELDS - {"observedStatus", "passed"}
     for index, fact in enumerate(facts):
         prefix = f"observedContext.repositoryFacts[{index}]"
@@ -678,6 +688,21 @@ def _validate_observed_context(
             errors.append(f"{prefix}.passed must be a boolean")
         if _is_int(expected) and _is_int(observed) and isinstance(passed, bool) and passed != (observed == expected):
             errors.append(f"{prefix}.passed must equal observedStatus == expectedStatus")
+        proposal_id = fact.get("proposalId")
+        if isinstance(proposal_id, str) and proposal_id.startswith("sequence.model.") and proposal_id not in planned:
+            errors.append(f"{prefix} requires the saved model scenario plan")
+        if workflow_plan and not proposal_id:
+            errors.append(f"{prefix}.proposalId is required for a workflow scenario plan")
+        if proposal_id is not None and planned:
+            proposal = planned.get(proposal_id) if isinstance(proposal_id, str) else None
+            if proposal is None:
+                errors.append(f"{prefix}.proposalId is not in scenarioPlan")
+            else:
+                if expected != proposal.get("expectedStatus") or fact.get("invariantId") != proposal.get("invariantId"):
+                    errors.append(f"{prefix} changed the planned invariant or expected status")
+                executed = fact.get("executedActions")
+                if (executed is not None or is_workflow_proposal(proposal)) and executed != [step["connectorAction"] for step in proposal.get("sequenceSteps", [])]:
+                    errors.append(f"{prefix}.executedActions disagrees with the planned sequence")
         target_url = _text(fact.get("targetUrl"))
         if _is_production_url(target_url):
             errors.append(f"{prefix}.targetUrl must not point at production")
@@ -716,6 +741,10 @@ def verify_connector_outputs(arguments: dict[str, Any]) -> dict[str, Any]:
     limit = None if limit_arg is None else _bounded_int(limit_arg, default=10, maximum=100)
     include_issue_payloads = bool(arguments.get("includeIssuePayloads", True))
     validation = _validate_observed_context(observed_context, scenario_plan_payload=plan)
+    plan_errors = validate_planned_sequences(source_context, plan)
+    if plan_errors:
+        validation["accepted"] = False
+        validation["errors"].extend(plan_errors)
     if not _text(provenance.get("provenanceId")):
         validation["accepted"] = False
         validation["errors"].append("accepted provenance with provenanceId is required")
@@ -740,7 +769,10 @@ def verify_connector_outputs(arguments: dict[str, Any]) -> dict[str, Any]:
         )
 
     context = _merge_contexts(source_context, observed_context)
-    report = build_connector_report(seed, limit=limit, context=context)
+    report = build_connector_report(
+        seed, limit=limit, context=context, exploration=_dict(plan.get("exploration")),
+        planned_proposals=_list(plan.get("acceptedScenarios")) if "acceptedScenarios" in plan else None,
+    )
     payloads = issue_payloads(report, context=context, limit=limit) if include_issue_payloads else []
     ledgers = {
         "observedByPlaywright": _observed_facts(observed_context),

@@ -54,6 +54,11 @@ Unlike a raw export, `propose` reports the proposal count and, when zero are
 generated, tells you exactly what is missing. Each proposal carries a
 `connectorAction` your connector maps to real fixture/browser/API behavior.
 
+For an action graph, add `--enable-scenario-proposer --scenario-model MODEL
+--plan-output scenario-plan.json` to explore model-proposed token sequences.
+See {doc}`connector-exploration` for attention, deterministic admission, external
+agent drafts and execution receipts.
+
 ## 4. Execute the connector
 
 Run your app-specific connector against **local, dev, or staging fixtures only**.

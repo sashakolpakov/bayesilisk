@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from .context import load_context, load_observations
-from .probe_proposals import generate_probe_proposals
 from .reporting import (
     build_contextual_report,
     build_report,
@@ -113,9 +112,15 @@ def main() -> int:
     context = load_context(args.context)
     runtime_config = runtime_config_from_args(args)
     if args.probe_proposals_output is not None:
-        content = json.dumps(generate_probe_proposals(context), indent=2, sort_keys=True) + "\n"
+        from .connector_exploration import explore_connector
+
+        exploration = explore_connector(context or {}, runtime_config=runtime_config)
+        content = json.dumps(exploration["proposals"], indent=2, sort_keys=True) + "\n"
         write_output(content, args.probe_proposals_output)
-        return 0
+        error = exploration["modelScenarioGeneration"].get("error")
+        if error:
+            print("scenario proposer: " + error, file=sys.stderr)
+        return 1 if error else 0
     if context:
         report = build_contextual_report(
             args.seed,

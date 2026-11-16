@@ -72,7 +72,14 @@ Bayesilisk accepts a proposal only when:
 - the facts remain schema-valid;
 - provenance is recorded.
 
-The accepted scenario still goes through the deterministic invariant checker.
+The accepted catalog scenario still goes through the deterministic invariant checker.
+
+Connectors have a separate model-guided path over their declared ABAG and goals.
+The prompt includes connector instructions, typed action signatures, exploration
+attention, retained executable sequences and execution/rejection feedback. A
+deterministic gate admits model-selected paths before execution. See
+{doc}`connector-exploration`. This path can choose alternative producers and
+compositions beyond the catalog and the first-producer planner.
 
 ## Feedback Loop
 
@@ -113,8 +120,8 @@ core pack plus optionally gated packs). See {doc}`motifs`.
 ## Automated Loop
 
 A deterministic surface scanner turns an API description into a draft connector
-contract, and a stateless loop controller drives
-`scan → bind motifs → validate → verify → fix` to convergence, returning the one
-step it cannot perform — connector execution — for the agent to run. Bayesilisk
-never executes the application and never decides pass/fail. See
+contract. A controller coordinates motif binding, optional model exploration,
+admission, execution hand-offs, verification and repair. Caller-owned state
+retains execution-checked procedures and feedback for subsequent exploration.
+Bayesilisk verifies observations; the connector executes the application. See
 {doc}`connector-loop`.

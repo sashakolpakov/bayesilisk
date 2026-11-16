@@ -42,6 +42,7 @@ reports
 integrations
 codex-mcp
 connector-quickstart
+connector-exploration
 connectors
 motifs
 connector-loop

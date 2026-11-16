@@ -89,6 +89,7 @@ def effective_runtime_config(overrides: dict[str, Any] | None = None) -> dict[st
             os.environ.get("BAYESILISK_OLLAMA_SCENARIO_MODEL", os.environ.get("OLLAMA_MODEL", "gemma4:e2b")),
         ),
         "scenarioProposalLimit": max(0, _config_int(overrides, "scenarioProposalLimit", int(os.environ.get("BAYESILISK_MODEL_SCENARIO_LIMIT", "3")))),
+        "scenarioMaxAttempts": max(1, min(3, _config_int(overrides, "scenarioMaxAttempts", 2))),
         "scenarioProvider": scenario_provider,
         "scenarioTimeout": _config_float(
             overrides,

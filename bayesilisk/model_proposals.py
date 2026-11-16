@@ -29,18 +29,20 @@ def _ollama_chat_json(
     base_url: str,
     model: str,
     timeout: float,
+    response_format: dict[str, Any] | str | None = None,
 ) -> dict[str, Any]:
-    payload = json.dumps(
-        {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "temperature": float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TEMPERATURE", "0.2")),
-                "num_predict": int(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_NUM_PREDICT", "1200")),
-            },
-        }
-    ).encode("utf-8")
+    body = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "options": {
+            "temperature": float(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_TEMPERATURE", "0.2")),
+            "num_predict": int(os.environ.get("BAYESILISK_OLLAMA_SCENARIO_NUM_PREDICT", "1200")),
+        },
+    }
+    if response_format is not None:
+        body["format"] = response_format
+    payload = json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/chat",
         data=payload,
@@ -62,8 +64,12 @@ def _openai_compatible_chat_json(
     base_url: str,
     model: str,
     timeout: float,
+    json_mode: bool = False,
 ) -> dict[str, Any]:
-    payload = json.dumps({"model": model, "messages": messages, "temperature": 0.2}).encode("utf-8")
+    body = {"model": model, "messages": messages, "temperature": 0.2}
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    payload = json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=payload,
@@ -97,6 +103,7 @@ class OllamaScenarioProposalProvider(ScenarioProposalProvider):
             base_url=config["ollamaBaseUrl"],
             model=config["scenarioModel"],
             timeout=config["scenarioTimeout"],
+            response_format=config.get("scenarioResponseSchema"),
         )
 
 
@@ -112,6 +119,7 @@ class OpenAICompatibleScenarioProposalProvider(ScenarioProposalProvider):
             base_url=config["scenarioBaseUrl"],
             model=config["scenarioModel"],
             timeout=config["scenarioTimeout"],
+            json_mode=bool(config.get("scenarioResponseSchema")),
         )
 
 

@@ -325,6 +325,8 @@ def build_connector_report(
     limit: int | None = None,
     context: dict[str, Any] | None = None,
     runtime_config: dict[str, Any] | None = None,
+    exploration: dict[str, Any] | None = None,
+    planned_proposals: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build an evidence-scoped report for connector verification.
 
@@ -357,7 +359,7 @@ def build_connector_report(
         if isinstance(fact, dict) and _is_observed_status_fact(fact)
     ]
     external_invariants: dict[str, dict[str, Any]] = {}
-    for fact in context.get("repositoryFacts", []):
+    for fact in [*context.get("repositoryFacts", []), *context.get("connectorActionGraph", {}).get("sequenceRules", [])]:
         if not isinstance(fact, dict) or _is_observed_status_fact(fact):
             continue
         invariant_id = fact.get("invariantId")
@@ -387,7 +389,7 @@ def build_connector_report(
         }
         for finding in findings
     ]
-    generated_probe_proposals = generate_probe_proposals(context)
+    generated_probe_proposals = planned_proposals if planned_proposals is not None else generate_probe_proposals(context)
     connector_summary = {
         "source": context.get("source", "none"),
         "repositoryFactCount": len(
@@ -418,12 +420,12 @@ def build_connector_report(
         "effectiveConfiguration": report_runtime_config(effective_config),
         "grassmannAttention": {
             "boundedFeedback": True,
-            "embeddingMode": "disabled-for-connector-verification",
+            "embeddingMode": "not-recorded",
             "planes": [],
             "selectedPlaneIds": [],
-            "source": "connector-observed-evidence-only",
+            "source": "no-saved-exploration-plan",
         },
-        "weakModelScenarioGeneration": {"enabled": False, "source": "connector-verification"},
+        "weakModelScenarioGeneration": {"enabled": False, "source": "no-saved-exploration-plan"},
         # Keep the historical key for report-schema compatibility while adding
         # the accurately named ledger for new consumers.
         "observedByPlaywright": [],
@@ -432,7 +434,7 @@ def build_connector_report(
         "proposedByModel": {
             "acceptedCount": 0,
             "enabled": False,
-            "provider": "disabled-for-connector-verification",
+            "provider": "not-recorded",
             "rejectedCount": 0,
         },
         "verifiedByBayesilisk": verified_ledger,
@@ -450,6 +452,22 @@ def build_connector_report(
         "contextSummary": connector_summary,
         "contextObservationSource": context.get("source", "none"),
     }
+    # Carry the saved planning transcript forward. Verification never calls the
+    # proposer again and no generated scenario is promoted into a finding here.
+    if exploration:
+        attention = exploration.get("grassmannAttention")
+        model = exploration.get("modelScenarioGeneration")
+        if isinstance(attention, dict):
+            report["grassmannAttention"] = attention
+            selected = set(attention.get("selectedPlaneIds", []))
+            report["selectedByGrassmannAttention"] = [{key: plane[key] for key in ("attentionScore", "invariantId", "reasons")}
+                                                     for plane in attention.get("planes", [])
+                                                     if plane.get("invariantId") in selected]
+        if isinstance(model, dict):
+            report["weakModelScenarioGeneration"] = model
+            report["proposedByModel"] = model
+        if isinstance(exploration.get("effectiveConfiguration"), dict):
+            report["effectiveConfiguration"] = exploration["effectiveConfiguration"]
     if generated_probe_proposals:
         report["generatedProbeProposals"] = generated_probe_proposals
     report["rankedProbes"] = ranked_probes(report, limit=limit)

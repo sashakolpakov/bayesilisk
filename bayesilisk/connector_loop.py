@@ -7,9 +7,9 @@ hands the agent the exact next action for the one step it cannot do: write and r
 the connector. The agent drives by calling `advance` repeatedly, passing the
 returned state back in each time; Bayesilisk holds no session.
 
-Determinism: no clocks or RNG; ids derive from content hashes; fingerprints are
-sorted. Convergence: stop after `maxDryRounds` consecutive rounds with no new
-verified ready-for-issue fingerprint, or when `maxRounds` is reached.
+Model exploration is optional. Admission and verification are deterministic for
+recorded inputs; ids derive from content hashes. A new executed procedure or
+verified finding counts as progress, with bounded dry rounds and a round cap.
 """
 
 from __future__ import annotations
@@ -25,8 +25,9 @@ from .connector_orchestration import (
     verify_connector_outputs,
 )
 from .connector_scan import scan_openapi
+from .config import effective_runtime_config
+from .connector_exploration import remember_executions
 from .motifs import available_motifs, bind_motifs
-from .probe_proposals import generate_probe_proposals
 from .utils import _safe_hash
 
 DEFAULT_MAX_ROUNDS = 6
@@ -56,6 +57,9 @@ def init_state(*, max_rounds: int = DEFAULT_MAX_ROUNDS, max_dry_rounds: int = DE
         "dryRounds": 0,
         "maxRounds": max(1, int(max_rounds)),
         "maxDryRounds": max(1, int(max_dry_rounds)),
+        "explorationMemory": {"retainedSequences": [], "attempts": [], "rejections": []},
+        "executionHistory": [],
+        "runtimeOptions": {},
     }
 
 
@@ -86,9 +90,20 @@ def advance(
     max_rounds: int | None = None,
     max_dry_rounds: int | None = None,
     seed: int = 150,
+    runtime_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Advance the loop one step. Pure: returns a fresh state + the step outputs."""
+    """Advance the loop with copied state and optional model calls."""
     state = copy.deepcopy(state) if state else init_state()
+    options = {**state.get("runtimeOptions", {}), **(runtime_config or {})}
+    state["runtimeOptions"] = {key: value for key, value in options.items()
+                               if key in effective_runtime_config({}) and key != "scenarioApiKey"}
+    state.setdefault("explorationMemory", {"retainedSequences": [], "attempts": [], "rejections": []})
+    state.setdefault("executionHistory", [])
+    if state.get("sourceContext") and isinstance(source_context, dict):
+        supplied_hash = _safe_hash(source_context)
+        if supplied_hash not in {state.get("sourceInputHash"), _safe_hash(state["sourceContext"])}:
+            state["phase"] = BLOCKED
+            return _result(state, "Source contract changed; start a new loop state before executing new scenarios.")
     if max_rounds is not None:
         state["maxRounds"] = max(1, int(max_rounds))
     if max_dry_rounds is not None:
@@ -103,13 +118,27 @@ def advance(
         motifs = available_motifs(license_token=license_token, extra_packs=packs)
         bound = bind_motifs(context, motifs)
         validation = validate_source_context(bound)
-        proposals = generate_probe_proposals(bound)
+        if not validation["accepted"]:
+            state["phase"] = BLOCKED
+            return _result(state, "Source context was rejected: " + "; ".join(validation["errors"]),
+                           sourceValidation=validation, proposals=[])
         prov = local_provenance(bound)
         if not prov["validation"]["accepted"]:
             state["phase"] = BLOCKED
             return _result(state, "Local provenance was rejected: " + "; ".join(prov["validation"]["errors"][:5]))
-        plan = scenario_plan({"provenance": prov["provenance"], "sourceContext": bound})
+        plan = scenario_plan({**options, "provenance": prov["provenance"], "sourceContext": bound,
+                              "explorationMemory": state["explorationMemory"]})
+        if not plan["validation"]["accepted"]:
+            state["phase"] = BLOCKED
+            return _result(state, "; ".join(plan["validation"]["errors"]), scenarioPlan=plan["scenarioPlan"])
+        proposals = plan["scenarioPlan"]["acceptedScenarios"]
+        if not proposals:
+            state["phase"] = BLOCKED
+            state["explorationMemory"]["rejections"] = plan["scenarioPlan"]["rejectedScenarios"]
+            return _result(state, "No admissible scenarios; review the proposer diagnostics or connector goals.",
+                           scenarioPlan=plan["scenarioPlan"])
         state["sourceContext"] = bound
+        state["sourceInputHash"] = _safe_hash(context)
         state["boundContext"] = bound
         state["provenance"] = prov["provenance"]
         state["scenarioPlan"] = plan["scenarioPlan"]
@@ -127,6 +156,7 @@ def advance(
             boundMotifCount=len(motifs),
             proposals=proposals,
             sourceValidation=validation,
+            scenarioPlan=plan["scenarioPlan"],
         )
 
     # Phase 2: we have a source context; we need observed evidence to advance.
@@ -157,6 +187,12 @@ def advance(
         )
 
     report = result.get("report") or {}
+    retained_before = len(state["explorationMemory"]["retainedSequences"])
+    state["explorationMemory"] = remember_executions(state["explorationMemory"], state["scenarioPlan"], observed_context)
+    new_retained = len(state["explorationMemory"]["retainedSequences"]) - retained_before
+    state["executionHistory"] = [*state["executionHistory"],
+                                 *[fact for fact in observed_context.get("repositoryFacts", [])
+                                   if isinstance(fact, dict) and isinstance(fact.get("passed"), bool)]][-100:]
     payload_by_fingerprint = {p.get("fingerprint"): p for p in result.get("issuePayloads", []) if isinstance(p, dict)}
     seen = set(state["seenFingerprints"])
     new_findings = [f for f in _ready_findings(report) if f.get("fingerprint") and f["fingerprint"] not in seen]
@@ -182,7 +218,7 @@ def advance(
             {"verifiedReport": report, "issuePayloads": result.get("issuePayloads", []), "provenance": state["provenance"]}
         ).get("fixPacket")
     else:
-        state["dryRounds"] += 1
+        state["dryRounds"] = 0 if new_retained else state["dryRounds"] + 1
 
     converged = state["dryRounds"] >= state["maxDryRounds"] or state["round"] >= state["maxRounds"]
     if converged:
@@ -203,6 +239,16 @@ def advance(
             "No new findings this round. Expand probe coverage or fixtures, re-execute, and re-run the loop "
             "with the new observed-context.json."
         )
+    if not converged:
+        next_plan = scenario_plan({
+            **options, "sourceContext": state["sourceContext"], "provenance": state["provenance"],
+            "explorationMemory": state["explorationMemory"], "executionHistory": state["executionHistory"],
+        })
+        if not next_plan["validation"]["accepted"]:
+            state["phase"] = BLOCKED
+            next_action = "; ".join(next_plan["validation"]["errors"])
+        else:
+            state["scenarioPlan"] = next_plan["scenarioPlan"]
     return _result(
         state,
         next_action,
@@ -211,4 +257,7 @@ def advance(
         fixPacket=fix,
         issuePayloads=state["issuePayloads"],
         newFindingCount=len(new_findings),
+        proposals=state["scenarioPlan"]["acceptedScenarios"] if state["phase"] not in {BLOCKED, CONVERGED} else [],
+        scenarioPlan=state["scenarioPlan"],
+        retainedSequenceCount=len(state["explorationMemory"]["retainedSequences"]),
     )

@@ -207,6 +207,27 @@ deterministic verification over it.
 See [docs/connector-quickstart.md](docs/connector-quickstart.md) and
 [docs/connectors.md](docs/connectors.md).
 
+### Model-Guided ABAG Exploration
+
+The connector-aware model proposer receives the application's typed action
+graph, goals and instructions. It can explore alternative paths and reuse
+execution-checked sequences. Every proposed path passes deterministic token,
+binding and goal validation before the connector executes it. Connector-specific
+subspace attention and execution feedback guide subsequent exploration.
+
+```sh
+bayesilisk connector propose examples/calcom/sequence-source-context.json \
+  --enable-scenario-proposer --scenario-model qwen2.5-coder:3b \
+  --enable-embeddings --embedding-model nomic-embed-text \
+  --output proposals.json --plan-output scenario-plan.json
+# Execute proposals.json with the application-specific connector, then:
+bayesilisk connector verify --plan scenario-plan.json --observed observed-context.json
+```
+
+Models are selected from your configured provider; install/select models locally
+before using the example. For provider setup, external-agent drafts, library
+growth and replay checks, see [docs/connector-exploration.md](docs/connector-exploration.md).
+
 ### Scan, Bind Motifs, And Loop
 
 To generate probes from an app surface instead of hand-writing all
@@ -225,10 +246,11 @@ bayesilisk connector loop --state loop.json --spec openapi.json
 bayesilisk connector loop --state loop.json --observed observed-context.json
 ```
 
-The closed loop performs deterministic steps only:
+The closed loop performs deterministic admission and verification, with optional
+model-guided exploration:
 
 ```text
-scan -> bind -> validate -> verify -> fix
+scan -> bind -> propose -> validate -> execute hand-off -> verify -> retain -> replan
 ```
 
 It tracks convergence and returns the exact next action for the connector or

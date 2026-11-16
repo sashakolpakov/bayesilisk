@@ -9,6 +9,7 @@ from typing import Any, BinaryIO
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from bayesilisk.config import effective_runtime_config  # type: ignore[no-redef]
+    from bayesilisk.connector_exploration import explore_connector  # type: ignore[no-redef]
     from bayesilisk.connector_orchestration import (  # type: ignore[no-redef]
         connector_prompt_packet,
         connector_quickstart,
@@ -33,6 +34,7 @@ if __package__ in {None, ""}:
     )
 else:
     from .config import effective_runtime_config
+    from .connector_exploration import explore_connector
     from .connector_loop import advance as loop_advance
     from .connector_orchestration import (
         connector_prompt_packet,
@@ -75,6 +77,8 @@ RUNTIME_CONFIG_SCHEMA: dict[str, Any] = {
     "scenarioModel": {"type": "string", "default": "gemma4:e2b"},
     "scenarioProposalLimit": {"type": "integer", "default": 3},
     "scenarioProvider": {"type": "string", "default": "ollama"},
+    "scenarioTimeout": {"type": "number", "default": 45},
+    "scenarioMaxAttempts": {"type": "integer", "minimum": 1, "maximum": 3, "default": 2},
 }
 
 TOOLS: tuple[dict[str, Any], ...] = (
@@ -126,12 +130,16 @@ TOOLS: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "propose_probes",
-        "description": "Expand context-supplied connector proposal rules and action graphs into app-agnostic probe proposals.",
+        "description": "Explore the connector's ABAG with deterministic rules and optional LLM token-sequence proposals, validated before execution. Returns attention, model diagnostics and a proposal prompt for external agents.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "context": {"type": "object"},
                 "limit": {"type": ["integer", "null"], "default": 24},
+                "draftPlan": {"type": "object"},
+                "explorationMemory": {"type": "object"},
+                "executionHistory": {"type": "array"},
+                **RUNTIME_CONFIG_SCHEMA,
             },
         },
     },
@@ -174,6 +182,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "license": {"type": "string"},
                 "maxRounds": {"type": "integer"},
                 "maxDryRounds": {"type": "integer"},
+                **RUNTIME_CONFIG_SCHEMA,
             },
         },
     },
@@ -234,6 +243,9 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "limit": {"type": "integer", "default": 24},
                 "provenance": {"type": "object"},
                 "sourceContext": {"type": "object"},
+                "explorationMemory": {"type": "object"},
+                "executionHistory": {"type": "array"},
+                **RUNTIME_CONFIG_SCHEMA,
             },
             "required": ["provenance", "sourceContext"],
         },
@@ -399,8 +411,17 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
             limit = arguments.get("limit", 24)
             if limit is not None:
                 limit = int(limit)
-            proposals = generate_probe_proposals(context, limit=limit or 24)
+            draft = arguments.get("draftPlan")
+            if "draftPlan" in arguments and (not isinstance(draft, dict) or not isinstance(draft.get("scenarios"), list)):
+                raise ValueError("draftPlan must contain a scenarios array")
+            exploration = explore_connector(
+                context, limit=24 if limit is None else max(0, limit), runtime_config=arguments,
+                drafts=draft["scenarios"] if draft is not None else None,
+                memory=arguments.get("explorationMemory"), history=arguments.get("executionHistory"),
+            )
+            proposals = exploration["proposals"]
             payload = {
+                **exploration,
                 "proposalCount": len(proposals),
                 "proposals": proposals,
                 "tool": VERSION,
@@ -438,6 +459,7 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
                 license_token=arguments.get("license"),
                 max_rounds=arguments.get("maxRounds"),
                 max_dry_rounds=arguments.get("maxDryRounds"),
+                runtime_config={key: arguments[key] for key in RUNTIME_CONFIG_SCHEMA if key in arguments},
             )
         elif name == "connector_quickstart":
             payload = connector_quickstart(arguments)
