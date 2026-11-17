@@ -204,7 +204,12 @@ The `bayesilisk-demo` command serves a local brittle workflow app and prints the
 
 ## Grassmann attention
 
-Contextual reports also include a bounded Grassmann-style attention layer. It is modeled after the practical Cage pattern: extract local context-plane anchors, score overlap/coupling, and use that score to direct the next exploration step. Bayesilisk keeps the default implementation transparent and dependency-free by using an anchor-plane proxy. If `BAYESILISK_USE_OLLAMA_EMBEDDINGS=1` is set, it also calls Ollama `/api/embed` with `BAYESILISK_OLLAMA_MODEL` defaulting to `nomic-embed-text`, normalizes the returned vectors, and adds `embeddingSimilarity` as another plane signal.
+Connector exploration uses orthonormal subspace projection over the connector's
+own goals, with coverage and execution feedback; see {doc}`connector-exploration`.
+The catalog report path described in this section uses a separate attention
+implementation and fragment-based proposer.
+
+Catalog contextual reports also include a bounded Grassmann-style attention layer. It is modeled after the practical Cage pattern: extract local context-plane anchors, score overlap/coupling, and use that score to direct the next exploration step. Bayesilisk keeps the default implementation transparent and dependency-free by using an anchor-plane proxy. If `BAYESILISK_USE_OLLAMA_EMBEDDINGS=1` is set, it also calls Ollama `/api/embed` with `BAYESILISK_OLLAMA_MODEL` defaulting to `nomic-embed-text`, normalizes the returned vectors, and adds `embeddingSimilarity` as another plane signal.
 
 The attention loop uses:
 

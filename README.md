@@ -62,7 +62,9 @@ Models may help propose where to look. They do not decide pass/fail, issue
 readiness, or truth.
 
 See [docs/architecture.md](docs/architecture.md) and the
-[manuscript](manuscript/main.tex) ([PDF](manuscript/main.pdf)).
+[manuscript](manuscript/main.tex) ([PDF](manuscript/main.pdf));
+[submission build instructions](manuscript/README.md) include the validated
+arXiv source archive.
 
 ## Quick Start
 
@@ -467,8 +469,11 @@ propose candidate scenarios, but they remain untrusted inputs.
 
 ### Grassmann Attention
 
-By default Bayesilisk uses a dependency-free anchor-plane proxy. To add Ollama
-embeddings:
+Connector exploration computes orthonormal subspace projection over
+connector-defined goals, with coverage and execution feedback. The separate
+built-in catalog path uses a dependency-free anchor-plane proxy. See
+[connector exploration](docs/connector-exploration.md) for the geometric score
+and full-ABAG model workflow. To add Ollama embeddings to catalog attention:
 
 ```sh
 BAYESILISK_USE_OLLAMA_EMBEDDINGS=1 \

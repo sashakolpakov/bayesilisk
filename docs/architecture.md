@@ -43,7 +43,14 @@ That evidence becomes context. It does not become proof by itself.
 
 ## Grassmann Attention
 
-The Grassmann layer is an attention router. It builds local context planes from Playwright observations, route names, actors, modules, tenant facts, issue text, scenario fragments, and invariant descriptions.
+The Grassmann layer is an attention router. Connector exploration constructs an
+orthonormal basis from each goal's descriptions, state requirements and typed
+bindings, then computes squared projection of a normalized context vector.
+Coverage and failure density supply separate bounded terms. The catalog report
+path retains an anchor-plane proxy. See {doc}`connector-exploration` for the
+implemented connector score and its evaluation limits.
+
+The catalog path builds local context planes from Playwright observations, route names, actors, modules, tenant facts, issue text, scenario fragments, and invariant descriptions.
 
 Attention answers:
 

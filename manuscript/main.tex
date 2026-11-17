@@ -21,13 +21,13 @@
 Beyond E2E Scripts: Using LLM-Proposed Scenarios \\
 Without Letting the LLM Be the Oracle}
 \author{Alexander Kolpakov\footnote{corresponding author; e-mail address: akolpakov@uaustin.org; postal address: University of Austin, 522~Congress Street, Austin TX, 78701 USA}}
-\date{\today}
+\date{November 16, 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Large language models can enlarge the scenario space explored by end-to-end tests, but they are unsafe as test oracles: they can invent impossible states, misread application semantics, and overstate weak evidence. Bayesilisk separates scenario proposal from verification. App-specific connectors publish a bounded search surface consisting of routes, actions, identifiers, state facts, invariants, and executable probe hooks. The Bayesilisk core expands that surface into candidate scenarios, validates their structure and declared dependencies, and verifies connector-returned evidence against explicit invariants. Grassmann-style attention guides exploration of the built-in invariant catalog; a Bayesian score orders evaluated catalog findings. The same boundary supports coding-agent assistance: agents may draft connector context, action mappings, and repair briefs, but observations must come from execution and issue readiness from verification. Reusable typed motifs provide a category-theoretic interpretation of workflow composition. A deterministic OpenAPI scanner drafts part of the search surface, and a stateless controller coordinates motif binding, verification, and repair hand-offs until a bounded stopping criterion is met.
+Large language models can enlarge the scenario space explored by end-to-end tests, but they are unsafe as test oracles: they can invent impossible states, misread application semantics, and overstate weak evidence. Bayesilisk separates scenario proposal from verification. App-specific connectors publish a bounded search surface consisting of routes, actions, identifiers, state facts, invariants, and executable probe hooks. The Bayesilisk core expands that surface into candidate scenarios, validates their structure and declared dependencies, and verifies connector-returned evidence against explicit invariants. Connector-goal attention uses orthonormal subspace projection to guide optional full-graph LLM exploration; a separate catalog attention path and Bayesian score guide catalog search and triage. The same boundary supports coding-agent assistance: agents may draft connector context, action mappings, and repair briefs, but observations must come from execution and issue readiness from verification. Reusable typed motifs provide a category-theoretic interpretation of workflow composition. A deterministic OpenAPI scanner drafts part of the search surface, and a stateless controller coordinates motif binding, proposal admission, execution-receipt checking, procedure retention, and repair hand-offs until a bounded stopping criterion is met.
 
 This paper gives a compact formal model for that loop and reports a Cal.com case study at a fixed May 2026 revision. From connector-declared route facts and a typed Abstract Bayesilisk Action Graph (ABAG), Bayesilisk generated seven probes. All of them returned deterministic expected-vs-observed violations. One upstream report has a targeted fix pull request that identifies the root cause and adds a regression Playwright test; an independent human reviewer approved that fix.
 \end{abstract}
@@ -56,9 +56,10 @@ connector for an application exposes context and executable hooks; it does not
 own the scenario search strategy. The \tool core generates candidate scenarios
 from the declared surface, validates candidates against the connector contract,
 asks the connector to execute them, and verifies returned evidence against
-explicit invariants. Attention guides catalog exploration, and Bayesian scores
-order evaluated catalog findings; connector route and sequence proposals are
-expanded in deterministic declaration order.
+explicit invariants. Attention guides connector-goal and catalog exploration, and Bayesian scores
+order evaluated catalog findings. Deterministic connector expansion remains
+available; optional model proposals explore alternative ABAG paths under the
+same declared contract.
 
 The workflow form of this boundary is an Abstract Bayesilisk Action Graph
 (ABAG). In an ABAG, \tool sees typed abstract tokens such as
@@ -113,7 +114,7 @@ There are five important questions to be answered about \tool, including its arc
 \textbf{Who generates scenarios?} The connector declares the app-specific search
 surface: routes, actions, identifiers, state facts, invariants, and valid
 mutation or action schemas. For workflow probes, it declares a typed ABAG:
-actions, abstract token preconditions, abstract token products, state
+actions, abstract token preconditions, abstract token products, initial tokens, state
 requirements, and connector refinements. \tool generates concrete candidate
 scenarios from that declared surface, optionally using LLM proposals as
 additional candidate ideas. The connector does not enumerate final tests.
@@ -182,9 +183,10 @@ validation.
 For longer workflows, \tool uses a typed Abstract Bayesilisk Action Graph
 (ABAG)
 \[
-  G = (A,T,\operatorname{req},\operatorname{prod},\operatorname{bind}),
+  G = (A,T,\operatorname{req},\operatorname{prod},\operatorname{bind},S_0),
 \]
-where \(A\) is the connector action set and \(T\) is a set of typed tokens. A
+where \(A\) is the connector action set, \(T\) is a set of typed tokens, and
+\(S_0\subseteq T\) contains connector-declared initial tokens (empty by default). A
 token \(\tau \in T\) has three relevant fields:
 \[
   \tau = (u,c,\rho).
@@ -199,6 +201,8 @@ app-specific adaptor vocabulary:
   \item \(\rho\) is an optional concrete connector refinement, for example
         \texttt{booking.uid} or \texttt{user.username}.
 \end{itemize}
+In the serialized connector contract, \(u\), \(c\), and \(\rho\) are named
+\texttt{token}, \texttt{resourceType}, and \texttt{refines}, respectively.
 The abstract key used by the \tool core is
 \[
   \kappa(\tau) = (u,c).
@@ -222,22 +226,46 @@ is valid for a terminal goal action \(a_k\) only if
   \forall t \in \{1,\ldots,k\}:
   \bigcup_{\tau\in\operatorname{req}(a_t)} K(\tau)
   \subseteq
-  \bigcup_{j<t}\ \bigcup_{\tau\in\operatorname{prod}(a_j)} K(\tau),
+  \left(\bigcup_{\tau\in S_0}K(\tau)\right)\cup
+  \left(\bigcup_{j<t}\ \bigcup_{\tau\in\operatorname{prod}(a_j)} K(\tau)\right),
   \qquad k \le d_{\max}.
 \]
 Goal parameter bindings are also typed. If a terminal action has a parameter
 \(p\), then \(\operatorname{bind}(a_k,p)=\tau\) means that \tool may bind
-\(p\) to previously produced tokens satisfying \(K(\tau)\).
+\(p\) to initially available or previously produced tokens satisfying \(K(\tau)\).
+A rule additionally requires its declared state tokens before the terminal
+action. Parameter bindings must have a matching typed token witness; when a
+concrete refinement is declared, that same witness must carry it. Abstract
+dependency matching alone does not establish the availability of a concrete handle.
 If \(\rho\) is present, \tool emits it in the generated proposal so the
 connector can look up the concrete value. Thus \tool may reason over
 \texttt{resource.public\_id}/\texttt{booking}, while the Cal.com connector
 executes with \texttt{booking.uid}. This is the central refinement boundary:
 Bayesilisk composes and validates over abstract tokens; the connector/adaptor
-executes concrete app operations through refinements. The current sequence
+executes concrete app operations through refinements. The deterministic sequence
 builder selects the first declared producer for each missing dependency and
 topologically orders the selected actions. It emits at most one sequence per
 rule, subject to depth and proposal-count limits; it does not enumerate all
 valid paths through \(G\).
+
+The optional model path searches beyond this first-producer construction. Its
+instructions are assembled from the complete connector-declared ABAG, sequence
+rules, initial tokens, connector instructions, attention telemetry, deterministic
+reference paths, and bounded execution/rejection history. The full graph remains
+visible, including actions that are not initially executable. The model returns
+ordered action identifiers and a declared rule identifier; it cannot supply new
+invariants, expectations, observations, or verdicts. Initially executable actions
+are identified as guidance, not used to prune the graph.
+
+The admission gate walks that proposed order without repairing it. It checks
+action and rule membership, typed dependencies at each prefix, the terminal
+action, required goal state, concrete parameter witnesses, depth and proposal
+limits, and duplicate proposals. Action signatures and bindings are filled from
+the contract; attempts to override them are rejected. Admitted paths receive a
+stable proposal identifier and contract hash. Up to three configured model
+attempts can use deterministic rejection diagnostics, including missing tokens
+and currently executable actions. A weak model may still fail; admission does
+not imply that the proposer can solve every graph.
 
 This makes the reusable unit a graph motif rather than an app noun. The same
 abstract sequence
@@ -300,6 +328,16 @@ binding still requires a connector-declared action graph, and concrete
 parameter names and fixture values require application-specific adaptation.
 The core pack includes unknown, foreign, and wrong-parent identifiers,
 cancelled-state replay, superseded tokens, and missing sub-resource references.
+These stored motif templates are distinct from retained executed procedures.
+The model-guided loop retains an admitted procedure only after accepted
+observations identify its proposal and give its complete ordered action receipt.
+Both passing and failing procedures can be retained; duplicate receipts do not
+increase execution counts. Later proposals may name a retained procedure as a
+block. Admission expands the block, revalidates its contract and bindings, and
+checks the whole composed path. A changed graph or connector version invalidates
+the retained entry. These are receipt-backed reusable paths, not learned
+correctness assertions.
+
 The retained Cal.com evidence below directly supports unknown/stale identifier
 handling and cancelled-booking replay; it does not validate every motif in the
 pack. Packs may be distributed as an open core or as optional signed, licensed
@@ -312,18 +350,40 @@ descriptions and observations define local subspaces in a feature space. For an
 invariant plane \(P_i\) and context vector \(q\), a Grassmannian proximity score
 can be written as
 \[
-  \gamma_i(q) = \|\Pi_{P_i} q\|_2^2,
+  \gamma_i(q) = \|\Pi_{P_i} \widehat q\|_2^2,
 \]
-where \(\Pi_{P_i}\) projects \(q\) onto the invariant plane. This follows the
+where \(\widehat q\) is the normalized context vector and
+\(\Pi_{P_i}\) projects onto the invariant plane. This follows the
 standard geometric view of subspaces on Grassmann manifolds~\cite{edelman1998geometry}.
 
-However, \(\gamma_i(q)\) is only an ideal geometric score. The current
-implementation does not compute this projection directly. Instead, it uses an
-interpretable bounded anchor-plane proxy, \(\alpha_i\), whose novelty term can
-include embedding similarity to the same invariant-plane anchors. Thus
-\(\alpha_i\) is the operational attention score used for ranking planes in the
-current artifact, while \(\gamma_i\) describes the intended Grassmannian
-interpretation. For each invariant~\(i\), \tool computes
+For connector exploration, this projection is implemented directly. Each goal
+invariant receives anchor vectors from its rule title, expected-behavior
+description, required states, and typed goal bindings. The query combines
+connector instructions, exploration focus, agent notes, and failure details.
+Modified Gram--Schmidt with reorthogonalization produces an orthonormal basis
+\(U_i\); with normalized query \(\widehat q\), the score is
+\[
+  \gamma_i(q)=\|U_i^\top\widehat q\|_2^2\in[0,1].
+\]
+Zero anchor residuals are discarded, and a zero query gives zero projection.
+Vectors use deterministic
+hashed text features by default or an optional Ollama embedding model; provider
+failures are exposed in telemetry and fall back to local features. With
+\(T_i\) recorded observations, \(F_i\) failures, and fixed/muted decay \(d_i\),
+connector attention is
+\[
+  \beta_i=\operatorname{clip}_{[0,1]}
+  \left(0.45\gamma_i(q)+\frac{0.35}{1+T_i}+0.20 f_i-d_i\right),
+  \quad
+  f_i=\begin{cases}F_i/T_i&T_i>0,\\0&T_i=0.\end{cases}
+\]
+The highest-scoring goal invariants enter the exploration prompt. This is
+subspace-based routing over connector-defined goals, not a verifier result or
+a demonstrated improvement over simpler scheduling baselines.
+
+The separate built-in catalog path retains its bounded anchor-plane proxy
+\(\alpha_i\), whose novelty term can include embedding similarity. It does not
+use the connector projection implementation. For each invariant~\(i\), \tool computes
 \[
   \alpha_i =
   \operatorname{clip}_{[0,1]}
@@ -337,7 +397,7 @@ with current weights
 \]
 The variables are computed directly from context facts. The notation is:
 \(P_i\) is the invariant plane; \(q\) is the context vector; \(\Pi_{P_i}\) is
-projection onto \(P_i\); \(\gamma_i(q)\) is ideal Grassmann proximity;
+projection onto \(P_i\); \(\gamma_i(q)\) is connector subspace proximity;
 \(\alpha_i\) is the operational attention score; \(T_i\) is the number of facts
 whose \texttt{invariantId} is \(i\); \(F_i\) is the number of those facts that
 fail; \(N_i^{PW}\) is the number of those facts whose source is
@@ -375,13 +435,13 @@ pass/fail verification. Then
   \qquad
   p_i=\min(1,N_i^{PW}/\tau_P).
 \]
-The current attention loop evaluates the built-in invariant catalog. The
+This catalog attention loop evaluates the built-in invariant catalog. The
 sensitivity \(\sigma_i\) is read from the
 \texttt{INVARIANT\_SENSITIVITY} table maintained by the \tool authors in the
 core configuration. It encodes how sensitive an invariant plane is considered
 for search prioritization. A catalog invariant absent from that table receives
-the neutral default \(0.5\). External connector invariant ids are not added to
-the attention planes. The novelty term is
+the neutral default \(0.5\). External connector invariant ids use the separate connector-goal attention
+path above rather than being added to the catalog planes. The novelty term is
 \[
   n_i=\max(\min(1,K_i/\tau_K),E_i),
 \]
@@ -517,7 +577,11 @@ Only \(\Fail\) with evidence becomes an issue-ready finding. \(\Invalid\) is a
 connector/proposer diagnostic. In the connector-verification interface, the
 required observation fields include integer statuses, a Boolean
 \texttt{passed} equal to their comparison, execution-source metadata, and
-artifact references. These checks establish structural consistency; they do
+artifact references. For planned workflows, observations must also identify the proposal and
+provide an ordered \texttt{executedActions} receipt matching the admitted path.
+Verification revalidates saved plans against the source contract, including
+bindings and expectations, rather than trusting editable origin labels.
+These checks establish structural consistency of submitted records; they do
 not independently attest that an execution occurred or that its expected status
 is the correct application specification.
 
@@ -561,11 +625,12 @@ applicability and implement the concrete actions.
 The stateless loop controller accepts this draft or a supplied source context,
 binds motifs, returns source-validation diagnostics and proposals, and requests
 connector execution. On later calls it validates observations, builds reports,
-accumulates issue-ready fingerprints, and produces repair briefs. Connector
+accumulates issue-ready fingerprints, retains receipt-backed model procedures,
+and produces repair briefs. Connector
 implementation, execution, and application of repairs remain external steps.
 The caller persists the returned state between calls. Invalid observations
-block a round; accepted rounds stop when \(K\) consecutive rounds add no new
-issue-ready fingerprint (default \(K=2\)) or the round limit is reached
+block a round; accepted rounds stop when \(K\) consecutive rounds add neither a new
+issue-ready fingerprint nor a newly executed retained procedure (default \(K=2\)) or the round limit is reached
 (default six). The phase name \texttt{converged} denotes this stopping rule:
 repeated evidence for an unresolved finding can satisfy it, so it does not
 establish that all defects have been repaired. The controller coordinates the
@@ -801,9 +866,11 @@ while still letting the generated proposal be executable.
 
 \textbf{Bounded workflow generation.} Sequence generation is governed by the
 connector-declared action graph, sequence rules, depth bound, and proposal
-limit. The current builder greedily selects producers without backtracking.
-Additional actions and rules can expose more workflows, but the builder offers
-no completeness guarantee over the valid paths through the graph.
+limit. The deterministic builder greedily selects producers without backtracking;
+the optional model proposer can explore alternative producers and compositions
+over the full graph. Both paths are bounded and offer no completeness guarantee
+over valid workflows. The current case study predates the model-guided connector
+loop and does not evaluate its incremental coverage or retained-procedure reuse.
 
 \textbf{Oracle scope.} The deterministic oracle is only as good as the supplied
 ruleset. \tool prevents the LLM from being the oracle; it does not remove the
@@ -812,6 +879,14 @@ expected statuses must be checked against the application's specification.
 The current status verifier compares one expected integer with one observed
 integer; alternative statuses recorded in motif metadata are not automatically
 accepted.
+
+\textbf{Execution boundary.} The implementation admits test plans and validates
+caller-supplied execution receipts; it is not a runtime authorization controller.
+Complete mediation of effectful calls, independently observed concrete effects,
+and explicit token revocation or consumption semantics would be additional
+requirements. Accumulated ABAG tokens alone establish neither intermediate
+application semantics nor object identity, and the artifact is not an end-to-end
+safety proof.
 
 \textbf{Baseline interpretation.} The retained Cal.com artifact establishes
 seven generated, executed probes and their status mismatches at one fixed
@@ -823,25 +898,19 @@ establish an incremental coverage benefit from LLM proposals.
 
 \section{Future Work}
 
-Two next steps would make the ranking layer more mathematically grounded while
-preserving the same trust boundary: attention and probability may guide search,
-but they must not become the oracle.
+Further evaluation should measure exploration and ranking while preserving the
+same trust boundary: attention and probability guide search; deterministic
+contract rules and submitted evidence determine verification results.
 
-\textbf{Actual Grassmann attention.} The current implementation uses
-\(\alpha_i\), a bounded anchor-plane proxy for the ideal Grassmannian score
-\(\gamma_i(q)\). A fuller version should construct an explicit feature vector
-\(q\) for each connector context and an orthonormal basis \(U_i\) for each
-invariant subspace \(P_i\). The operational attention score could then be the
-projection energy
-\[
-  \gamma_i(q)=\|U_i^\top q\|_2^2,
-\]
-or a related Grassmann distance based on principal angles between the context
-subspace and invariant subspace. The basis vectors can be built from invariant
-text, connector-declared routes/actions, nearby tests, execution evidence, and
-validated historical findings. This would replace the current hand-weighted
-proxy as the main exploration router, while leaving deterministic verification
-unchanged~\cite{edelman1998geometry}.
+\textbf{Attention and exploration evaluation.} Connector subspace projection
+and full-ABAG model exploration are implemented, but their measured advantage
+remains open. Matched-budget comparisons should separate geometric attention
+from coverage-only scheduling and ordinary embedding similarity, and compare
+model-proposed paths with deterministic producer selection. Retained procedures
+also need evaluation for useful composition, repeated failures, stale contracts,
+and provider dependence. The fixed Cal.com artifact is not an experiment
+on these later mechanisms. Stronger runtime enforcement would require the
+additional execution semantics described above.
 
 \textbf{Calibrated likelihoods.} The current artifact uses invariant-level
 ranking constants \(L_i^{fail}\) and \(L_i^{pass}\). A stronger version should
@@ -884,6 +953,10 @@ supports reuse across apps and coordinates bounded scan--verify--repair rounds
 with external execution and repair. The next
 research step is to repeat this artifact discipline across additional
 applications while keeping the \tool core app-agnostic.
+
+\section*{Acknowledgments}
+
+GPT-6.1-sol assisted with coding and manuscript editing.
 
 \section*{Funding}
 
